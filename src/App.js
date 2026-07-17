@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import { CustomerProvider } from './contexts/CustomerContext';
 import Navbar from './components/Navbar';
 import PrivateRoute from './components/PrivateRoute';
 import './index.css';
@@ -14,6 +13,7 @@ import ProductPage from './pages/customer/ProductPage';
 import AboutPage from './pages/customer/AboutPage';
 import ContactPage from './pages/customer/ContactPage';
 import ServicesPage from './pages/customer/ServicesPage';
+import CustomerRegister from './pages/customer/CustomerRegister';
 
 // Admin Pages
 import Login from './pages/Login';
@@ -27,12 +27,13 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <CustomerProvider>
           <Navbar />
           <Routes>
             {/* Customer Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/customer/login" element={<CustomerLogin />} />
+            <Route path="/customer/register" element={<CustomerRegister />} />
+
             <Route path="/customer/dashboard" element={<CustomerDashboard />} />
             <Route path="/customer/products" element={<ProductPage />} />
             <Route path="/customer/about" element={<AboutPage />} />
@@ -71,7 +72,6 @@ function App() {
             
             <Route path="*" element={<Navigate to="/" />} />
           </Routes>
-        </CustomerProvider>
       </AuthProvider>
     </Router>
   );
