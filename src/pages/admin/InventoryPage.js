@@ -5,7 +5,12 @@ import { Link } from 'react-router-dom';
 
 function InventoryPage() {
   const [products, setProducts] = useState([]);
-  const [newProduct, setNewProduct] = useState({ name: '', quantity: '', price: '' });
+  const [newProduct, setNewProduct] = useState({
+  name: '',
+  category: '',  // ✅ Add this
+  quantity: '',
+  price: ''
+});
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -24,6 +29,7 @@ function InventoryPage() {
       console.error('Error loading products:', error);
     }
   };
+  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -32,6 +38,7 @@ function InventoryPage() {
       await addDoc(collection(db, 'inventory'), {
         name: newProduct.name,
         quantity: parseInt(newProduct.quantity),
+        category: newProduct.category, 
         price: parseFloat(newProduct.price)
       });
       setNewProduct({ name: '', quantity: '', price: '' });
@@ -103,6 +110,21 @@ function InventoryPage() {
                   />
                 </div>
               </div>
+              <div className="mb-4">
+  <label className="block text-gray-700 font-medium mb-2">Category</label>
+  <select
+    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+    value={newProduct.category}
+    onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+    required
+  >
+    <option value="">Select Category</option>
+    <option value="Women">Women</option>
+    <option value="Men">Men</option>
+    <option value="Kids">Kids</option>
+    <option value="Accessories">Accessories</option>
+  </select>
+</div>
               <button
                 type="submit"
                 disabled={loading}
@@ -112,6 +134,7 @@ function InventoryPage() {
               </button>
             </form>
           </div>
+          
 
           {/* Product List */}
           <div className="bg-white rounded-2xl shadow p-6">

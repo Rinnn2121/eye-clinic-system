@@ -29,9 +29,7 @@ function ProductPage() {
       <div className="max-w-6xl mx-auto p-4">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-3xl font-bold text-gray-800">👓 Our Products</h1>
-          <Link to="/customer/dashboard" className="text-blue-600 hover:underline">
-            ← Back to Dashboard
-          </Link>
+          
         </div>
         
         {loading ? (
@@ -55,9 +53,6 @@ function ProductPage() {
                   <p className="text-gray-500 text-sm mt-1">{product.category || 'Eyewear'}</p>
                   <div className="mt-4 flex justify-between items-center">
                     <span className="text-2xl font-bold text-blue-600">₱{product.price}</span>
-                    <span className={`text-sm px-2 py-1 rounded-full ${product.quantity > 10 ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>
-                      Stock: {product.quantity}
-                    </span>
                   </div>
                   <button className="w-full mt-4 bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 transition-colors">
                     Inquire

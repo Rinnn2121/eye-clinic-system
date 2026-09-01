@@ -37,6 +37,13 @@ function Navbar() {
     };
   }, [prevScrollPos]);
 
+    const getDashboardUrl = () => {
+      if (userRole === 'admin') {
+        return '/admin/dashboard';
+      }
+      return '/customer/dashboard';
+    };
+
   return (
     <nav 
       className={`bg-[#4A90E2]/40 backdrop-blur-sm shadow-md sticky top-0 z-50 transition-transform duration-300 ${
@@ -89,19 +96,10 @@ function Navbar() {
             <div className="flex items-center space-x-3">
               {currentUser ? (
                 <>
-                  {(userRole === 'admin' || userRole === 'staff') && (
-                    <Link 
-                      to="/admin/dashboard" 
-                      className="text-gray-700 hover:text-[#4A90E2] transition-colors text-sm font-medium"
-                    >
-                      Dashboard
-                    </Link>
-                  )}
-                  
                   <Link 
-                    to="/customer/dashboard" 
+                    to={getDashboardUrl()} 
                     className="text-[#4A90E2] hover:text-[#4A90E2]/70 transition-colors"
-                    title="My Account"
+                    title="Dashboard"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
