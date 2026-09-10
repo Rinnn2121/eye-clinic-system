@@ -1,13 +1,14 @@
 import React, { createContext, useState, useEffect, useContext } from 'react';
-import { auth } from '../firebase/config';
+import { auth, db } from '../firebase/config';
 import { 
   signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,  // ✅ Added
+  createUserWithEmailAndPassword,
   signOut, 
   onAuthStateChanged,
   setPersistence,
   browserSessionPersistence
 } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';  // ✅ Added
 
 const AuthContext = createContext();
 
@@ -18,6 +19,7 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
+  const [userData, setUserData] = useState(null);  // ✅ Store full user data
   const [loading, setLoading] = useState(true);
 
   // Set session persistence
@@ -38,9 +40,18 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  // ✅ SIGNUP (Added)
+  // ✅ SIGNUP with role assignment
   const signup = async (email, password) => {
     const result = await createUserWithEmailAndPassword(auth, email, password);
+    
+    // ✅ Create user document in Firestore with 'customer' role
+    await setDoc(doc(db, 'users', email), {
+      email: email,
+      role: 'customer',
+      name: email.split('@')[0],  // Use email prefix as name
+      createdAt: new Date().toISOString()
+    });
+    
     return result;
   };
 
@@ -50,30 +61,40 @@ export function AuthProvider({ children }) {
     await signOut(auth);
   };
 
-  // ✅ AUTH STATE
+  // ✅ ROLE DETECTION - Better version
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
-      if (user) {
-        if (user.email === 'admin@eyeclinic.com') {
-          setUserRole('admin');
-        } else {
-          setUserRole('customer');
+  const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    setCurrentUser(user);
+    
+    if (user) {
+      let role = user.email === 'admin@eyeclinic.com' ? 'admin' : 'customer';
+      
+      try {
+        const userDoc = await getDoc(doc(db, 'users', user.email));
+        if (userDoc.exists()) {
+          role = userDoc.data().role || role;
         }
-      } else {
-        setUserRole(null);
+      } catch (error) {
+        console.log('Using email-based role');
       }
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, []);
+      
+      setUserRole(role);
+    } else {
+      setUserRole(null);
+    }
+    
+    // ✅ Set loading to false ONLY after role is set
+    setLoading(false);
+  });
+  return unsubscribe;
+}, []);
 
-  // ✅ VALUE OBJECT (includes signup)
   const value = {
     currentUser,
     userRole,
+    userData,  // ✅ Export full user data
     login,
-    signup,      // ✅ Added
+    signup,
     logout,
     loading
   };
@@ -83,4 +104,10 @@ export function AuthProvider({ children }) {
       {!loading && children}
     </AuthContext.Provider>
   );
+
+  return (
+  <AuthContext.Provider value={value}>
+    {!loading && children}
+  </AuthContext.Provider>
+);
 }

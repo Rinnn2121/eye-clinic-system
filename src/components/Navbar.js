@@ -38,11 +38,18 @@ function Navbar() {
   }, [prevScrollPos]);
 
     const getDashboardUrl = () => {
-      if (userRole === 'admin') {
-        return '/admin/dashboard';
-      }
-      return '/customer/dashboard';
-    };
+  if (userRole === 'admin' || userRole === 'staff') {
+    return '/admin/dashboard';
+  }
+  return '/customer/dashboard';
+};
+
+// Display role badge
+<span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
+  {userRole === 'admin' ? '👑 Admin' : 
+   userRole === 'staff' ? '👨‍⚕️ Staff' : 
+   '👤 Customer'}
+</span>
 
   return (
     <nav 
