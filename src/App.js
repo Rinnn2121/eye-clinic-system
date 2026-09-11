@@ -3,7 +3,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
-import AuthRedirect from './components/AuthRedirect';
 import Navbar from './components/Navbar';
 import PrivateRoute from './components/PrivateRoute';
 
@@ -25,7 +24,6 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AuthRedirect />
         <Navbar />
         <Routes>
           <Route path="/" element={<LandingPage />} />
