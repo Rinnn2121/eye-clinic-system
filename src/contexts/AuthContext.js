@@ -1,3 +1,5 @@
+// src/contexts/AuthContext.js
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { auth, db } from '../firebase/config';
 import { 
@@ -8,7 +10,7 @@ import {
   setPersistence,
   browserSessionPersistence
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';  // ✅ Added
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -19,10 +21,9 @@ export function useAuth() {
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
   const [userRole, setUserRole] = useState(null);
-  const [userData, setUserData] = useState(null);  // ✅ Store full user data
+  const [userData, setUserData] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Set session persistence
   useEffect(() => {
     const configurePersistence = async () => {
       try {
@@ -34,65 +35,67 @@ export function AuthProvider({ children }) {
     configurePersistence();
   }, []);
 
-  // ✅ LOGIN
   const login = async (email, password) => {
     const result = await signInWithEmailAndPassword(auth, email, password);
     return result;
   };
 
-  // ✅ SIGNUP with role assignment
   const signup = async (email, password) => {
     const result = await createUserWithEmailAndPassword(auth, email, password);
-    
-    // ✅ Create user document in Firestore with 'customer' role
     await setDoc(doc(db, 'users', email), {
       email: email,
       role: 'customer',
-      name: email.split('@')[0],  // Use email prefix as name
+      name: email.split('@')[0],
       createdAt: new Date().toISOString()
     });
-    
     return result;
   };
 
-  // ✅ LOGOUT
   const logout = async () => {
     localStorage.clear();
     await signOut(auth);
   };
 
-  // ✅ ROLE DETECTION - Better version
   useEffect(() => {
-  const unsubscribe = onAuthStateChanged(auth, async (user) => {
-    setCurrentUser(user);
-    
-    if (user) {
-      let role = user.email === 'admin@eyeclinic.com' ? 'admin' : 'customer';
-      
-      try {
-        const userDoc = await getDoc(doc(db, 'users', user.email));
-        if (userDoc.exists()) {
-          role = userDoc.data().role || role;
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setCurrentUser(user);
+        
+        try {
+          const userDoc = await getDoc(doc(db, 'users', user.email));
+          
+          if (userDoc.exists()) {
+            setUserRole(userDoc.data().role || 'customer');
+            setUserData(userDoc.data());
+          } else {
+            const newUserData = {
+              email: user.email,
+              role: 'customer',
+              name: user.email.split('@')[0],
+              createdAt: new Date().toISOString()
+            };
+            await setDoc(doc(db, 'users', user.email), newUserData);
+            setUserRole('customer');
+            setUserData(newUserData);
+          }
+        } catch (error) {
+          console.error('Error getting role:', error);
+          setUserRole('customer');
         }
-      } catch (error) {
-        console.log('Using email-based role');
+      } else {
+        setCurrentUser(null);
+        setUserRole(null);
+        setUserData(null);
       }
-      
-      setUserRole(role);
-    } else {
-      setUserRole(null);
-    }
-    
-    // ✅ Set loading to false ONLY after role is set
-    setLoading(false);
-  });
-  return unsubscribe;
-}, []);
+      setLoading(false);
+    });
+    return unsubscribe;
+  }, []);
 
   const value = {
     currentUser,
     userRole,
-    userData,  // ✅ Export full user data
+    userData,
     login,
     signup,
     logout,
@@ -104,10 +107,4 @@ export function AuthProvider({ children }) {
       {!loading && children}
     </AuthContext.Provider>
   );
-
-  return (
-  <AuthContext.Provider value={value}>
-    {!loading && children}
-  </AuthContext.Provider>
-);
 }

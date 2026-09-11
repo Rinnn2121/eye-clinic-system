@@ -44,7 +44,7 @@ function Navbar() {
   return '/customer/dashboard';
 };
 
-// Display role badge
+// Role badge
 <span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
   {userRole === 'admin' ? '👑 Admin' : 
    userRole === 'staff' ? '👨‍⚕️ Staff' : 

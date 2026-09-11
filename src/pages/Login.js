@@ -1,5 +1,3 @@
-// src/pages/Login.js
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -9,23 +7,21 @@ function Login() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  
-  // ✅ Get userRole and loading from useAuth
-  const { login, currentUser, userRole, loading: authLoading } = useAuth();
+  const { login, currentUser, userRole, roleReady } = useAuth();
   const navigate = useNavigate();
 
-  // ✅ Redirect ONLY when userRole is set and auth is done loading
+  // ✅ Redirect when role is ready
   useEffect(() => {
-    if (!authLoading && currentUser && userRole) {
-      if (userRole === 'admin') {
-        navigate('/admin/dashboard', { replace: true });
-      } else if (userRole === 'staff') {
+    if (roleReady && currentUser && userRole) {
+      console.log('🚀 Login.js redirecting as:', userRole);
+      
+      if (userRole === 'admin' || userRole === 'staff') {
         navigate('/admin/dashboard', { replace: true });
       } else {
         navigate('/customer/dashboard', { replace: true });
       }
     }
-  }, [currentUser, userRole, authLoading, navigate]);
+  }, [roleReady, currentUser, userRole, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -34,7 +30,6 @@ function Login() {
 
     try {
       await login(email, password);
-      // ✅ DON'T navigate here — useEffect handles it
     } catch (err) {
       setError('Invalid email or password');
       setLoading(false);
