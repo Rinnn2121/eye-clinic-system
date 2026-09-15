@@ -1,56 +1,72 @@
 import React from 'react';
-import { Link } from 'react-router-dom';
 
 function AboutPage() {
   return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto p-4">
-        <div className="flex justify-between items-center mb-6">
-          <h1 className="text-3xl font-bold text-gray-800">ℹ️ About Us</h1>
+    <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
+      <div className="w-full max-w-4xl">
+        
+        
+
+        {/* Main Content Card - Centered */}
+        <div className="bg-indigo-200 rounded-[32px] p-8 md:p-12 lg:p-16 shadow-sm mb-8">
+          
+          {/* Title - Centered */}
+          <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-[#4A90E2] text-center mb-8">
+            Vitug - Sumaya Optical Clinic
+          </h1>
+
+          {/* Clinic Description - Centered */}
+          <div className="text-center text-gray-700 text-sm md:text-base leading-relaxed max-w-3xl mx-auto mb-16">
+            <p>
+              Clinic description here Clinic description here Clinic description here Clinic description here 
+              Clinic description here Clinic description here Clinic description here Clinic description here 
+              Clinic description here Clinic description here Clinic description here Clinic description here 
+              Clinic description here Clinic description here
+            </p>
+          </div>
+          </div>
+
+          {/* Three Column Section - Centered Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 md:gap-8 text-center">
+            
+            {/* Visit Our Branches */}
+            <div className="bg-indigo-200 rounded-[32px] p-4">
+            <div className="flex flex-col items-center">
+              <h2 className="text-xl md:text-2xl font-medium text-black mb-12 md:mb-16">
+                Visit Our Branches
+              </h2>
+              <div className="text-gray-600 text-sm leading-relaxed">
+                <p>Branches Information here</p>
+              </div>
+            </div>
+        </div>
+            {/* Opening Hours */}
+                        <div className="bg-indigo-200 rounded-[32px] p-4">
+            <div className="flex flex-col items-center">
+              <h2 className="text-xl md:text-2xl font-medium text-black mb-12 md:mb-16">
+                Opening Hours
+              </h2>
+              <div className="text-gray-600 text-sm leading-relaxed">
+                <p>Schedule Information here</p>
+              </div>
+            </div>
+        </div>
+            {/* Contact Us */}
+                        <div className="bg-indigo-200 rounded-[32px] p-4">
+            <div className="flex flex-col items-center">
+              <h2 className="text-xl md:text-2xl font-medium text-black mb-12 md:mb-16">
+                Contact Us
+              </h2>
+              <div className="text-gray-600 text-sm leading-relaxed">
+                <p>Contact Information here</p>
+              </div>
+            </div>
         </div>
         
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-4">Our Mission</h2>
-          <p className="text-gray-600 leading-relaxed">
-            To provide exceptional eye care services and high-quality eyewear 
-            to our community, ensuring every patient leaves with clearer vision 
-            and a smile.
-          </p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-lg p-8 mb-6">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-4">Our Services</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-              <span className="text-green-500 text-xl">✓</span>
-              <span>Comprehensive Eye Examinations</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-              <span className="text-green-500 text-xl">✓</span>
-              <span>Prescription Eyeglasses & Contact Lenses</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-              <span className="text-green-500 text-xl">✓</span>
-              <span>Pediatric Eye Care</span>
-            </div>
-            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl">
-              <span className="text-green-500 text-xl">✓</span>
-              <span>Treatment for Eye Diseases</span>
-            </div>
           </div>
-        </div>
 
-        <div className="bg-white rounded-2xl shadow-lg p-8">
-          <h2 className="text-2xl font-semibold text-gray-800 mb-4">Contact Us</h2>
-          <div className="space-y-3 text-gray-600">
-            <p className="flex items-center gap-3">📍 123 Eye Care Street, Metro Manila</p>
-            <p className="flex items-center gap-3">📞 (02) 8123-4567</p>
-            <p className="flex items-center gap-3">📧 info@eyeclinic.com</p>
-            <p className="flex items-center gap-3">🕐 Mon-Sat: 8:00 AM - 6:00 PM</p>
-          </div>
         </div>
       </div>
-    </div>
   );
 }
 

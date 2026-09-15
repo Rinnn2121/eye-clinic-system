@@ -1,13 +1,22 @@
+
 import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../contexts/AuthContext';  // ✅ Import at top
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Link } from 'react-router-dom';
-import { useAuth } from '../../contexts/AuthContext';  // ✅ Added this
 
 function CustomerDashboard() {
-  const { currentUser } = useAuth();  // ✅ Use useAuth instead of useCustomer
+  // ✅ Call useAuth at the TOP of the component
+  const { currentUser, logout } = useAuth();
+  
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  // ✅ handleLogout now uses logout from the top
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/';
+  };
 
   useEffect(() => {
     const loadAppointments = async () => {
@@ -17,8 +26,10 @@ function CustomerDashboard() {
       }
       
       try {
-        // ✅ Use currentUser.email instead of currentCustomer.name
-        const q = query(collection(db, 'appointments'), where('customerEmail', '==', currentUser.email));
+        const q = query(
+          collection(db, 'appointments'), 
+          where('customerEmail', '==', currentUser.email)
+        );
         const querySnapshot = await getDocs(q);
         const apts = [];
         querySnapshot.forEach(doc => {
@@ -32,9 +43,8 @@ function CustomerDashboard() {
     };
     
     loadAppointments();
-  }, [currentUser]);  // ✅ Dependency: currentUser
+  }, [currentUser]);
 
-  // ✅ Check if user is logged in
   if (!currentUser) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -46,17 +56,10 @@ function CustomerDashboard() {
     );
   }
 
-  // ✅ Logout function
-  const handleLogout = async () => {
-    const { logout } = useAuth();  // Get logout from useAuth
-    await logout();
-    window.location.href = '/';
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-6xl mx-auto p-4">
-        {/* Header - Updated for email login */}
+        {/* Header */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white rounded-2xl shadow-xl p-6 mb-6">
           <div className="flex justify-between items-center">
             <div>
@@ -92,7 +95,9 @@ function CustomerDashboard() {
           <div className="bg-white rounded-2xl shadow p-6">
             <p className="text-gray-500 text-sm">Member Since</p>
             <p className="text-xl font-semibold text-gray-800">
-              {currentUser.metadata?.creationTime ? new Date(currentUser.metadata.creationTime).toLocaleDateString() : 'N/A'}
+              {currentUser.metadata?.creationTime 
+                ? new Date(currentUser.metadata.creationTime).toLocaleDateString() 
+                : 'N/A'}
             </p>
           </div>
         </div>
