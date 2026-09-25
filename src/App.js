@@ -9,16 +9,18 @@ import PrivateRoute from './components/PrivateRoute';
 // Pages
 import LandingPage from './pages/customer/LandingPage';
 import CustomerLogin from './pages/customer/CustomerLogin';
-import CustomerRegister from './pages/customer/CustomerRegister';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import ProductPage from './pages/customer/ProductPage';
 import AboutPage from './pages/customer/AboutPage';
 import Login from './pages/Login';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AppointmentPage from './pages/admin/AppointmentPage';
-import CustomerRegistration from './pages/admin/CustomerRegistration';
+import CustomersPage from './pages/admin/CustomersPage';
 import InventoryPage from './pages/admin/InventoryPage';
 import SalesPage from './pages/admin/SalesPage';
+import PatientRecordPage from './pages/admin/PatientRecordPage';
+import CustomerHistoryPage from './pages/admin/CustomerHistoryPage';
+import CustomerRegister from './pages/customer/CustomerRegister';
 
 function App() {
   return (
@@ -46,7 +48,7 @@ function App() {
           } />
           <Route path="/admin/customers" element={
             <PrivateRoute allowedRoles={['admin', 'staff']}>
-              <CustomerRegistration />
+              <CustomersPage />
             </PrivateRoute>
           } />
           <Route path="/admin/inventory" element={
@@ -57,6 +59,18 @@ function App() {
           <Route path="/admin/sales" element={
             <PrivateRoute allowedRoles={['admin', 'staff']}>
               <SalesPage />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/patient-record/:customerId" element={
+            <PrivateRoute allowedRoles={['admin', 'staff']}>
+              <PatientRecordPage />
+            </PrivateRoute>
+          } />
+
+          <Route path="/admin/customer-history/:customerId" element={
+            <PrivateRoute allowedRoles={['admin', 'staff']}>
+              <CustomerHistoryPage />
             </PrivateRoute>
           } />
           
