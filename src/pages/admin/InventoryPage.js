@@ -6,11 +6,11 @@ import { Link } from 'react-router-dom';
 function InventoryPage() {
   const [products, setProducts] = useState([]);
   const [newProduct, setNewProduct] = useState({
-  name: '',
-  category: '',  // ✅ Add this
-  quantity: '',
-  price: ''
-});
+    name: '',
+    category: '',
+    quantity: '',
+    price: ''
+  });
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -24,12 +24,13 @@ function InventoryPage() {
       querySnapshot.forEach(doc => {
         items.push({ id: doc.id, ...doc.data() });
       });
+      // Sort by category alphabetically (optional, but keeps list clean)
+      items.sort((a, b) => (a.category || '').localeCompare(b.category || ''));
       setProducts(items);
     } catch (error) {
       console.error('Error loading products:', error);
     }
   };
-  
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -39,9 +40,11 @@ function InventoryPage() {
         name: newProduct.name,
         quantity: parseInt(newProduct.quantity),
         category: newProduct.category, 
-        price: parseFloat(newProduct.price)
+        price: parseFloat(newProduct.price),
+        createdAt: new Date().toISOString()
       });
-      setNewProduct({ name: '', quantity: '', price: '' });
+      // ✅ Fixed: Now resets category too
+      setNewProduct({ name: '', category: '', quantity: '', price: '' });
       await loadProducts();
       alert('✅ Product added successfully!');
     } catch (error) {
@@ -87,6 +90,7 @@ function InventoryPage() {
                   required
                 />
               </div>
+              
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-gray-700 font-medium mb-2">Quantity</label>
@@ -110,21 +114,25 @@ function InventoryPage() {
                   />
                 </div>
               </div>
+
               <div className="mb-4">
-  <label className="block text-gray-700 font-medium mb-2">Category</label>
-  <select
-    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-    value={newProduct.category}
-    onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
-    required
-  >
-    <option value="">Select Category</option>
-    <option value="Women">Women</option>
-    <option value="Men">Men</option>
-    <option value="Kids">Kids</option>
-    <option value="Accessories">Accessories</option>
-  </select>
-</div>
+                <label className="block text-gray-700 font-medium mb-2">Category</label>
+                <select
+                  className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  value={newProduct.category}
+                  onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
+                  required
+                >
+                  <option value="">Select Category</option>
+                  {/* ✅ Updated Categories */}
+                  <option value="Metal Frame">Metal Frame</option>
+                  <option value="Plastic Frame">Plastic Frame</option>
+                  <option value="Lens">Lens</option>
+                  <option value="Package">Package (Frame + Lens)</option>
+                  <option value="Service">Service (e.g., Eye Exam)</option>
+                </select>
+              </div>
+
               <button
                 type="submit"
                 disabled={loading}
@@ -134,7 +142,6 @@ function InventoryPage() {
               </button>
             </form>
           </div>
-          
 
           {/* Product List */}
           <div className="bg-white rounded-2xl shadow p-6">
@@ -146,7 +153,13 @@ function InventoryPage() {
                 products.map((item) => (
                   <div key={item.id} className="flex justify-between items-center border-b pb-3">
                     <div>
-                      <p className="font-semibold">{item.name}</p>
+                      <p className="font-semibold">
+                        {item.name} 
+                        {/* ✅ Show category badge */}
+                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-0.5 rounded-full">
+                          {item.category || 'Uncategorized'}
+                        </span>
+                      </p>
                       <p className="text-sm text-gray-500">
                         Qty: {item.quantity} | ₱{item.price}
                       </p>

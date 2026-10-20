@@ -6,7 +6,6 @@ function Navbar() {
   const { currentUser, userRole, logout } = useAuth();
   const navigate = useNavigate();
   
-  // State for scroll behavior
   const [prevScrollPos, setPrevScrollPos] = useState(0);
   const [visible, setVisible] = useState(true);
 
@@ -15,41 +14,29 @@ function Navbar() {
     navigate('/');
   };
 
-  // Handle scroll - hides navbar when scrolling down, shows when scrolling up
   useEffect(() => {
     const handleScroll = () => {
       const currentScrollPos = window.scrollY;
-      
-      // Hide navbar when scrolling down, show when scrolling up
       if (currentScrollPos > prevScrollPos && currentScrollPos > 50) {
-        setVisible(false); // Scrolling down - hide navbar
+        setVisible(false);
       } else {
-        setVisible(true); // Scrolling up - show navbar
+        setVisible(true);
       }
-      
       setPrevScrollPos(currentScrollPos);
     };
 
     window.addEventListener('scroll', handleScroll);
-    
-    return () => {
-      window.removeEventListener('scroll', handleScroll);
-    };
+    return () => window.removeEventListener('scroll', handleScroll);
   }, [prevScrollPos]);
 
-    const getDashboardUrl = () => {
-  if (userRole === 'admin' || userRole === 'staff') {
-    return '/admin/dashboard';
-  }
-  return '/customer/dashboard';
-};
+  const getDashboardUrl = () => {
+    if (userRole === 'admin' || userRole === 'staff') {
+      return '/admin/dashboard';
+    }
+    return '/customer/dashboard';
+  };
 
-// Role badge
-<span className="text-xs text-gray-500 bg-gray-200 px-2 py-1 rounded-full">
-  {userRole === 'admin' ? '👑 Admin' : 
-   userRole === 'staff' ? '👨‍⚕️ Staff' : 
-   '👤 Customer'}
-</span>
+  const isAdminOrStaff = userRole === 'admin' || userRole === 'staff';
 
   return (
     <nav 
@@ -58,77 +45,87 @@ function Navbar() {
       }`}
     >
       <div className="container mx-auto px-4">
-        <div className="flex justify-between items-center h-20">
+        {/* Note: I changed h-20 to py-2 to accommodate the taller logo */}
+        <div className="flex justify-between items-center py-2">
           
-          {/* Logo Section - Left */}
-          <Link to="/" className="flex items-center">
-                    <img 
-            src="/images/vslogo.png" 
-            alt="Vitug-Sumaya Optical Clinic Logo" 
-            className="h-28 w-auto object-contain"
-          />
+          {/* ✅ LOGO - Using your image */}
+          <Link to={isAdminOrStaff ? "/admin/dashboard" : "/"} className="flex items-center">
+            <img 
+              src="/images/vslogo.png" 
+              alt="Vitug-Sumaya Optical Clinic Logo" 
+              className="h-16 md:h-20 w-auto object-contain" 
+            />
           </Link>
 
-          {/* Navigation Links - Right */}
+          {/* Navigation Links */}
           <div className="hidden md:flex items-center space-x-6">
-            <Link 
-              to="/customer/products" 
-              className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors"
-            >
-              Products
-            </Link>
-            <Link 
-              to="/customer/about" 
-              className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors"
-            >
-              About Us
-            </Link>
-            <Link 
-              to="/contact" 
-              className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors"
-            >
-              Contact
-            </Link>
-            <Link 
-              to="/services" 
-              className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors"
-            >
-              Services
-            </Link>
+            
+            {isAdminOrStaff ? (
+              <>
+                <Link to="/admin/appointments" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                  Appointments
+                </Link>
+                <Link to="/admin/customers" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                  Customers
+                </Link>
+                {userRole === 'admin' && (
+                  <Link to="/admin/inventory" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                    Inventory
+                  </Link>
+                )}
+                <Link to="/admin/sales" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                  Sales
+                </Link>
+              </>
+            ) : (
+              <>
+                <Link to="/customer/products" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                  Products
+                </Link>
+                <Link to="/customer/about" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                  About Us
+                </Link>
+                <Link to="/contact" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                  Contact
+                </Link>
+                <Link to="/services" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                  Services
+                </Link>
+              </>
+            )}
 
-            {/* Divider */}
             <span className="w-px h-6 bg-gray-300"></span>
 
-            {/* Right Section - Login/User */}
-            <div className="flex items-center space-x-3">
+            {/* Right Side (Dashboard Icon + Logout/Login) */}
+            <div className="flex items-center gap-4">
               {currentUser ? (
                 <>
+                  {/* Dashboard Icon */}
                   <Link 
                     to={getDashboardUrl()} 
-                    className="text-[#4A90E2] hover:text-[#4A90E2]/70 transition-colors"
-                    title="Dashboard"
+                    className="text-[#4A90E2] hover:text-[#4A90E2]/70 transition-colors p-2 bg-white/50 rounded-full"
+                    title="Go to Dashboard"
                   >
                     <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                   </Link>
-                  
+
+                  {/* Logout Button */}
                   <button
                     onClick={handleLogout}
-                    className="bg-red-500 text-white px-3 py-1.5 rounded-lg hover:bg-red-600 transition-colors text-sm"
+                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
                   >
                     Logout
                   </button>
                 </>
               ) : (
-                <>
-                  <Link 
-                    to="/customer/login" 
-                    className="bg-[#4A90E2] text-white px-5 py-2 rounded-lg hover:bg-[#4A90E2]/80 transition-colors font-medium text-sm"
-                  >
-                    Login
-                  </Link>
-                </>
+                <Link 
+                  to="/customer/login" 
+                  className="bg-[#4A90E2] text-white px-5 py-2 rounded-lg hover:bg-[#4A90E2]/80 transition-colors font-medium text-sm"
+                >
+                  Login
+                </Link>
               )}
             </div>
           </div>
