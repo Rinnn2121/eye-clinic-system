@@ -1,6 +1,10 @@
+// src/pages/admin/SalesPage.js
+
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import SalesChart from '../../components/SalesChart';
+import { Link } from 'react-router-dom';
 
 function SalesPage() {
   const [timeFilter, setTimeFilter] = useState('This Day');
@@ -15,7 +19,11 @@ function SalesPage() {
   });
 
   const [categories, setCategories] = useState([]);
-  const [weeklyData, setWeeklyData] = useState([]);
+
+  // ✅ New states for the Table Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [paymentFilter, setPaymentFilter] = useState('All Payment Methods');
+  const [statusFilter, setStatusFilter] = useState('All Status');
 
   // ✅ Fetch from Firestore
   useEffect(() => {
@@ -41,7 +49,7 @@ function SalesPage() {
     fetchSales();
   }, []);
 
-  // ✅ Filter sales by range
+  // ✅ Filter sales by time range (for the charts and top stats)
   const filterSalesByRange = (data, range) => {
     const now = new Date();
     let startDate = new Date();
@@ -63,14 +71,13 @@ function SalesPage() {
     return data.filter((s) => new Date(s.orderDate) >= startDate);
   };
 
-  // ✅ Recalculate on filter change
+  // ✅ Recompute when filter or sales change
   useEffect(() => {
     if (sales.length === 0 && loading) return;
 
     const filtered = filterSalesByRange(sales, timeFilter);
     computeStats(filtered);
     computeCategories(filtered);
-    computeWeekly(filtered);
   }, [timeFilter, sales, loading]);
 
   // ✅ Stats
@@ -100,7 +107,7 @@ function SalesPage() {
     setStats({ totalSales, productsSold, totalCustomers: uniqueCustomers, bestSeller });
   };
 
-  // ✅ Categories
+  // ✅ Categories (for donut)
   const computeCategories = (data) => {
     const categoryMap = {};
     data.forEach((s) => {
@@ -123,42 +130,11 @@ function SalesPage() {
     setCategories(catArray);
   };
 
-  // ✅ Weekly
-  const computeWeekly = (data) => {
-    const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const weekTotals = { Sun: 0, Mon: 0, Tue: 0, Wed: 0, Thu: 0, Fri: 0, Sat: 0 };
-
-    const now = new Date();
-    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-
-    data.forEach((s) => {
-      const d = new Date(s.orderDate);
-      if (d >= sevenDaysAgo) {
-        const dayName = days[d.getDay()];
-        weekTotals[dayName] += s.totalAmount || 0;
-      }
-    });
-
-    setWeeklyData(Object.entries(weekTotals).map(([day, total]) => ({ day, total })));
-  };
-
-  // ✅ Peso
+  // ✅ Peso formatter
   const peso = (num) =>
     `₱ ${Number(num).toLocaleString('en-PH', { minimumFractionDigits: 0 })}`;
 
-  // ✅ Path
-  const buildPath = () => {
-    if (weeklyData.length === 0) return '';
-    const max = Math.max(...weeklyData.map((d) => d.total), 1);
-    const points = weeklyData.map((d, i) => {
-      const x = 55 + i * 52;
-      const y = 155 - (d.total / max) * 130;
-      return `${x} ${y}`;
-    });
-    return `M ${points.join(' L ')}`;
-  };
-
-  // ✅ Donut
+  // ✅ Donut builder
   const circumference = 2 * Math.PI * 40;
   const buildDonut = () => {
     let offset = 0;
@@ -181,6 +157,32 @@ function SalesPage() {
       return el;
     });
   };
+
+  // ✅ Map dropdown to SalesChart range
+  const rangeForChart = () => {
+    if (timeFilter === 'This Day') return 'Today';
+    if (timeFilter === 'This Week') return 'Week';
+    if (timeFilter === 'This Month') return 'Month';
+    return 'Year';
+  };
+
+  // ✅ Filter the table data based on Search, Payment, and Status
+  const filteredTransactions = sales.filter((sale) => {
+    const matchesSearch = 
+      (sale.receiptNo?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
+      (sale.customerName?.toLowerCase() || '').includes(searchTerm.toLowerCase());
+      
+    const matchesPayment = paymentFilter === 'All Payment Methods' || sale.paymentMethod === paymentFilter;
+    
+    // Treat undefined paymentStatus as 'Pending' or 'Partial' if they have a balance
+    const currentStatus = sale.paymentStatus || (sale.balance > 0 ? 'Partial' : 'Paid');
+    const matchesStatus = statusFilter === 'All Status' || 
+      currentStatus.toLowerCase() === statusFilter.toLowerCase() ||
+      (statusFilter === 'Paid' && sale.balance <= 0) ||
+      (statusFilter === 'Partial' && sale.balance > 0);
+
+    return matchesSearch && matchesPayment && matchesStatus;
+  });
 
   if (loading) {
     return (
@@ -222,13 +224,13 @@ function SalesPage() {
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Total Sales', value: peso(stats.totalSales), bg: 'bg-indigo-100', iconBg: 'bg-indigo-500' },
-            { label: 'Products Sold', value: stats.productsSold, bg: 'bg-purple-100', iconBg: 'bg-purple-500' },
-            { label: 'Total Customers', value: stats.totalCustomers, bg: 'bg-green-100', iconBg: 'bg-green-500' },
+            { label: 'Total Sales', value: peso(stats.totalSales), bg: 'bg-indigo-100 border border-indigo-200', iconBg: 'bg-indigo-500' },
+            { label: 'Products Sold', value: stats.productsSold, bg: 'bg-purple-100 border border-purple-200', iconBg: 'bg-purple-500' },
+            { label: 'Total Customers', value: stats.totalCustomers, bg: 'bg-green-100 border border-green-200', iconBg: 'bg-green-500' },
             {
               label: 'Best Seller / Popular',
               value: stats.bestSeller.name,
-              bg: 'bg-yellow-100',
+              bg: 'bg-yellow-100 border border-yellow-200',
               iconBg: 'bg-yellow-500',
               sub: `${stats.bestSeller.count} sold (${stats.bestSeller.percent}% of total)`,
             },
@@ -246,27 +248,16 @@ function SalesPage() {
 
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          {/* Sales Trend */}
           <div className="bg-white rounded-2xl p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Sales Trend</h2>
-            <svg viewBox="0 0 400 180" className="w-full h-44">
-              {[15, 50, 85, 120, 155].map((y, i) => (
-                <line key={i} x1="50" y1={y} x2="390" y2={y} stroke="#f3f4f6" />
-              ))}
-              <path d={buildPath()} fill="none" stroke="#93c5fd" strokeWidth="2" />
-              {weeklyData.map((d, i) => {
-                const max = Math.max(...weeklyData.map((x) => x.total), 1);
-                const x = 55 + i * 52;
-                const y = 155 - (d.total / max) * 130;
-                return <circle key={i} cx={x} cy={y} r="3" fill="#4A90E2" />;
-              })}
-              {weeklyData.map((d, i) => (
-                <text key={i} x={60 + i * 52} y="178" fontSize="10" fill="#9ca3af">
-                  {d.day}
-                </text>
-              ))}
-            </svg>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold text-gray-900">Sales Trend</h2>
+              <span className="text-xs text-gray-500">{timeFilter}</span>
+            </div>
+            <SalesChart orders={sales} range={rangeForChart()} width={400} height={200} />
           </div>
 
+          {/* Sales By Product Category */}
           <div className="bg-white rounded-2xl p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Sales By Product Category</h2>
             <div className="flex flex-col sm:flex-row items-center gap-6">
@@ -300,45 +291,114 @@ function SalesPage() {
           </div>
         </div>
 
-        {/* Recent Sales Table */}
-        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Sales</h2>
-            <button className="text-sm text-[#4A90E2] hover:underline">View All →</button>
+        {/* ✅ NEW: Recent Transactions Table with Filters */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+          
+          {/* Table Header & Filters */}
+          <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-gray-200 bg-white">
+            <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
+            
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+              {/* Search Bar */}
+              <div className="relative w-full md:w-64">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </span>
+                <input
+                  type="text"
+                  placeholder="Search by receipt no., customer..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
+                />
+              </div>
+
+              {/* Payment Filter */}
+              <select
+                value={paymentFilter}
+                onChange={(e) => setPaymentFilter(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none"
+              >
+                <option value="All Payment Methods">All Payment Methods</option>
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+                <option value="Card">Card</option>
+              </select>
+
+              {/* Status Filter */}
+              <select
+                value={statusFilter}
+                onChange={(e) => setStatusFilter(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none"
+              >
+                <option value="All Status">All Status</option>
+                <option value="Paid">Paid</option>
+                <option value="Partial">Partial</option>
+              </select>
+
+              <Link to="/admin/transactions" className="text-sm text-[#4A90E2] hover:underline font-medium ml-auto md:ml-2">
+                View All →
+              </Link>
+            </div>
           </div>
+
+          {/* Table Content */}
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="bg-[#dbeafe] text-gray-800">
-                  <th className="text-left px-6 py-3">Date &amp; Time</th>
-                  <th className="text-left px-6 py-3">Receipt No.</th>
-                  <th className="text-left px-6 py-3">Customer Name</th>
-                  <th className="text-left px-6 py-3">Items</th>
-                  <th className="text-left px-6 py-3">Total Amount</th>
-                  <th className="text-left px-6 py-3">Payment Method</th>
+                <tr className="bg-[#dbeafe] text-gray-800 text-left">
+                  <th className="px-6 py-4 font-semibold">Receipt No.</th>
+                  <th className="px-6 py-4 font-semibold">Date & Time</th>
+                  <th className="px-6 py-4 font-semibold">Customer Name</th>
+                  <th className="px-6 py-4 font-semibold">Items</th>
+                  <th className="px-6 py-4 font-semibold">Total Amount</th>
+                  <th className="px-6 py-4 font-semibold">Payment</th>
+                  <th className="px-6 py-4 font-semibold">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-100">
-                {sales.slice(0, 5).map((sale) => (
-                  <tr key={sale.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-gray-600">
-                      {new Date(sale.orderDate).toLocaleString('en-PH')}
-                    </td>
-                    <td className="px-6 py-4">{sale.receiptNo}</td>
-                    <td className="px-6 py-4">{sale.customerName}</td>
-                    <td className="px-6 py-4">
-                      {sale.items?.reduce((a, i) => a + (i.qty || 1), 0)} item(s)
-                    </td>
-                    <td className="px-6 py-4 font-medium">{peso(sale.totalAmount)}</td>
-                    <td className="px-6 py-4">{sale.paymentMethod}</td>
-                  </tr>
-                ))}
-                {sales.length === 0 && (
+                            <tbody className="divide-y divide-gray-100">
+                {filteredTransactions.length === 0 ? (
                   <tr>
-                    <td colSpan="6" className="text-center py-8 text-gray-500">
-                      No sales data yet
+                    <td colSpan="7" className="text-center py-8 text-gray-500">
+                      No transactions found matching your filters.
                     </td>
                   </tr>
+                ) : (
+                  /* ✅ Added .slice(0, 5) here to limit to 5 entries */
+                  filteredTransactions.slice(0, 5).map((sale) => {
+                    const isPartial = sale.balance > 0;
+                    const statusText = sale.paymentStatus === 'paid' || !isPartial ? 'Paid' : 'Partial';
+
+                    return (
+                      <tr key={sale.id} className="hover:bg-gray-50 text-gray-700">
+                        <td className="px-6 py-4">{sale.receiptNo || '—'}</td>
+                        <td className="px-6 py-4 text-xs">
+                          {sale.orderDate ? new Date(sale.orderDate).toLocaleString('en-US', {
+                            month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit'
+                          }) : '—'}
+                        </td>
+                        <td className="px-6 py-4">{sale.customerName || '—'}</td>
+                        <td className="px-6 py-4">{sale.items?.reduce((a, i) => a + (i.qty || 1), 0) || 1}</td>
+                        <td className="px-6 py-4 font-medium">{peso(sale.totalAmount)}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-700' :
+                            sale.paymentMethod === 'GCash' ? 'bg-blue-100 text-blue-700' : 
+                            'bg-purple-100 text-purple-700'
+                          }`}>
+                            {sale.paymentMethod || 'Cash'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs font-bold ${
+                            statusText === 'Paid' ? 'bg-green-100 text-green-700' : 'bg-orange-100 text-orange-700'
+                          }`}>
+                            ● {statusText}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>

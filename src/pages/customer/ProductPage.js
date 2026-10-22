@@ -54,9 +54,12 @@ function ProductPage() {
                   <div className="mt-4 flex justify-between items-center">
                     <span className="text-2xl font-bold text-blue-600">₱{product.price}</span>
                   </div>
-                  <button className="w-full mt-4 bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 transition-colors">
-                    Inquire
-                  </button>
+                  <Link
+                  to={`/contact?product=${encodeURIComponent(product.name)}&id=${product.id}`}
+                  className="block w-full mt-4 bg-blue-600 text-white py-2 rounded-xl hover:bg-blue-700 transition-colors text-center"
+                >
+                  Inquire
+                </Link>
                 </div>
               </div>
             ))}

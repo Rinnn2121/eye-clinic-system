@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { collection, getDocs, addDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Link } from 'react-router-dom';
+import ConfirmModal from '../../components/ConfirmModal';
 
 function AppointmentPage() {
   const [appointments, setAppointments] = useState([]);
@@ -12,6 +13,8 @@ function AppointmentPage() {
     status: 'scheduled'
   });
   const [loading, setLoading] = useState(false);
+  const [successMsg, setSuccessMsg] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
     loadAppointments();
@@ -37,9 +40,9 @@ function AppointmentPage() {
       await addDoc(collection(db, 'appointments'), newAppointment);
       setNewAppointment({ customerName: '', date: '', time: '', status: 'scheduled' });
       await loadAppointments();
-      alert('✅ Appointment scheduled successfully!');
+      setSuccessMsg(true);
     } catch (error) {
-      alert('❌ Error: ' + error.message);
+      setErrorMsg(error.message); // add error state if you want
     }
     setLoading(false);
   };
@@ -126,6 +129,26 @@ function AppointmentPage() {
           </div>
         </div>
       </div>
+      <ConfirmModal
+        isOpen={successMsg}
+        title="Appointment Scheduled!"
+        message="The appointment has been successfully added."
+        icon="✅"
+        confirmText="OK"
+        confirmColor="green"
+        isAlert
+        onConfirm={() => setSuccessMsg(false)}
+      />
+      <ConfirmModal
+        isOpen={!!errorMsg}
+        title="Something Went Wrong"
+        message={errorMsg}
+        icon="❌"
+        confirmText="OK"
+        confirmColor="red"
+        isAlert
+        onConfirm={() => setErrorMsg('')}
+      />
     </div>
   );
 }

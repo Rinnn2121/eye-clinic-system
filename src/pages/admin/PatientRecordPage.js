@@ -1,8 +1,11 @@
+// src/pages/admin/PatientRecordPage.js
+
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { doc, getDoc, addDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
+import ConfirmModal from '../../components/ConfirmModal';
 
 function PatientRecordPage() {
   const { customerId } = useParams();
@@ -14,22 +17,36 @@ function PatientRecordPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  // ✅ Modal states
+  const [showPrescriptionError, setShowPrescriptionError] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [receiptNo, setReceiptNo] = useState('');
+
+  // ✅ Manual total override state
+  const [isManualTotal, setIsManualTotal] = useState(false);
+
   const [record, setRecord] = useState({
     date: new Date().toISOString().split('T')[0],
-    
     firstName: '', lastName: '', nickname: '', address: '', age: '', phone: '', occupation: '',
+    
     oldPd: '', newPd: '',
     oldODsph: '', oldODcyl: '', oldODaxis: '',
     oldOSsph: '', oldOScyl: '', oldOSaxis: '', oldADD: '',
     newODsph: '', newODcyl: '', newODaxis: '',
     newOSsph: '', newOScyl: '', newOSaxis: '', newADD: '',
     prescriptionNotes: '', additionalNotes: '',
-    frame: '', lens: '',
+    
+    frame: '', 
+    lensType: '',
+    coating: '',
+    
     total: 0, amountPaid: '', balance: 0,
     paymentStatus: 'pending', paymentMethod: 'Cash',
     optometrist: '',
   });
 
+  // Load customer & inventory
   useEffect(() => {
     const load = async () => {
       try {
@@ -44,7 +61,9 @@ function PatientRecordPage() {
             age: custData.age || '', phone: custData.phone || '', occupation: custData.occupation || '',
           }));
         } else {
-          alert('Customer not found'); navigate('/admin/customers'); return;
+          setSaveError('Customer not found');
+          setTimeout(() => navigate('/admin/customers'), 2000);
+          return;
         }
 
         const invSnap = await getDocs(collection(db, 'inventory'));
@@ -53,7 +72,9 @@ function PatientRecordPage() {
         setInventory(invList);
         setLoading(false);
       } catch (err) {
-        console.error(err); setLoading(false);
+        console.error(err); 
+        setSaveError(err.message);
+        setLoading(false);
       }
     };
     load();
@@ -61,41 +82,78 @@ function PatientRecordPage() {
 
   // Auto-calculate total
   useEffect(() => {
+    if (isManualTotal) return; // Don't override if manually edited
+
     const f = inventory.find((i) => i.id === record.frame);
-    const l = inventory.find((i) => i.id === record.lens);
+    const lt = inventory.find((i) => i.id === record.lensType);
+    const c = inventory.find((i) => i.id === record.coating);
     
-    // If the frame has "Package" in the name, use its price. Otherwise, add frame + lens.
     const isPackage = f?.name?.toLowerCase().includes('package');
-    const subtotal = isPackage ? (f?.price || 0) : ((f?.price || 0) + (l?.price || 0));
     
+    let subtotal = 0;
+    if (isPackage) {
+      subtotal = f?.price || 0;
+    } else {
+      const framePrice = f?.price || 0;
+      const lensPrice = (lt?.price || 0) + (c?.price || 0);
+      subtotal = framePrice + lensPrice;
+    }
+
+    if (subtotal > 0) {
+      setRecord((p) => ({ ...p, total: subtotal }));
+    }
+  }, [record.frame, record.lensType, record.coating, inventory, isManualTotal]);
+    
+  // Auto-calculate balance
+  useEffect(() => {
     const paid = Number(record.amountPaid) || 0;
-    const balance = subtotal - paid;
+    const balance = record.total - paid;
+
+    let calculatedStatus = 'pending';
+    if (record.total > 0 && paid >= record.total) {
+      calculatedStatus = 'paid';
+    }
 
     setRecord((p) => ({ 
       ...p, 
-      total: subtotal, 
-      balance: balance > 0 ? balance : 0 
+      balance: balance > 0 ? balance : 0,
+      paymentStatus: calculatedStatus
     }));
-  }, [record.frame, record.lens, record.amountPaid, inventory]);
+  }, [record.amountPaid, record.total]);
 
   const handleSave = async () => {
     if (!record.newODsph && !record.newOSsph) {
-      alert('Please enter at least the new prescription SPH for OD or OS.'); return;
+      setShowPrescriptionError(true); 
+      return;
     }
 
     setSaving(true);
     try {
       const f = inventory.find((i) => i.id === record.frame);
-      const l = inventory.find((i) => i.id === record.lens);
-      const receiptNo = `SO-${Date.now().toString().slice(-5)}`;
+      const lt = inventory.find((i) => i.id === record.lensType);
+      const c = inventory.find((i) => i.id === record.coating);
+      const generatedReceipt = `SO-${Date.now().toString().slice(-5)}`;
       const isPackage = f?.name?.toLowerCase().includes('package');
 
+      // Update customer stats
+            // ✅ Update customer stats AND latest transaction info for the Customers Table
       await updateDoc(doc(db, 'customers', customerId), {
-        firstName: record.firstName, lastName: record.lastName, nickname: record.nickname,
-        address: record.address, age: record.age, phone: record.phone, occupation: record.occupation,
-        lastVisit: new Date().toISOString(), totalVisits: (customer.totalVisits || 0) + 1,
+        firstName: record.firstName, 
+        lastName: record.lastName, 
+        nickname: record.nickname,
+        address: record.address, 
+        age: record.age, 
+        phone: record.phone, 
+        occupation: record.occupation,
+        lastVisit: new Date().toISOString(), 
+        totalVisits: (customer.totalVisits || 0) + 1,
+        
+        // ✅ NEW: Save latest balance & payment info directly to the customer profile
+        latestBalance: record.balance || 0,
+        latestPaymentMethod: record.paymentMethod || 'Cash',
+        latestPaymentStatus: record.paymentStatus || 'pending'
       });
-
+      // Save record
       await addDoc(collection(db, 'records'), {
         customerId, customerName: `${record.lastName}, ${record.firstName}`, date: record.date,
         oldPd: record.oldPd, newPd: record.newPd,
@@ -109,32 +167,57 @@ function PatientRecordPage() {
         },
         prescriptionNotes: record.prescriptionNotes, additionalNotes: record.additionalNotes,
         frame: f ? { id: f.id, name: f.name, price: f.price, isPackage } : null,
-        lens: l ? { id: l.id, name: l.name, price: l.price } : null,
+        lensType: lt ? { id: lt.id, name: lt.name, price: lt.price } : null,
+        coating: c ? { id: c.id, name: c.name, price: c.price } : null,
         total: record.total,
         amountPaid: Number(record.amountPaid) || 0, balance: record.balance,
         paymentStatus: record.paymentStatus, paymentMethod: record.paymentMethod,
         optometrist: record.optometrist, createdBy: currentUser?.email, createdAt: new Date().toISOString(),
+        receiptNo: generatedReceipt, // Save receiptNo to link with orders
       });
 
+      // Save order
       await addDoc(collection(db, 'orders'), {
-        receiptNo, customerId, customerName: `${record.lastName}, ${record.firstName}`,
-        totalAmount: record.total, amountPaid: Number(record.amountPaid) || 0, balance: record.balance,
-        paymentStatus: record.paymentStatus, paymentMethod: record.paymentMethod, orderDate: new Date().toISOString(),
+        receiptNo: generatedReceipt, 
+        customerId, 
+        customerName: `${record.lastName}, ${record.firstName}`,
+        
+        // ✅ NEW: Save contact info and notes for the modal
+        customerPhone: record.phone, 
+        notes: record.additionalNotes || record.prescriptionNotes || '',
+        
+        totalAmount: record.total, 
+        amountPaid: Number(record.amountPaid) || 0, 
+        balance: record.balance,
+        
+        // ✅ NEW: Save discount so the math looks correct in the modal
+        discount: Number(record.discount) || 0, 
+        
+        paymentStatus: record.paymentStatus, 
+        paymentMethod: record.paymentMethod, 
+        orderDate: new Date().toISOString(),
         items: [
           ...(f ? [{ name: f.name, category: isPackage ? 'Package' : f.category, qty: 1, price: f.price }] : []),
-          ...(!isPackage && l ? [{ name: l.name, category: 'Lens', qty: 1, price: l.price }] : []),
+          ...(!isPackage && lt ? [{ name: lt.name, category: 'Lens Type', qty: 1, price: lt.price }] : []),
+          ...(!isPackage && c ? [{ name: c.name, category: 'Coating', qty: 1, price: c.price }] : []),
         ],
       });
 
-      alert(`✅ Record saved! Receipt: ${receiptNo}`);
-      navigate('/admin/customers');
+      // Show success modal
+      setReceiptNo(generatedReceipt);
+      setShowSuccess(true);
     } catch (err) {
-      console.error(err); alert('Failed to save: ' + err.message);
+      console.error(err); 
+      setSaveError(err.message);
     }
     setSaving(false);
   };
 
-  if (loading) return <div className="min-h-screen flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4A90E2]"></div></div>;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4A90E2]"></div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
@@ -200,12 +283,13 @@ function PatientRecordPage() {
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label><input type="text" value={record.additionalNotes} onChange={(e) => setRecord({ ...record, additionalNotes: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" /></div>
         </div>
 
-        {/* FRAME & LENS */}
+        {/* FRAME, LENS TYPE, & COATING SECTION */}
         <div className="space-y-3 mb-6">
+          
           {inventory.find((i) => i.id === record.frame)?.name?.toLowerCase().includes('package') ? (
             <div className="flex items-end gap-2">
               <span className="text-sm font-medium w-20 text-[#4A90E2]">PACKAGE:</span>
-              <select value={record.frame} onChange={(e) => setRecord({ ...record, frame: e.target.value })}
+              <select value={record.frame} onChange={(e) => setRecord({ ...record, frame: e.target.value, lensType: '', coating: '' })}
                 className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent font-semibold text-[#4A90E2]">
                 <option value="">Select Package</option>
                 {inventory.filter((i) => i.name?.toLowerCase().includes('package')).map((i) => (
@@ -214,16 +298,21 @@ function PatientRecordPage() {
                 <option value="custom">--- Custom Frame & Lens ---</option>
               </select>
               {record.frame && record.frame !== 'custom' && (
-                <button onClick={() => setRecord({ ...record, frame: '', lens: '' })} className="text-xs text-red-500 hover:underline">Clear</button>
+                <button onClick={() => setRecord({ ...record, frame: '', lensType: '', coating: '' })} className="text-xs text-red-500 hover:underline">Clear</button>
               )}
             </div>
           ) : (
             <>
+              {/* FRAME */}
               <div className="flex items-end gap-2">
                 <span className="text-sm font-medium w-20">FRAME:</span>
                 <select value={record.frame} onChange={(e) => setRecord({ ...record, frame: e.target.value })}
                   className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent">
                   <option value="">Select frame</option>
+                  
+                  {/* Option for Customer's Own Frame */}
+                  <option value="custom">👤 Customer's Own Frame (No Charge)</option>
+                  
                   <optgroup label="📦 Packages (Frame + Lens)">
                     {inventory.filter((i) => i.name?.toLowerCase().includes('package')).map((i) => (
                       <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
@@ -241,12 +330,26 @@ function PatientRecordPage() {
                   </optgroup>
                 </select>
               </div>
+
+              {/* LENS TYPE */}
               <div className="flex items-end gap-2">
-                <span className="text-sm font-medium w-20">LENS:</span>
-                <select value={record.lens} onChange={(e) => setRecord({ ...record, lens: e.target.value })}
+                <span className="text-sm font-medium w-20">LENS TYPE:</span>
+                <select value={record.lensType} onChange={(e) => setRecord({ ...record, lensType: e.target.value })}
                   className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent">
-                  <option value="">Select lens</option>
-                  {inventory.filter((i) => i.category === 'Lens').map((i) => (
+                  <option value="">Select lens type</option>
+                  {inventory.filter((i) => i.category === 'Lens Type').map((i) => (
+                    <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* COATING */}
+              <div className="flex items-end gap-2">
+                <span className="text-sm font-medium w-20">COATING:</span>
+                <select value={record.coating} onChange={(e) => setRecord({ ...record, coating: e.target.value })}
+                  className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent">
+                  <option value="">Select coating</option>
+                  {inventory.filter((i) => i.category === 'Coating').map((i) => (
                     <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
                   ))}
                 </select>
@@ -259,7 +362,18 @@ function PatientRecordPage() {
         <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
           <div className="flex items-center gap-2 border-t pt-2">
             <span className="text-sm font-bold w-20">TOTAL:</span>
-            <span className="flex-1 text-lg font-bold">₱{record.total.toLocaleString()}</span>
+            <div className="flex-1 flex items-center">
+              <span className="text-lg font-bold mr-1">₱</span>
+              <input
+              type="number"
+              value={record.total}
+              onChange={(e) => {
+                setIsManualTotal(true); // ✅ Override auto-calc
+                setRecord({ ...record, total: Number(e.target.value)});
+              }}
+              className="w-full text-lg font-bold outline-none bg-transparent border-b border-gray-300 focus:border-[#4A90E2]"
+              />
+               </div>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium w-20 text-gray-600">AMOUNT PAID:</span>
@@ -282,8 +396,11 @@ function PatientRecordPage() {
             </div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-600">STATUS:</span>
-              <select value={record.paymentStatus} onChange={(e) => setRecord({ ...record, paymentStatus: e.target.value })}
-                className="flex-1 border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]">
+              <select 
+                value={record.paymentStatus} 
+                disabled 
+                className="flex-1 border border-gray-300 rounded-lg p-2 text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none"
+              >
                 <option value="pending">Pending (May Balance)</option>
                 <option value="paid">Fully Paid</option>
               </select>
@@ -302,6 +419,43 @@ function PatientRecordPage() {
           <button onClick={handleSave} disabled={saving} className="flex-1 bg-[#4A90E2] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 disabled:opacity-50">{saving ? 'Saving...' : 'Save & Print'}</button>
         </div>
       </div>
+
+      {/* ✅ MODALS */}
+      <ConfirmModal
+        isOpen={showPrescriptionError}
+        title="Missing Prescription"
+        message="Please enter at least the new prescription SPH for OD or OS."
+        icon="⚠️"
+        confirmText="OK"
+        confirmColor="red"
+        isAlert
+        onConfirm={() => setShowPrescriptionError(false)}
+      />
+
+      <ConfirmModal
+        isOpen={!!saveError}
+        title="Save Failed"
+        message={saveError}
+        icon="❌"
+        confirmText="OK"
+        confirmColor="red"
+        isAlert
+        onConfirm={() => setSaveError('')}
+      />
+
+      <ConfirmModal
+        isOpen={showSuccess}
+        title="Record Saved!"
+        message={`Receipt No: ${receiptNo}\nThe record has been successfully saved.`}
+        icon="✅"
+        confirmText="Go to Customers"
+        confirmColor="green"
+        isAlert
+        onConfirm={() => {
+          setShowSuccess(false);
+          navigate('/admin/customers');
+        }}
+      />
     </div>
   );
 }

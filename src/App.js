@@ -21,6 +21,7 @@ import SalesPage from './pages/admin/SalesPage';
 import PatientRecordPage from './pages/admin/PatientRecordPage';
 import CustomerHistoryPage from './pages/admin/CustomerHistoryPage';
 import CustomerRegister from './pages/customer/CustomerRegister';
+import AllTransactionsPage from './pages/admin/AllTransactionsPage';
 
 function App() {
   return (
@@ -61,6 +62,11 @@ function App() {
               <SalesPage />
             </PrivateRoute>
           } />
+          <Route path="/admin/transactions" element={
+          <PrivateRoute allowedRoles={['admin', 'staff']}>
+            <AllTransactionsPage />
+          </PrivateRoute>
+        } />
 
           <Route path="/admin/patient-record/:customerId" element={
             <PrivateRoute allowedRoles={['admin', 'staff']}>

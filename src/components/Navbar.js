@@ -45,89 +45,93 @@ function Navbar() {
       }`}
     >
       <div className="container mx-auto px-4">
-        {/* Note: I changed h-20 to py-2 to accommodate the taller logo */}
+        {/* Main Flex Container */}
         <div className="flex justify-between items-center py-2">
           
-          {/* ✅ LOGO - Using your image */}
-          <Link to={isAdminOrStaff ? "/admin/dashboard" : "/"} className="flex items-center">
-            <img 
-              src="/images/vslogo.png" 
-              alt="Vitug-Sumaya Optical Clinic Logo" 
-              className="h-16 md:h-20 w-auto object-contain" 
-            />
-          </Link>
-
-          {/* Navigation Links */}
-          <div className="hidden md:flex items-center space-x-6">
+          {/* ✅ LEFT SIDE: Contains BOTH the Logo and the Tabs */}
+          <div className="flex items-center gap-8">
             
-            {isAdminOrStaff ? (
-              <>
-                <Link to="/admin/appointments" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
-                  Appointments
-                </Link>
-                <Link to="/admin/customers" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
-                  Customers
-                </Link>
-                {userRole === 'admin' && (
-                  <Link to="/admin/inventory" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
-                    Inventory
-                  </Link>
-                )}
-                <Link to="/admin/sales" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
-                  Sales
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link to="/customer/products" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
-                  Products
-                </Link>
-                <Link to="/customer/about" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
-                  About Us
-                </Link>
-                <Link to="/contact" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
-                  Contact
-                </Link>
-                <Link to="/services" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
-                  Services
-                </Link>
-              </>
-            )}
+            {/* Logo */}
+            <Link to={isAdminOrStaff ? "/admin/dashboard" : "/"}>
+              <img 
+                src="/images/vslogo.png" 
+                alt="Vitug-Sumaya Optical Clinic Logo" 
+                className="h-16 md:h-20 w-auto object-contain" 
+              />
+            </Link>
 
-            <span className="w-px h-6 bg-gray-300"></span>
-
-            {/* Right Side (Dashboard Icon + Logout/Login) */}
-            <div className="flex items-center gap-4">
-              {currentUser ? (
+            {/* Navigation Links */}
+            <div className="hidden md:flex items-center space-x-6">
+              {isAdminOrStaff ? (
                 <>
-                  {/* Dashboard Icon */}
-                  <Link 
-                    to={getDashboardUrl()} 
-                    className="text-[#4A90E2] hover:text-[#4A90E2]/70 transition-colors p-2 bg-white/50 rounded-full"
-                    title="Go to Dashboard"
-                  >
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                    </svg>
+                  <Link to="/admin/dashboard" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                    Overview
                   </Link>
-
-                  {/* Logout Button */}
-                  <button
-                    onClick={handleLogout}
-                    className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
-                  >
-                    Logout
-                  </button>
+                  <Link to="/admin/appointments" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                    Appointments
+                  </Link>
+                  <Link to="/admin/customers" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                    Customers
+                  </Link>
+                  {userRole === 'admin' && (
+                    <Link to="/admin/inventory" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                      Inventory
+                    </Link>
+                  )}
+                  <Link to="/admin/sales" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                    Sales
+                  </Link>
                 </>
               ) : (
-                <Link 
-                  to="/customer/login" 
-                  className="bg-[#4A90E2] text-white px-5 py-2 rounded-lg hover:bg-[#4A90E2]/80 transition-colors font-medium text-sm"
-                >
-                  Login
-                </Link>
+                <>
+                  <Link to="/customer/products" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                    Products
+                  </Link>
+                  <Link to="/customer/about" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                    About Us
+                  </Link>
+                  <Link to="/contact" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                    Contact
+                  </Link>
+                  <Link to="/services" className="text-gray-700 hover:text-[#4A90E2] font-medium transition-colors">
+                    Services
+                  </Link>
+                </>
               )}
             </div>
+          </div>
+
+          {/* ✅ RIGHT SIDE: Contains ONLY the Login/Logout/Dashboard buttons */}
+          <div className="hidden md:flex items-center gap-4">
+            {currentUser ? (
+              <>
+                <span className="w-px h-6 bg-gray-300 mr-2"></span>
+                
+                <Link 
+                  to={getDashboardUrl()} 
+                  className="text-[#4A90E2] hover:text-[#4A90E2]/70 transition-colors p-2 bg-white/50 rounded-full"
+                  title="Go to Dashboard"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </Link>
+
+                <button
+                  onClick={handleLogout}
+                  className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors text-sm font-medium"
+                >
+                  Logout
+                </button>
+              </>
+            ) : (
+              <Link 
+                to="/customer/login" 
+                className="bg-[#4A90E2] text-white px-5 py-2 rounded-lg hover:bg-[#4A90E2]/80 transition-colors font-medium text-sm"
+              >
+                Login
+              </Link>
+            )}
           </div>
 
           {/* Mobile Menu Button */}

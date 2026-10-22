@@ -1,7 +1,11 @@
+// src/pages/admin/CustomerHistoryPage.js
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { collection, query, where, getDocs, doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import ConfirmModal from '../../components/ConfirmModal';
+import ViewRecordModal from '../../components/ViewRecordModal';
 
 function CustomerHistoryPage() {
   const { customerId } = useParams();
@@ -16,6 +20,9 @@ function CustomerHistoryPage() {
   const [paymentRecord, setPaymentRecord] = useState(null);
   const [newPayment, setNewPayment] = useState('');
   const [updating, setUpdating] = useState(false);
+
+  // ✅ New states for custom ConfirmModal
+  const [alertConfig, setAlertConfig] = useState(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -38,6 +45,8 @@ function CustomerHistoryPage() {
     loadData();
   }, [loadData]);
 
+      // Inside CustomerHistoryPage.js
+
   const handleUpdatePayment = async (e) => {
     e.preventDefault();
     if (!paymentRecord) return;
@@ -45,40 +54,71 @@ function CustomerHistoryPage() {
 
     try {
       const paymentAmount = Number(newPayment);
+      
+      // 1. Calculate new totals
       const updatedAmountPaid = (paymentRecord.amountPaid || 0) + paymentAmount;
       const updatedBalance = paymentRecord.total - updatedAmountPaid;
-      
       const newStatus = updatedBalance <= 0 ? 'paid' : 'pending';
+      
+      // 2. Create the payment entry for the history ledger
+      const newPaymentEntry = {
+        date: new Date().toISOString(),
+        amount: paymentAmount,
+        method: paymentRecord.paymentMethod || 'Cash',
+        receivedBy: 'Admin Staff' 
+      };
 
-      // 1. Update the Record in Firestore
+      // 3. Get existing history (or empty array if this is the first payment)
+      const existingHistory = paymentRecord.paymentHistory || [];
+
+      // 4. Update the Record in Firestore (records collection)
       await updateDoc(doc(db, 'records', paymentRecord.id), {
         amountPaid: updatedAmountPaid,
         balance: updatedBalance > 0 ? updatedBalance : 0,
-        paymentStatus: newStatus
+        paymentStatus: newStatus,
+        paymentHistory: [...existingHistory, newPaymentEntry] // ✅ Append to array
       });
 
-      // 2. Update the corresponding Order in Sales
-      const q = query(collection(db, 'orders'), where('customerId', '==', customerId));
-      const ordersSnap = await getDocs(q);
-      ordersSnap.forEach(async (orderDoc) => {
-        const orderData = orderDoc.data();
-        if (orderData.totalAmount === paymentRecord.total && orderData.balance > 0) {
+      // 5. Update the corresponding Order in Sales
+      if (paymentRecord.receiptNo) {
+        const q = query(collection(db, 'orders'), where('receiptNo', '==', paymentRecord.receiptNo));
+        const ordersSnap = await getDocs(q);
+        ordersSnap.forEach(async (orderDoc) => {
           await updateDoc(doc(db, 'orders', orderDoc.id), {
             amountPaid: updatedAmountPaid,
             balance: updatedBalance > 0 ? updatedBalance : 0,
-            paymentStatus: newStatus
+            paymentStatus: newStatus,
+            paymentHistory: [...existingHistory, newPaymentEntry] // ✅ Save to order too
           });
-        }
+        });
+      }
+
+      // 6. Update the Customer's profile for the table
+      await updateDoc(doc(db, 'customers', customerId), {
+        latestBalance: updatedBalance > 0 ? updatedBalance : 0,
+        latestPaymentStatus: newStatus
       });
 
-      alert('✅ Payment updated successfully!');
+      // 7. Reset UI
       setPaymentRecord(null);
       setNewPayment('');
-      setViewRecord(null); // Close the view modal if it was open
-      loadData();
+      setViewRecord(null); // Close the view modal so it refreshes
+      
+      loadData(); // Refresh the list
+
+      setAlertConfig({
+        type: 'success',
+        title: 'Payment Recorded!',
+        message: `Payment of ₱${paymentAmount.toLocaleString()} has been added to the ledger.`
+      });
+
     } catch (err) {
       console.error(err);
-      alert('Failed to update payment');
+      setAlertConfig({
+        type: 'error',
+        title: 'Update Failed',
+        message: 'Could not update the payment. Please try again.'
+      });
     }
     setUpdating(false);
   };
@@ -103,156 +143,89 @@ function CustomerHistoryPage() {
           </Link>
         </div>
 
-        {records.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm p-12 text-center text-gray-500">
+                        {records.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow-sm p-12 text-center text-gray-500 border border-gray-200">
             No visits recorded yet.
           </div>
         ) : (
-          <div className="space-y-3">
-            {/* ✅ Clickable Record Cards */}
-            {records.map((r) => (
-              <button 
-                key={r.id} 
-                onClick={() => setViewRecord(r)}
-                className="w-full text-left bg-white rounded-2xl shadow-sm p-6 hover:shadow-md transition-shadow border border-transparent hover:border-[#4A90E2]"
-              >
-                <div className="flex justify-between items-center">
-                  <div>
-                    <h3 className="font-semibold text-lg">{r.date}</h3>
-                    <p className="text-sm text-gray-500">
-                      Total: <strong>₱{(r.total || 0).toLocaleString()}</strong>
-                    </p>
-                  </div>
-                  <div className="flex flex-col items-end gap-1">
-                    <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+          <div className="space-y-4">
+            {records.map((r) => {
+              // Extract and format the items purchased
+              const itemNames = [
+                r.frame?.name,
+                r.lensType?.name,
+                r.coating?.name
+              ].filter(Boolean).join(', ');
+
+              // Format the time
+              const timeString = r.createdAt 
+                ? new Date(r.createdAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) 
+                : '';
+
+              return (
+                <button 
+                  key={r.id} 
+                  onClick={() => setViewRecord(r)}
+                  className="w-full text-left bg-white rounded-xl border border-gray-300 p-5 hover:shadow-md transition-shadow relative"
+                >
+                  {/* Top Row: Date & Time + Status Badge */}
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-baseline gap-2">
+                      {/* Date (Large) */}
+                      <h3 className="font-bold text-xl text-gray-900">
+                        {new Date(r.date).toLocaleDateString('en-US', { month: 'short', day: '2-digit', year: 'numeric' })}
+                      </h3>
+                      
+                      {/* Time (Smaller & Gray) */}
+                      {timeString && (
+                        <span className="text-sm font-medium text-black">{timeString}</span>
+                      )}
+                    </div>
+                    
+                    <span className={`text-xs px-3 py-1 rounded-full font-bold ${
                       r.paymentStatus === 'paid' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
                     }`}>
-                      {r.paymentStatus === 'paid' ? 'Fully Paid' : 'Pending Balance'}
-                    </span>
-                    <span className="text-sm font-bold text-red-500">
-                      Balance: ₱{(r.balance || 0).toLocaleString()}
+                      {r.paymentStatus === 'paid' ? 'Fully Paid' : 'Pending'}
                     </span>
                   </div>
-                </div>
-              </button>
-            ))}
+
+                  {/* Bottom Row: Price + Items + Balance */}
+                  <div className="flex justify-between items-end mt-1">
+                    <div className="flex items-center gap-2 text-gray-700 text-sm font-medium">
+                      {/* Price (with .00) */}
+                      <span>₱ {Number(r.total || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                      
+                      {itemNames && (
+                        <>
+                          <span className="text-gray-400">|</span>
+                          <span>{itemNames}</span>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="text-sm font-bold text-red-600">
+                      Balance: ₱ {Number(r.balance || 0).toLocaleString()}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
       </div>
 
-      {/* ✅ VIEW RECORD MODAL */}
-      {viewRecord && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            
-            <div className="sticky top-0 bg-[#4A90E2] text-white p-4 flex justify-between items-center rounded-t-2xl">
-              <div>
-                <h2 className="text-lg font-bold">Visit Details</h2>
-                <p className="text-sm opacity-90">{viewRecord.date}</p>
-              </div>
-              <button onClick={() => setViewRecord(null)} className="text-2xl leading-none hover:text-gray-200">
-                &times;
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              
-              {/* Prescription Summary */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-xl">
-                  <h4 className="text-sm font-bold text-gray-500 mb-2">OLD PRESCRIPTION</h4>
-                  <p className="text-sm">PD: {viewRecord.oldPd || '—'}</p>
-                  <p className="text-sm">OD: {viewRecord.oldPrescription?.od?.sph || '—'}</p>
-                  <p className="text-sm">OS: {viewRecord.oldPrescription?.os?.sph || '—'}</p>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <h4 className="text-sm font-bold text-[#4A90E2] mb-2">NEW PRESCRIPTION</h4>
-                  <p className="text-sm">PD: {viewRecord.newPd || '—'}</p>
-                  <p className="text-sm">OD: {viewRecord.newPrescription?.od?.sph || '—'}</p>
-                  <p className="text-sm">OS: {viewRecord.newPrescription?.os?.sph || '—'}</p>
-                </div>
-              </div>
-
-              {/* Products */}
-              <div>
-                <h4 className="text-sm font-bold text-gray-500 mb-2">FRAME & LENS</h4>
-                <div className="flex gap-4">
-                  <div className="flex-1 bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500">Frame</p>
-                    <p className="font-medium">{viewRecord.frame?.name || '—'}</p>
-                  </div>
-                  <div className="flex-1 bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500">Lens</p>
-                    <p className="font-medium">{viewRecord.lens?.name || '—'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Notes */}
-              {(viewRecord.prescriptionNotes || viewRecord.additionalNotes) && (
-                <div>
-                  <h4 className="text-sm font-bold text-gray-500 mb-2">NOTES</h4>
-                  <div className="bg-yellow-50 p-3 rounded-lg text-sm border border-yellow-100">
-                    {viewRecord.prescriptionNotes && <p>{viewRecord.prescriptionNotes}</p>}
-                    {viewRecord.additionalNotes && <p className="text-gray-600 mt-1">{viewRecord.additionalNotes}</p>}
-                  </div>
-                </div>
-              )}
-
-              {/* Payment Breakdown */}
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <h4 className="text-sm font-bold text-gray-500 mb-3">PAYMENT BREAKDOWN</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Subtotal (Frame + Lens)</span>
-                    <span>₱{((viewRecord.total || 0) + (Number(viewRecord.discount) || 0)).toLocaleString()}</span>
-                  </div>
-                  {Number(viewRecord.discount) > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Discount</span>
-                      <span>- ₱{Number(viewRecord.discount).toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold border-t pt-2">
-                    <span>Total Amount</span>
-                    <span>₱{(viewRecord.total || 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Amount Paid ({viewRecord.paymentMethod})</span>
-                    <span>₱{(viewRecord.amountPaid || 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-red-600 font-bold">
-                    <span>Balance</span>
-                    <span>₱{(viewRecord.balance || 0).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Modal Footer Buttons */}
-            <div className="sticky bottom-0 bg-white border-t p-4 flex gap-3 rounded-b-2xl">
-              <button 
-                onClick={() => setViewRecord(null)}
-                className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
-              >
-                Close
-              </button>
-              {viewRecord.balance > 0 && (
-                <button 
-                  onClick={() => {
-                    setPaymentRecord(viewRecord);
-                    setNewPayment('');
-                  }}
-                  className="flex-1 bg-[#4A90E2] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90"
-                >
-                  Update Payment
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
+                        {/* ✅ New & Cleaner View Record Modal */}
+      <ViewRecordModal 
+        record={viewRecord} 
+        customer={customer} 
+        onClose={() => setViewRecord(null)} 
+        onUpdatePayment={(record) => {
+          setPaymentRecord(record);   // ✅ Opens the Update Payment modal
+          setNewPayment('');          // ✅ Clears the input field
+          // Note: We don't close the ViewRecordModal here. It will close automatically when the payment is saved.
+        }}
+      />
+      
       {/* ✅ UPDATE PAYMENT MODAL */}
       {paymentRecord && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
@@ -291,6 +264,20 @@ function CustomerHistoryPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* ✅ CUSTOM ALERTS (Replaces native alert) */}
+      {alertConfig && (
+        <ConfirmModal
+          isOpen={true}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          icon={alertConfig.type === 'success' ? '✅' : '❌'}
+          confirmText="OK"
+          confirmColor={alertConfig.type === 'success' ? 'green' : 'red'}
+          isAlert
+          onConfirm={() => setAlertConfig(null)}
+        />
       )}
     </div>
   );
