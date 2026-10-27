@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { doc, getDoc, addDoc, collection, getDocs, updateDoc } from 'firebase/firestore';
+import { doc, getDoc, addDoc, collection, getDocs, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -17,6 +17,10 @@ function PatientRecordPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
+  const [customFrame, setCustomFrame] = useState({ name: '', price: '' });
+  const [customLens, setCustomLens] = useState({ name: '', price: '' });
+  const [customCoating, setCustomCoating] = useState({ name: '', price: '' });
+
   // ✅ Modal states
   const [showPrescriptionError, setShowPrescriptionError] = useState(false);
   const [saveError, setSaveError] = useState('');
@@ -27,7 +31,7 @@ function PatientRecordPage() {
   const [isManualTotal, setIsManualTotal] = useState(false);
 
   const [record, setRecord] = useState({
-    date: new Date().toISOString().split('T')[0],
+    date: new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0],
     firstName: '', lastName: '', nickname: '', address: '', age: '', phone: '', occupation: '',
     
     oldPd: '', newPd: '',
@@ -80,7 +84,7 @@ function PatientRecordPage() {
     load();
   }, [customerId, navigate]);
 
-  // Auto-calculate total
+    // ✅ Auto-calculate total
   useEffect(() => {
     if (isManualTotal) return; // Don't override if manually edited
 
@@ -90,19 +94,22 @@ function PatientRecordPage() {
     
     const isPackage = f?.name?.toLowerCase().includes('package');
     
+    // ✅ Use custom price if "Others" is selected, otherwise use inventory price
+    const framePrice = record.frame === 'others' ? (Number(customFrame.price) || 0) : (f?.price || 0);
+    const lensPrice = record.lensType === 'others' ? (Number(customLens.price) || 0) : (lt?.price || 0);
+    const coatingPrice = record.coating === 'others' ? (Number(customCoating.price) || 0) : (c?.price || 0);
+
     let subtotal = 0;
-    if (isPackage) {
+    if (isPackage && record.frame !== 'others') {
       subtotal = f?.price || 0;
     } else {
-      const framePrice = f?.price || 0;
-      const lensPrice = (lt?.price || 0) + (c?.price || 0);
-      subtotal = framePrice + lensPrice;
+      subtotal = framePrice + lensPrice + coatingPrice;
     }
 
     if (subtotal > 0) {
       setRecord((p) => ({ ...p, total: subtotal }));
     }
-  }, [record.frame, record.lensType, record.coating, inventory, isManualTotal]);
+  }, [record.frame, record.lensType, record.coating, inventory, isManualTotal, customFrame.price, customLens.price, customCoating.price]);
     
   // Auto-calculate balance
   useEffect(() => {
@@ -121,7 +128,7 @@ function PatientRecordPage() {
     }));
   }, [record.amountPaid, record.total]);
 
-  const handleSave = async () => {
+    const handleSave = async () => {
     if (!record.newODsph && !record.newOSsph) {
       setShowPrescriptionError(true); 
       return;
@@ -129,31 +136,32 @@ function PatientRecordPage() {
 
     setSaving(true);
     try {
-      const f = inventory.find((i) => i.id === record.frame);
-      const lt = inventory.find((i) => i.id === record.lensType);
-      const c = inventory.find((i) => i.id === record.coating);
+            // ✅ Handle custom "Others" inputs
+      const f = record.frame === 'others' 
+        ? { id: 'custom', name: customFrame.name, price: Number(customFrame.price) } 
+        : inventory.find((i) => i.id === record.frame);
+        
+      const lt = record.lensType === 'others' 
+        ? { id: 'custom', name: customLens.name, price: Number(customLens.price) } 
+        : inventory.find((i) => i.id === record.lensType);
+        
+      const c = record.coating === 'others' 
+        ? { id: 'custom', name: customCoating.name, price: Number(customCoating.price) } 
+        : inventory.find((i) => i.id === record.coating);
       const generatedReceipt = `SO-${Date.now().toString().slice(-5)}`;
       const isPackage = f?.name?.toLowerCase().includes('package');
 
-      // Update customer stats
-            // ✅ Update customer stats AND latest transaction info for the Customers Table
+      // 1. Update customer stats
       await updateDoc(doc(db, 'customers', customerId), {
-        firstName: record.firstName, 
-        lastName: record.lastName, 
-        nickname: record.nickname,
-        address: record.address, 
-        age: record.age, 
-        phone: record.phone, 
-        occupation: record.occupation,
-        lastVisit: new Date().toISOString(), 
-        totalVisits: (customer.totalVisits || 0) + 1,
-        
-        // ✅ NEW: Save latest balance & payment info directly to the customer profile
+        firstName: record.firstName, lastName: record.lastName, nickname: record.nickname,
+        address: record.address, age: record.age, phone: record.phone, occupation: record.occupation,
+        lastVisit: new Date().toISOString(), totalVisits: (customer.totalVisits || 0) + 1,
         latestBalance: record.balance || 0,
         latestPaymentMethod: record.paymentMethod || 'Cash',
         latestPaymentStatus: record.paymentStatus || 'pending'
       });
-      // Save record
+
+      // 2. Save the clinical record
       await addDoc(collection(db, 'records'), {
         customerId, customerName: `${record.lastName}, ${record.firstName}`, date: record.date,
         oldPd: record.oldPd, newPd: record.newPd,
@@ -173,29 +181,16 @@ function PatientRecordPage() {
         amountPaid: Number(record.amountPaid) || 0, balance: record.balance,
         paymentStatus: record.paymentStatus, paymentMethod: record.paymentMethod,
         optometrist: record.optometrist, createdBy: currentUser?.email, createdAt: new Date().toISOString(),
-        receiptNo: generatedReceipt, // Save receiptNo to link with orders
+        receiptNo: generatedReceipt,
       });
 
-      // Save order
+      // 3. Save the order for sales tracking
       await addDoc(collection(db, 'orders'), {
-        receiptNo: generatedReceipt, 
-        customerId, 
-        customerName: `${record.lastName}, ${record.firstName}`,
-        
-        // ✅ NEW: Save contact info and notes for the modal
+        receiptNo: generatedReceipt, customerId, customerName: `${record.lastName}, ${record.firstName}`,
         customerPhone: record.phone, 
         notes: record.additionalNotes || record.prescriptionNotes || '',
-        
-        totalAmount: record.total, 
-        amountPaid: Number(record.amountPaid) || 0, 
-        balance: record.balance,
-        
-        // ✅ NEW: Save discount so the math looks correct in the modal
-        discount: Number(record.discount) || 0, 
-        
-        paymentStatus: record.paymentStatus, 
-        paymentMethod: record.paymentMethod, 
-        orderDate: new Date().toISOString(),
+        totalAmount: record.total, amountPaid: Number(record.amountPaid) || 0, balance: record.balance,
+        paymentStatus: record.paymentStatus, paymentMethod: record.paymentMethod, orderDate: new Date().toISOString(),
         items: [
           ...(f ? [{ name: f.name, category: isPackage ? 'Package' : f.category, qty: 1, price: f.price }] : []),
           ...(!isPackage && lt ? [{ name: lt.name, category: 'Lens Type', qty: 1, price: lt.price }] : []),
@@ -203,7 +198,36 @@ function PatientRecordPage() {
         ],
       });
 
-      // Show success modal
+            // ✅ 6. Mark the patient's active appointment as Completed
+      // We search for ANY appointment for this customer that is "Pending" or "Scheduled"
+      // that falls on OR before today. (This handles late visits or early arrivals).
+      
+      
+      const apptQuery = query(
+        collection(db, 'appointments'),
+        where('customerId', '==', customerId),
+        where('status', 'in', ['Pending', 'Scheduled'])
+      );
+      
+      const apptSnap = await getDocs(apptQuery);
+      
+      if (!apptSnap.empty) {
+        // Filter locally to find the closest appointment on or before today
+        const pendingAppts = [];
+        apptSnap.forEach(doc => pendingAppts.push({ id: doc.id, ...doc.data() }));
+        
+        // Sort them so today's appointment is first, then past due
+        pendingAppts.sort((a, b) => a.date.localeCompare(b.date));
+        
+        // Pick the first one (which would be the most relevant one)
+        const apptToComplete = pendingAppts[0];
+        
+        await updateDoc(doc(db, 'appointments', apptToComplete.id), {
+          status: 'Completed'
+        });
+      }
+
+      // 5. Show success modal
       setReceiptNo(generatedReceipt);
       setShowSuccess(true);
     } catch (err) {
@@ -247,33 +271,119 @@ function PatientRecordPage() {
           <div className="flex items-end gap-2"><span className="text-sm font-medium">DATE:</span><input type="date" value={record.date} onChange={(e) => setRecord({ ...record, date: e.target.value })} className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none" /></div>
         </div>
 
-        {/* OLD PRESCRIPTION TABLE */}
+                {/* OLD PRESCRIPTION TABLE */}
         <div className="border-2 border-gray-700 rounded-lg mb-4 overflow-hidden">
-          <div className="grid grid-cols-[80px_1fr_90px] bg-gray-50"><div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">PD</div><div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">OLD PRESCRIPTION</div><div className="p-2 text-center font-semibold text-xs">ADD</div></div>
-          <div className="grid grid-cols-[80px_1fr_90px] border-t-2 border-gray-700">
-            <div className="border-r-2 border-gray-700 p-2"><input type="text" value={record.oldPd} onChange={(e) => setRecord({ ...record, oldPd: e.target.value })} className="w-full text-center text-sm outline-none" placeholder="PD" /></div>
-            <div className="border-r-2 border-gray-700 p-2"><div className="flex items-center gap-2"><span className="text-xs font-medium w-8">OD:</span><input value={record.oldODsph} onChange={(e) => setRecord({ ...record, oldODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" /><input value={record.oldODcyl} onChange={(e) => setRecord({ ...record, oldODcyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" /><span className="text-xs">x</span><input value={record.oldODaxis} onChange={(e) => setRecord({ ...record, oldODaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" /></div></div>
-            <div className="p-2 flex items-center justify-center"><input value={record.oldADD} onChange={(e) => setRecord({ ...record, oldADD: e.target.value })} className="w-full text-center text-sm outline-none" placeholder="ADD" /></div>
+          {/* Header */}
+          <div className="grid grid-cols-[80px_1fr_90px] bg-gray-50 border-b-2 border-gray-700">
+            <div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">PD</div>
+            <div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">OLD PRESCRIPTION</div>
+            <div className="p-2 text-center font-semibold text-xs">ADD</div>
           </div>
-          <div className="grid grid-cols-[80px_1fr_90px] border-t-2 border-gray-700">
-            <div className="border-r-2 border-gray-700 p-2"></div>
-            <div className="border-r-2 border-gray-700 p-2"><div className="flex items-center gap-2"><span className="text-xs font-medium w-8">OS:</span><input value={record.oldOSsph} onChange={(e) => setRecord({ ...record, oldOSsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" /><input value={record.oldOScyl} onChange={(e) => setRecord({ ...record, oldOScyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" /><span className="text-xs">x</span><input value={record.oldOSaxis} onChange={(e) => setRecord({ ...record, oldOSaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" /></div></div>
-            <div className="p-2"></div>
+          
+          {/* Body Grid - Note: We use grid-cols but rowSpan on the outer divs */}
+          <div className="grid grid-cols-[80px_1fr_90px]">
+            
+            {/* ✅ Single PD Input spanning both rows */}
+            <div className="border-r-2 border-gray-700 row-span-2 flex items-center justify-center p-2">
+              <input 
+                type="text" 
+                value={record.oldPd} 
+                onChange={(e) => setRecord({ ...record, oldPd: e.target.value })} 
+                className="w-full text-center text-sm outline-none bg-transparent" 
+                placeholder="PD" 
+              />
+            </div>
+
+            {/* ✅ OD Row */}
+            <div className="border-r-2  border-b-2 border-gray-700 p-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium w-8">OD:</span>
+                <input value={record.oldODsph} onChange={(e) => setRecord({ ...record, oldODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
+                <input value={record.oldODcyl} onChange={(e) => setRecord({ ...record, oldODcyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
+                <span className="text-xs">x</span>
+                <input value={record.oldODaxis} onChange={(e) => setRecord({ ...record, oldODaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
+              </div>
+            </div>
+
+            {/* ✅ Single ADD Input spanning both rows */}
+            <div className="row-span-2 flex items-center justify-center p-2">
+              <input 
+                value={record.oldADD} 
+                onChange={(e) => setRecord({ ...record, oldADD: e.target.value })} 
+                className="w-full text-center text-sm outline-none bg-transparent" 
+                placeholder="ADD" 
+              />
+            </div>
+
+            {/* ✅ OS Row */}
+            <div className="border-r-2 border-gray-700 p-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium w-8">OS:</span>
+                <input value={record.oldOSsph} onChange={(e) => setRecord({ ...record, oldOSsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
+                <input value={record.oldOScyl} onChange={(e) => setRecord({ ...record, oldOScyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
+                <span className="text-xs">x</span>
+                <input value={record.oldOSaxis} onChange={(e) => setRecord({ ...record, oldOSaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
+              </div>
+            </div>
+
           </div>
         </div>
 
         {/* NEW PRESCRIPTION TABLE */}
         <div className="border-2 border-gray-700 rounded-lg mb-6 overflow-hidden">
-          <div className="grid grid-cols-[80px_1fr_90px] bg-gray-50"><div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">PD</div><div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">NEW PRESCRIPTION</div><div className="p-2 text-center font-semibold text-xs">ADD</div></div>
-          <div className="grid grid-cols-[80px_1fr_90px] border-t-2 border-gray-700">
-            <div className="border-r-2 border-gray-700 p-2"><input type="text" value={record.newPd} onChange={(e) => setRecord({ ...record, newPd: e.target.value })} className="w-full text-center text-sm outline-none" placeholder="PD" /></div>
-            <div className="border-r-2 border-gray-700 p-2"><div className="flex items-center gap-2"><span className="text-xs font-medium w-8">OD:</span><input value={record.newODsph} onChange={(e) => setRecord({ ...record, newODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" /><input value={record.newODcyl} onChange={(e) => setRecord({ ...record, newODcyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" /><span className="text-xs">x</span><input value={record.newODaxis} onChange={(e) => setRecord({ ...record, newODaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" /></div></div>
-            <div className="p-2 flex items-center justify-center"><input value={record.newADD} onChange={(e) => setRecord({ ...record, newADD: e.target.value })} className="w-full text-center text-sm outline-none" placeholder="ADD" /></div>
+          {/* Header */}
+          <div className="grid grid-cols-[80px_1fr_90px] bg-gray-50 border-b-2 border-gray-700">
+            <div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">PD</div>
+            <div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">NEW PRESCRIPTION</div>
+            <div className="p-2 text-center font-semibold text-xs">ADD</div>
           </div>
-          <div className="grid grid-cols-[80px_1fr_90px] border-t-2 border-gray-700">
-            <div className="border-r-2 border-gray-700 p-2"></div>
-            <div className="border-r-2 border-gray-700 p-2"><div className="flex items-center gap-2"><span className="text-xs font-medium w-8">OS:</span><input value={record.newOSsph} onChange={(e) => setRecord({ ...record, newOSsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" /><input value={record.newOScyl} onChange={(e) => setRecord({ ...record, newOScyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" /><span className="text-xs">x</span><input value={record.newOSaxis} onChange={(e) => setRecord({ ...record, newOSaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" /></div></div>
-            <div className="p-2"></div>
+          
+          {/* Body Grid */}
+          <div className="grid grid-cols-[80px_1fr_90px]">
+            
+            {/* ✅ Single PD Input spanning both rows */}
+            <div className="border-r-2 border-gray-700 row-span-2 flex items-center justify-center p-2">
+              <input 
+                type="text" 
+                value={record.newPd} 
+                onChange={(e) => setRecord({ ...record, newPd: e.target.value })} 
+                className="w-full text-center text-sm outline-none bg-transparent" 
+                placeholder="PD" 
+              />
+            </div>
+
+            {/* ✅ OD Row */}
+            <div className="border-r-2 border-b-2 border-gray-700 p-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium w-8">OD:</span>
+                <input value={record.newODsph} onChange={(e) => setRecord({ ...record, newODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
+                <input value={record.newODcyl} onChange={(e) => setRecord({ ...record, newODcyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
+                <span className="text-xs">x</span>
+                <input value={record.newODaxis} onChange={(e) => setRecord({ ...record, newODaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
+              </div>
+            </div>
+
+            {/* ✅ Single ADD Input spanning both rows */}
+            <div className="row-span-2 flex items-center justify-center p-2">
+              <input 
+                value={record.newADD} 
+                onChange={(e) => setRecord({ ...record, newADD: e.target.value })} 
+                className="w-full text-center text-sm outline-none bg-transparent" 
+                placeholder="ADD" 
+              />
+            </div>
+
+            {/* ✅ OS Row */}
+            <div className="border-r-2 border-gray-700 p-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium w-8">OS:</span>
+                <input value={record.newOSsph} onChange={(e) => setRecord({ ...record, newOSsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
+                <input value={record.newOScyl} onChange={(e) => setRecord({ ...record, newOScyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
+                <span className="text-xs">x</span>
+                <input value={record.newOSaxis} onChange={(e) => setRecord({ ...record, newOSaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
+              </div>
+            </div>
+
           </div>
         </div>
 
@@ -283,7 +393,7 @@ function PatientRecordPage() {
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label><input type="text" value={record.additionalNotes} onChange={(e) => setRecord({ ...record, additionalNotes: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" /></div>
         </div>
 
-        {/* FRAME, LENS TYPE, & COATING SECTION */}
+                {/* FRAME, LENS TYPE, & COATING SECTION */}
         <div className="space-y-3 mb-6">
           
           {inventory.find((i) => i.id === record.frame)?.name?.toLowerCase().includes('package') ? (
@@ -297,9 +407,6 @@ function PatientRecordPage() {
                 ))}
                 <option value="custom">--- Custom Frame & Lens ---</option>
               </select>
-              {record.frame && record.frame !== 'custom' && (
-                <button onClick={() => setRecord({ ...record, frame: '', lensType: '', coating: '' })} className="text-xs text-red-500 hover:underline">Clear</button>
-              )}
             </div>
           ) : (
             <>
@@ -309,10 +416,7 @@ function PatientRecordPage() {
                 <select value={record.frame} onChange={(e) => setRecord({ ...record, frame: e.target.value })}
                   className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent">
                   <option value="">Select frame</option>
-                  
-                  {/* Option for Customer's Own Frame */}
                   <option value="custom">👤 Customer's Own Frame (No Charge)</option>
-                  
                   <optgroup label="📦 Packages (Frame + Lens)">
                     {inventory.filter((i) => i.name?.toLowerCase().includes('package')).map((i) => (
                       <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
@@ -328,8 +432,16 @@ function PatientRecordPage() {
                       <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
                     ))}
                   </optgroup>
+                  <option value="others">➕ Others (Custom Input)</option>
                 </select>
               </div>
+              {/* ✅ Custom Frame Input */}
+              {record.frame === 'others' && (
+                <div className="flex gap-2 ml-24">
+                  <input type="text" placeholder="Custom Frame Name" value={customFrame.name} onChange={(e) => setCustomFrame({...customFrame, name: e.target.value})} className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
+                  <input type="number" placeholder="Price" value={customFrame.price} onChange={(e) => setCustomFrame({...customFrame, price: e.target.value})} className="w-24 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
+                </div>
+              )}
 
               {/* LENS TYPE */}
               <div className="flex items-end gap-2">
@@ -340,8 +452,16 @@ function PatientRecordPage() {
                   {inventory.filter((i) => i.category === 'Lens Type').map((i) => (
                     <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
                   ))}
+                  <option value="others">➕ Others (Custom Input)</option>
                 </select>
               </div>
+              {/* ✅ Custom Lens Input */}
+              {record.lensType === 'others' && (
+                <div className="flex gap-2 ml-24">
+                  <input type="text" placeholder="Custom Lens Name" value={customLens.name} onChange={(e) => setCustomLens({...customLens, name: e.target.value})} className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
+                  <input type="number" placeholder="Price" value={customLens.price} onChange={(e) => setCustomLens({...customLens, price: e.target.value})} className="w-24 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
+                </div>
+              )}
 
               {/* COATING */}
               <div className="flex items-end gap-2">
@@ -352,8 +472,16 @@ function PatientRecordPage() {
                   {inventory.filter((i) => i.category === 'Coating').map((i) => (
                     <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
                   ))}
+                  <option value="others">➕ Others (Custom Input)</option>
                 </select>
               </div>
+              {/* ✅ Custom Coating Input */}
+              {record.coating === 'others' && (
+                <div className="flex gap-2 ml-24">
+                  <input type="text" placeholder="Custom Coating Name" value={customCoating.name} onChange={(e) => setCustomCoating({...customCoating, name: e.target.value})} className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
+                  <input type="number" placeholder="Price" value={customCoating.price} onChange={(e) => setCustomCoating({...customCoating, price: e.target.value})} className="w-24 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
+                </div>
+              )}
             </>
           )}
         </div>
@@ -394,16 +522,19 @@ function PatientRecordPage() {
                 <option value="Card">Card</option>
               </select>
             </div>
-            <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-600">STATUS:</span>
-              <select 
-                value={record.paymentStatus} 
-                disabled 
-                className="flex-1 border border-gray-300 rounded-lg p-2 text-sm bg-gray-100 text-gray-500 cursor-not-allowed outline-none"
-              >
-                <option value="pending">Pending (May Balance)</option>
-                <option value="paid">Fully Paid</option>
-              </select>
+              <div className="flex-1 flex">
+                {record.paymentStatus === 'paid' ? (
+                  <span className="bg-green-100 text-green-700 px-3 py-2 rounded-lg text-sm font-bold flex-1 text-center">
+                    Fully Paid
+                  </span>
+                ) : (
+                  <span className="bg-yellow-100 text-yellow-700 px-3 py-2 rounded-lg text-sm font-bold flex-1 text-center">
+                    Pending 
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -243,37 +243,28 @@ function CustomersPage() {
 
         </div>
 
-        {/* Filters Row */}
-        <div className="flex flex-wrap items-center gap-3 mb-4">
+                {/* Filters Row */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 flex flex-wrap items-center gap-3 mb-4">
           
           {/* Search Bar */}
           <div className="relative flex-1 min-w-[250px]">
-            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              🔍
+            </span>
             <input
               type="text"
               placeholder="Search by reference id, name, or phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-2.5 bg-white border border-gray-300 rounded-xl focus:ring-2 focus:ring-[#4A90E2] outline-none text-sm placeholder-gray-500"
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
             />
           </div>
-
-          {/* Sort Dropdown */}
-          <select 
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white text-gray-600 outline-none shadow-sm cursor-pointer"
-          >
-            <option value="recent">Recent Visits</option>
-            <option value="oldest">Oldest First</option>
-            <option value="alphabetical">Name (A-Z)</option>
-          </select>
 
           {/* Payment Method Filter */}
           <select 
             value={paymentFilter}
             onChange={(e) => setPaymentFilter(e.target.value)}
-            className="border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white text-gray-600 outline-none shadow-sm cursor-pointer"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
           >
             <option value="All Payments">All Payment Methods</option>
             <option value="Cash">Cash</option>
@@ -285,20 +276,29 @@ function CustomersPage() {
           <select 
             value={balanceFilter}
             onChange={(e) => setBalanceFilter(e.target.value)}
-            className="border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white text-gray-600 outline-none shadow-sm cursor-pointer"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
           >
             <option value="All Balances">All Balances</option>
             <option value="Has Balances">Only Unpaid</option>
             <option value="No Balance">Fully Paid</option>
           </select>
 
-          {/* ✅ Clear Filter Button */}
-          <button
-            onClick={clearFilters}
-            className="px-4 py-2.5 text-sm font-medium text-gray-600 bg-gray-100 hover:bg-gray-200 border border-gray-300 rounded-xl transition-colors"
+          {/* Sort Dropdown */}
+          <select 
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            Clear Filters
+            <option value="recent">Recent Visits</option>
+            <option value="oldest">Oldest First</option>
+            <option value="alphabetical">Name (A-Z)</option>
+          </select>
+
+          <button onClick={clearFilters} className="text-sm text-[#4A90E2] hover:underline font-bold flex items-center gap-1 ml-auto px-4">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+            Clear All Filters
           </button>
+
         </div>
 
         {/* Table */}
@@ -391,7 +391,9 @@ function CustomersPage() {
             </div>
           )}
           
-          {/* Pagination */}
+          
+        </div>
+        {/* Pagination */}
           <div className="flex justify-center items-center gap-2 p-4 border-t border-gray-100">
             <button 
               onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -432,7 +434,6 @@ function CustomersPage() {
               Next
             </button>
           </div>
-        </div>
       </div>
 
       {/* Modal */}

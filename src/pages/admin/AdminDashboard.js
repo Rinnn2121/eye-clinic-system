@@ -11,6 +11,9 @@ function AdminDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
 
+  // ✅ New State for Calendar Selection
+  const [selectedDate, setSelectedDate] = useState(new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0]);
+
   // State for real data
   const [stats, setStats] = useState({
     salesToday: 0,
@@ -38,7 +41,7 @@ function AdminDashboard() {
   // ✅ Fetch Data Function
   const fetchDashboardData = async () => {
     try {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
       const lastWeek = new Date();
       lastWeek.setDate(lastWeek.getDate() - 7);
 
@@ -70,10 +73,6 @@ function AdminDashboard() {
         allAppts.push(data);
         if (data.date === today) apptsTodayCount++;
       });
-
-      const todaysAppts = allAppts
-        .filter((a) => a.date === today)
-        .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
 
       // 3. ORDERS / SALES
       const ordersRef = collection(db, 'orders');
@@ -131,7 +130,8 @@ function AdminDashboard() {
         mostRequestedService: mostRequested ? mostRequested[0] : '—',
       });
 
-      setAppointments(todaysAppts);
+      // ✅ Save ALL appointments
+      setAppointments(allAppts);
       setRecentSales(recentOrdersList);
       setInventoryList(invList.filter(i => i.isActive !== false).slice(0, 5));
 
@@ -170,6 +170,44 @@ function AdminDashboard() {
 
     return total;
   }, [allOrders, chartRange]);
+
+  // ✅ Filter appointments for selected date in calendar
+  const selectedDateAppts = useMemo(() => {
+    return appointments
+      .filter(a => a.date === selectedDate)
+      .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
+  }, [appointments, selectedDate]);
+
+  // ✅ SORTING LOGIC FOR OVERVIEW APPOINTMENTS
+  const todaysAppts = useMemo(() => {
+    const today = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
+    
+    const filtered = appointments.filter(a => a.date === today);
+
+    return filtered.sort((a, b) => {
+      const getStatusWeight = (status) => {
+        const s = (status || '').toLowerCase();
+        if (s === 'pending' || s === 'scheduled') return 1;
+        if (s === 'completed') return 2;
+        if (s === 'cancelled') return 3;
+        return 4;
+      };
+
+      const weightA = getStatusWeight(a.status);
+      const weightB = getStatusWeight(b.status);
+
+      if (weightA !== weightB) return weightA - weightB;
+
+      const dateA = new Date(`${a.date}T${a.time || '00:00'}`).getTime();
+      const dateB = new Date(`${b.date}T${b.time || '00:00'}`).getTime();
+      
+      if (weightA === 1) {
+        return dateA - dateB; 
+      } else {
+        return dateB - dateA; 
+      }
+    });
+  }, [appointments]);
 
   if (loading) {
     return (
@@ -280,7 +318,6 @@ function AdminDashboard() {
             </div>
           </div>
 
-                    {/* Recent Sales */}
           <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col h-full">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-bold text-[#0035A8]">Recent Sales</h3>
@@ -300,7 +337,6 @@ function AdminDashboard() {
                   {recentSales.length === 0 ? (
                     <tr><td colSpan="3" className="p-4 text-center text-gray-500">No sales yet</td></tr>
                   ) : (
-                    /* ✅ Sliced to 5 items */
                     recentSales.slice(0, 5).map((sale) => (
                       <tr key={sale.id} className="border-b border-gray-100 last:border-0">
                         <td className="p-2 text-gray-700">{sale.receiptNo}</td>
@@ -342,13 +378,13 @@ function AdminDashboard() {
           </div>
         </div>
 
-                {/* ✅ BOTTOM SECTION: Restructured for exact alignment */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        {/* BOTTOM SECTION: Restructured for exact alignment */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* LEFT SIDE: Appointments, Inventory, Customers (8 Columns) */}
           <div className="lg:col-span-8 flex flex-col gap-6">
             
-            {/* Appointments Card */}
+            {/* ✅ Appointments Card (Sorted based on logic) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-[#f3e8ff] p-5 border-b border-purple-100">
                 <div className="flex justify-between items-start">
@@ -369,17 +405,27 @@ function AdminDashboard() {
                 </div>
               </div>
               <div className="bg-white">
-                {appointments.length === 0 ? (
+                {todaysAppts.length === 0 ? (
                   <p className="text-gray-500 text-sm py-8 text-center">No appointments scheduled for today.</p>
                 ) : (
-                  appointments.map((apt, idx) => (
-                    <div key={idx} className={`flex items-center justify-between py-4 px-6 ${idx !== appointments.length - 1 ? 'border-b border-gray-100' : ''}`}>
+                  todaysAppts.map((apt, idx) => (
+                    <div key={idx} className={`flex items-center justify-between py-4 px-6 ${idx !== todaysAppts.length - 1 ? 'border-b border-gray-100' : ''}`}>
                       <div className="w-1/4"><span className="font-semibold text-gray-800 text-sm">{apt.time}</span></div>
                       <div className="w-1/3"><span className="text-sm font-medium text-gray-700">{apt.customerName || 'Saavedra, Rudolf'}</span></div>
                       <div className="w-1/4"><span className="text-sm text-gray-500">{apt.reason || 'Eye Examination'}</span></div>
                       <div className="w-1/6 text-right flex items-center justify-end gap-2">
-                        <span className={`w-1.5 h-1.5 rounded-full ${apt.status === 'Confirmed' ? 'bg-green-500' : apt.status === 'Pending' ? 'bg-yellow-500' : 'bg-red-500'}`}></span>
-                        <span className={`text-xs font-bold ${apt.status === 'Confirmed' ? 'text-green-600' : apt.status === 'Pending' ? 'text-yellow-600' : 'text-red-500'}`}>{apt.status || 'Confirmed'}</span>
+                        <span className={`w-1.5 h-1.5 rounded-full ${
+                          apt.status === 'Completed' ? 'bg-green-500' :
+                          apt.status === 'Cancelled' ? 'bg-red-500' : 
+                          'bg-yellow-500'
+                        }`}></span>
+                        <span className={`text-xs font-bold ${
+                          apt.status === 'Completed' ? 'text-green-600' :
+                          apt.status === 'Cancelled' ? 'text-red-500' : 
+                          'text-yellow-600'
+                        }`}>
+                          {apt.status || 'Pending'}
+                        </span>
                       </div>
                     </div>
                   ))
@@ -387,10 +433,10 @@ function AdminDashboard() {
               </div>
             </div>
 
-            {/* Bottom Row of Left Side: Inventory & Customers */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch flex-1">
+            {/* Bottom Row of Left Side: Inventory & Customers (Horizontal Rectangles) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               
-                             {/* Inventory */}
+              {/* Inventory */}
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
                 <div className="flex justify-between items-center px-5 py-3 border-b border-gray-100">
                   <h3 className="font-bold text-lg text-[#d97706] flex items-center gap-2">
@@ -413,9 +459,7 @@ function AdminDashboard() {
                     <tbody>
                       {inventoryList.slice(0, 5).map((item) => (
                         <tr key={item.id} className="border-b border-gray-100 last:border-0">
-                          {/* Reduced py-3 to py-1.5 */}
                           <td className="px-3 py-1.5 flex items-center gap-3">
-                            {/* Made the placeholder square smaller (w-6 h-6) */}
                             <div className="w-6 h-6 bg-gray-200 rounded-md flex-shrink-0"></div>
                             <span className="font-bold text-gray-800 text-xs truncate">{item.name}</span>
                           </td>
@@ -434,7 +478,7 @@ function AdminDashboard() {
               </div>
 
               {/* Customers Overview */}
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col h-full">
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-[#15803d] flex items-center gap-2">
                     <span className="text-xl">👥</span> Customers
@@ -469,7 +513,7 @@ function AdminDashboard() {
           {/* RIGHT SIDE: Calendar & Items for Pick-up (4 Columns) */}
           <div className="lg:col-span-4 flex flex-col gap-6">
             
-            {/* Calendar */}
+            {/* Interactive Calendar */}
             <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col flex-1">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -501,29 +545,56 @@ function AdminDashboard() {
                 
                 {[...Array(daysInMonth)].map((_, i) => {
                   const day = i + 1;
+                  const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                  
                   const isToday = day === new Date().getDate();
-                  const hasEvent = [10, 11, 16, 17, 18].includes(day); 
+                  const isSelected = selectedDate === formattedDate;
+                  const hasAppointments = appointments.some(a => a.date === formattedDate);
+
                   return (
                     <div key={i} className="flex flex-col items-center justify-center p-0.5">
-                      <div className={`w-7 h-7 flex items-center justify-center rounded-full ${isToday ? 'bg-blue-100 text-blue-600 font-bold' : 'text-gray-700'}`}>
+                      <button 
+                        onClick={() => setSelectedDate(formattedDate)}
+                        className={`w-7 h-7 flex items-center justify-center rounded-full transition-colors ${
+                          isSelected ? 'bg-blue-600 text-white font-bold' : 
+                          isToday ? 'bg-blue-100 text-blue-600 font-bold' : 
+                          'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
                         {day}
-                      </div>
-                      {hasEvent && <div className={`w-1 h-1 rounded-full mt-0.5 ${isToday ? 'bg-blue-600' : 'bg-blue-500'}`}></div>}
+                      </button>
+                      
+                      <div className={`w-1 h-1 rounded-full mt-0.5 ${
+                        hasAppointments 
+                          ? (isSelected ? 'bg-blue-600' : 'bg-blue-500') 
+                          : 'bg-transparent'
+                      }`}></div>
                     </div>
                   );
                 })}
               </div>
 
-              <div className="mt-4 bg-[#dbeafe] text-blue-900 text-xs p-3 rounded-xl flex items-start gap-2">
-                <span className="text-blue-500 mt-0.5">●</span>
-                <div>
-                  <p className="font-bold mb-0.5">Incoming Schedule</p>
-                  <p>You have {stats.apptsToday} appointments today.</p>
+              <div className="mt-4 bg-[#dbeafe] text-blue-900 text-xs p-3 rounded-xl flex flex-col gap-2">
+                <div className="flex justify-between items-center font-bold">
+                  <span>Incoming Schedule</span>
+                  <span>{new Date(selectedDate).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
                 </div>
+                {selectedDateAppts.length === 0 ? (
+                  <p className="text-blue-700/70 italic">No appointments scheduled.</p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {selectedDateAppts.map((apt, idx) => (
+                      <div key={idx} className="flex gap-2">
+                        <span className="font-semibold">{apt.time}</span>
+                        <span className="truncate">{apt.customerName}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* ✅ Items for Pick-up (Compact & Stretches to align) */}
+            {/* Items for Pick-up (Unchanged) */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col flex-1">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-bold text-lg text-black flex items-center gap-2">
@@ -532,7 +603,6 @@ function AdminDashboard() {
               </div>
 
               <div className="flex flex-col flex-1 gap-2">
-                {/* Top Row */}
                 <div className="grid grid-cols-2 gap-2 flex-[1.2]">
                   <div className="border border-blue-500 rounded-xl p-2 flex flex-col items-center justify-center bg-white">
                     <div className="flex items-center gap-1 mb-1">
@@ -551,7 +621,6 @@ function AdminDashboard() {
                   </div>
                 </div>
 
-                {/* Middle Row */}
                 <div className="border border-yellow-500 rounded-xl p-2 flex flex-col items-center justify-center bg-white flex-1">
                   <div className="flex items-center gap-1 mb-0.5">
                     <div className="bg-[#fef3c7] text-[#eab308] rounded-full w-4 h-4 flex items-center justify-center text-[9px] font-bold">⏱</div>
@@ -560,7 +629,6 @@ function AdminDashboard() {
                   <p className="text-lg font-bold text-[#eab308]">{stats.inProgress}</p>
                 </div>
 
-                {/* Bottom Row */}
                 <Link
                   to="/admin/sales"
                   className="bg-[#e5e7eb] rounded-xl p-2 flex items-center justify-center hover:bg-gray-300 transition-colors flex-1"
@@ -576,7 +644,6 @@ function AdminDashboard() {
           </div>
         </div>
 
-          
       </div>
 
       {/* ✅ Add Customer Modal */}

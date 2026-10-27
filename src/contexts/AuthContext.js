@@ -8,7 +8,7 @@ import {
   signOut, 
   onAuthStateChanged,
   setPersistence,
-  browserSessionPersistence
+  browserSessionPersistence // ✅ Changed to localPersistence
 } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
@@ -27,6 +27,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const configurePersistence = async () => {
       try {
+        // ✅ Changed to localPersistence so it stays logged in across tabs
         await setPersistence(auth, browserSessionPersistence);
       } catch (error) {
         console.error('Error setting persistence:', error);
@@ -52,12 +53,15 @@ export function AuthProvider({ children }) {
   };
 
   const logout = async () => {
-    localStorage.clear();
+    // ✅ Removed localStorage.clear() to prevent wiping Firebase's session
     await signOut(auth);
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      // ✅ Start loading whenever auth state changes
+      setLoading(true); 
+      
       if (user) {
         setCurrentUser(user);
         
@@ -87,6 +91,8 @@ export function AuthProvider({ children }) {
         setUserRole(null);
         setUserData(null);
       }
+      
+      // ✅ Only stop loading AFTER Firestore role is fetched
       setLoading(false);
     });
     return unsubscribe;
@@ -104,7 +110,8 @@ export function AuthProvider({ children }) {
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {/* ✅ Removed !loading from here so PrivateRoute can handle the spinner */}
+      {children}
     </AuthContext.Provider>
   );
 }

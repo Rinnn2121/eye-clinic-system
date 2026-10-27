@@ -16,6 +16,13 @@ function AllTransactionsPage() {
   const [statusFilter, setStatusFilter] = useState('All Status');
   const [selectedSale, setSelectedSale] = useState(null);
 
+    // ✅ Clear Filters Function
+  const clearFilters = () => {
+    setSearchTerm('');
+    setPaymentFilter('All Payment Methods');
+    setStatusFilter('All Status');
+  };
+  
   // Pagination (Mockup for now)
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
@@ -82,66 +89,81 @@ function AllTransactionsPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-7xl mx-auto">
         
-        {/* Header Row */}
-        <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <h1 className="text-3xl font-bold text-gray-900">All Transactions</h1>
+                {/* ✅ Combined Header & Controls */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           
+          {/* Left Side: Back Link & Title */}
+          <div className="flex flex-col gap-1">
+            <Link to="/admin/sales" 
+            className="text-sm text-[#4A90E2] flex items-center gap-1 font-bold transition-colors mb-2 w-fit">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Sales
+            </Link>
+            <h1 className="text-3xl font-bold text-gray-900">All Transactions</h1>
+          </div>
+
+          {/* Right Side: Date Range & Export Buttons */}
           <div className="flex items-center gap-3">
-            {/* Date Range Placeholder */}
-            <div className="flex items-center gap-2 border border-gray-300 rounded-lg px-3 py-2 bg-white text-sm text-gray-600">
-              <span>📅</span>
-              <span>Sept 21, 2026 - Sept 26, 2026</span>
-              <span className="text-gray-400 ml-2">▼</span>
-            </div>
-            
-            {/* Export Button */}
-            <button className="bg-[#4A90E2] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 flex items-center gap-2">
+            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 shadow-sm">
+              <span>📅</span> Date Range <span className="text-xs text-gray-400">▼</span>
+            </button>
+            <button className="flex items-center gap-2 px-4 py-2 bg-[#4A90E2] text-white rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 shadow-sm">
               <span>⬇</span> Export Sales
             </button>
           </div>
+
         </div>
 
-        {/* Filters Row */}
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
-          <Link to="/admin/sales" className="text-sm text-[#4A90E2] hover:underline mb-2 md:mb-0">
-            ← Back to Dashboard
-          </Link>
+                {/* Filter Bar */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 flex flex-wrap items-center gap-3 mb-6">
           
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="relative w-64">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              </span>
-              <input
-                type="text"
-                placeholder="Search by receipt no., customer..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-              />
-            </div>
-            
-            <select
-              value={paymentFilter}
-              onChange={(e) => setPaymentFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none"
-            >
-              <option value="All Payment Methods">All Payment Methods</option>
-              <option value="Cash">Cash</option>
-              <option value="GCash">GCash</option>
-              <option value="Card">Card</option>
-            </select>
-
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none"
-            >
-              <option value="All Status">All Status</option>
-              <option value="Paid">Paid</option>
-              <option value="Partial">Partial</option>
-            </select>
+          {/* Search Bar */}
+          <div className="relative flex-1 min-w-[250px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            </span>
+            <input
+              type="text"
+              placeholder="Search by receipt no., customer..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
+            />
           </div>
+          
+          {/* Payment Filter */}
+          <select 
+            value={paymentFilter}
+            onChange={(e) => setPaymentFilter(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
+          >
+            <option value="All Payment Methods">All Payment Methods</option>
+            <option value="Cash">Cash</option>
+            <option value="GCash">GCash</option>
+            <option value="Card">Card</option>
+          </select>
+
+          {/* Status Filter */}
+          <select 
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
+          >
+            <option value="All Status">All Status</option>
+            <option value="Paid">Paid</option>
+            <option value="Partial">Partial</option>
+          </select>
+
+          {/* Clear Filters */}
+          <button 
+            onClick={clearFilters}
+            className="text-sm text-[#4A90E2] hover:underline font-bold flex items-center gap-1 px-2"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+            Clear All Filters
+          </button>
         </div>
 
         {/* Table */}

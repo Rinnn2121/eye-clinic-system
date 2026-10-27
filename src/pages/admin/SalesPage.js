@@ -1,6 +1,6 @@
 // src/pages/admin/SalesPage.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect} from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import SalesChart from '../../components/SalesChart';
@@ -15,12 +15,12 @@ function SalesPage() {
     totalSales: 0,
     productsSold: 0,
     totalCustomers: 0,
-    bestSeller: { name: '—', count: 0, percent: 0 },
+    outstandingPayments: 0,
   });
 
   const [categories, setCategories] = useState([]);
 
-  // ✅ New states for the Table Filters
+  // ✅ Table Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('All Payment Methods');
   const [statusFilter, setStatusFilter] = useState('All Status');
@@ -80,7 +80,7 @@ function SalesPage() {
     computeCategories(filtered);
   }, [timeFilter, sales, loading]);
 
-  // ✅ Stats
+  // ✅ Stats Calculation
   const computeStats = (data) => {
     const totalSales = data.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
     const productsSold = data.reduce(
@@ -89,22 +89,22 @@ function SalesPage() {
     );
     const uniqueCustomers = new Set(data.map((s) => s.customerEmail || s.customerName)).size;
 
-    const productCount = {};
-    data.forEach((s) => {
-      s.items?.forEach((item) => {
-        productCount[item.name] = (productCount[item.name] || 0) + (item.qty || 1);
-      });
-    });
-    const bestEntry = Object.entries(productCount).sort((a, b) => b[1] - a[1])[0];
-    const bestSeller = bestEntry
-      ? {
-          name: bestEntry[0],
-          count: bestEntry[1],
-          percent: productsSold > 0 ? Math.round((bestEntry[1] / productsSold) * 100) : 0,
-        }
-      : { name: '—', count: 0, percent: 0 };
+    // ✅ Calculate Total Outstanding Payments (Ignore 'PAY-' receipts)
+    const outstandingPayments = data.reduce((sum, s) => {
+      const isPaymentReceipt = s.receiptNo?.startsWith('PAY-');
+      
+      if (!isPaymentReceipt) {
+        return sum + (Number(s.balance) || 0);
+      }
+      return sum;
+    }, 0);
 
-    setStats({ totalSales, productsSold, totalCustomers: uniqueCustomers, bestSeller });
+    setStats({ 
+      totalSales, 
+      productsSold, 
+      totalCustomers: uniqueCustomers, 
+      outstandingPayments 
+    });
   };
 
   // ✅ Categories (for donut)
@@ -166,6 +166,13 @@ function SalesPage() {
     return 'Year';
   };
 
+  // ✅ Clear Filters
+  const clearFilters = () => {
+    setSearchTerm('');
+    setPaymentFilter('All Payment Methods');
+    setStatusFilter('All Status');
+  };
+
   // ✅ Filter the table data based on Search, Payment, and Status
   const filteredTransactions = sales.filter((sale) => {
     const matchesSearch = 
@@ -174,7 +181,6 @@ function SalesPage() {
       
     const matchesPayment = paymentFilter === 'All Payment Methods' || sale.paymentMethod === paymentFilter;
     
-    // Treat undefined paymentStatus as 'Pending' or 'Partial' if they have a balance
     const currentStatus = sale.paymentStatus || (sale.balance > 0 ? 'Partial' : 'Paid');
     const matchesStatus = statusFilter === 'All Status' || 
       currentStatus.toLowerCase() === statusFilter.toLowerCase() ||
@@ -224,24 +230,30 @@ function SalesPage() {
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Total Sales', value: peso(stats.totalSales), bg: 'bg-indigo-100 border border-indigo-200', iconBg: 'bg-indigo-500' },
-            { label: 'Products Sold', value: stats.productsSold, bg: 'bg-purple-100 border border-purple-200', iconBg: 'bg-purple-500' },
-            { label: 'Total Customers', value: stats.totalCustomers, bg: 'bg-green-100 border border-green-200', iconBg: 'bg-green-500' },
+            { label: 'Total Sales', value: peso(stats.totalSales), bg: 'bg-indigo-100 border border-indigo-200', iconBg: 'bg-indigo-500', icon: '₱' },
+            { label: 'Products Sold', value: stats.productsSold, bg: 'bg-purple-100 border border-purple-200', iconBg: 'bg-purple-500', icon: '👓' },
+            { label: 'Total Customers', value: stats.totalCustomers, bg: 'bg-green-100 border border-green-200', iconBg: 'bg-green-500', icon: '👥' },
             {
-              label: 'Best Seller / Popular',
-              value: stats.bestSeller.name,
-              bg: 'bg-yellow-100 border border-yellow-200',
-              iconBg: 'bg-yellow-500',
-              sub: `${stats.bestSeller.count} sold (${stats.bestSeller.percent}% of total)`,
+              label: 'Outstanding Payments',
+              value: peso(stats.outstandingPayments),
+              bg: 'ml-10 bg-[#fef3c7] border border-yellow-200', 
+              iconBg: 'bg-[#fbbf24]', 
+              icon: '⏰', 
             },
           ].map((stat, idx) => (
-            <div key={idx} className={`${stat.bg} rounded-2xl p-5 shadow-sm`}>
+            <div 
+              key={idx} 
+              className={`${stat.bg} rounded-2xl p-5 shadow-sm relative`}
+            >
+
               <div className="flex items-center gap-3 mb-3">
-                <div className={`${stat.iconBg} rounded-full w-8 h-8`}></div>
-                <span className="text-sm text-gray-700 font-medium">{stat.label}</span>
+                <div className={`${stat.iconBg} text-white rounded-full w-10 h-10 flex items-center justify-center text-lg shadow-sm`}>
+                  {stat.icon}
+                </div>
+                <span className="text-sm text-gray-800 font-bold">{stat.label}</span>
               </div>
-              <div className="text-2xl font-bold text-gray-900 mb-1 truncate">{stat.value}</div>
-              {stat.sub && <div className="text-xs text-gray-600">{stat.sub}</div>}
+              
+              <div className="text-2xl font-bold text-gray-900">{stat.value}</div>
             </div>
           ))}
         </div>
@@ -249,7 +261,7 @@ function SalesPage() {
         {/* Charts Row */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           {/* Sales Trend */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Sales Trend</h2>
               <span className="text-xs text-gray-500">{timeFilter}</span>
@@ -258,7 +270,7 @@ function SalesPage() {
           </div>
 
           {/* Sales By Product Category */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Sales By Product Category</h2>
             <div className="flex flex-col sm:flex-row items-center gap-6">
               <div className="relative w-40 h-40 flex-shrink-0">
@@ -291,16 +303,15 @@ function SalesPage() {
           </div>
         </div>
 
-        {/* ✅ NEW: Recent Transactions Table with Filters */}
+        {/* ✅ Recent Transactions Table with Enclosed Filters */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           
-          {/* Table Header & Filters */}
-          <div className="flex flex-wrap items-center justify-between gap-4 p-4 border-b border-gray-200 bg-white">
-            <h2 className="text-lg font-semibold text-gray-900">Recent Transactions</h2>
-            
-            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          {/* Filter Bar */}
+          <div className="bg-white p-2 border-b border-gray-200">
+            <div className="flex flex-wrap items-center gap-3">
+              
               {/* Search Bar */}
-              <div className="relative w-full md:w-64">
+              <div className="relative flex-1 min-w-[250px]">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </span>
@@ -309,7 +320,7 @@ function SalesPage() {
                   placeholder="Search by receipt no., customer..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
+                  className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
                 />
               </div>
 
@@ -317,7 +328,7 @@ function SalesPage() {
               <select
                 value={paymentFilter}
                 onChange={(e) => setPaymentFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none"
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <option value="All Payment Methods">All Payment Methods</option>
                 <option value="Cash">Cash</option>
@@ -329,14 +340,22 @@ function SalesPage() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none"
+                className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
               >
                 <option value="All Status">All Status</option>
                 <option value="Paid">Paid</option>
                 <option value="Partial">Partial</option>
               </select>
 
-              <Link to="/admin/transactions" className="text-sm text-[#4A90E2] hover:underline font-medium ml-auto md:ml-2">
+              {/* Clear Filters */}
+              <button 
+                onClick={clearFilters}
+                className="text-sm text-[#4A90E2] hover:underline font-bold flex items-center gap-1 px-2"
+              >
+                Clear Filters
+              </button>
+
+              <Link to="/admin/transactions" className="text-sm text-[#4A90E2] hover:underline font-bold ml-auto px-2">
                 View All →
               </Link>
             </div>
@@ -356,7 +375,7 @@ function SalesPage() {
                   <th className="px-6 py-4 font-semibold">Status</th>
                 </tr>
               </thead>
-                            <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-gray-100">
                 {filteredTransactions.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="text-center py-8 text-gray-500">
@@ -364,7 +383,6 @@ function SalesPage() {
                     </td>
                   </tr>
                 ) : (
-                  /* ✅ Added .slice(0, 5) here to limit to 5 entries */
                   filteredTransactions.slice(0, 5).map((sale) => {
                     const isPartial = sale.balance > 0;
                     const statusText = sale.paymentStatus === 'paid' || !isPartial ? 'Paid' : 'Partial';

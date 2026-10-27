@@ -161,32 +161,38 @@ function InventoryPage() {
           </button>
         </div>
 
-        {/* Filter Bar */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <div className="relative w-full md:w-96">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                {/* Filter Bar */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 flex flex-wrap items-center gap-3 mb-4">
+          
+          {/* Search Bar */}
+          <div className="relative flex-1 min-w-[250px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              🔍
+            </span>
             <input
               type="text"
               placeholder="Search by product name, category..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
             />
           </div>
-          
+
+          {/* Sort Dropdown */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="px-4 py-2.5 bg-white border border-gray-300 rounded-lg text-sm text-gray-700 outline-none"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
           >
             <option>Price: Low to High</option>
             <option>Price: High to Low</option>
             <option>Name: A-Z</option>
           </select>
+
         </div>
 
         {/* Category Tabs */}
-        <div className="flex flex-wrap gap-2 mb-6">
+        <div className="flex flex-wrap justify-center gap-2 mb-6">
           {tabs.map((tab) => (
             <button
               key={tab}
