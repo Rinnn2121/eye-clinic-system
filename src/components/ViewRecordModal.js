@@ -25,6 +25,23 @@ function ViewRecordModal({ record, customer, onClose, onUpdatePayment }) {
   const phone = record.phone || customer?.phone || '';
   const occupation = record.occupation || customer?.occupation || '';
 
+  // ✅ Helper function to calculate the difference
+const getDiff = (oldVal, newVal) => {
+  // Convert strings to numbers
+  const o = parseFloat(oldVal);
+  const n = parseFloat(newVal);
+  
+  // If either is empty or not a number, return null (no badge)
+  if (isNaN(o) || isNaN(n)) return null;
+  
+  const diff = n - o;
+  if (diff === 0) return null; // No change
+  
+  // Format as "+0.50" or "-0.50"
+  const sign = diff > 0 ? '+' : '';
+  return `${sign}${diff.toFixed(2)}`;
+};
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-start justify-center p-4 pt-10 pb-10 z-50 overflow-y-auto">
       <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl border border-gray-200 relative">
@@ -146,7 +163,7 @@ function ViewRecordModal({ record, customer, onClose, onUpdatePayment }) {
             </div>
           </div>
 
-          {/* NEW PRESCRIPTION TABLE */}
+                    {/* NEW PRESCRIPTION TABLE */}
           <div className="border border-gray-400 rounded-md overflow-hidden">
             <div className="grid grid-cols-[60px_1fr_60px] bg-gray-100 border-b border-gray-400">
               <div className="border-r border-gray-400 p-2 text-center font-bold text-[10px] uppercase">PD</div>
@@ -154,21 +171,49 @@ function ViewRecordModal({ record, customer, onClose, onUpdatePayment }) {
               <div className="p-2 text-center font-bold text-[10px] uppercase">ADD</div>
             </div>
             
+            {/* OD Row */}
             <div className="grid grid-cols-[60px_1fr_60px] border-b border-gray-200">
               <div className="border-r border-gray-400 p-2 flex items-center justify-center text-sm font-medium">
                 {record.newPd || 'PD'}
               </div>
               <div className="border-r border-gray-400 p-2 flex items-center gap-2">
                 <span className="text-[10px] font-bold text-gray-600">OD:</span>
+                
+                {/* ✅ SPH with Diff */}
                 <div className="flex-1 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">SPH</span>
-                  <span className="text-xs font-medium">{newRx.od?.sph || '-'}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-medium">{newRx.od?.sph || '-'}</span>
+                    {getDiff(oldRx.od?.sph, newRx.od?.sph) && (
+                      <span className={`text-[9px] font-bold px-1 rounded ${
+                        getDiff(oldRx.od?.sph, newRx.od?.sph).startsWith('+') 
+                          ? 'text-green-600 bg-green-50' 
+                          : 'text-red-600 bg-red-50'
+                      }`}>
+                        {getDiff(oldRx.od?.sph, newRx.od?.sph)}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* ✅ CYL with Diff */}
                 <div className="flex-1 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">CYL</span>
-                  <span className="text-xs font-medium">{newRx.od?.cyl || '-'}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-medium">{newRx.od?.cyl || '-'}</span>
+                    {getDiff(oldRx.od?.cyl, newRx.od?.cyl) && (
+                      <span className={`text-[9px] font-bold px-1 rounded ${
+                        getDiff(oldRx.od?.cyl, newRx.od?.cyl).startsWith('+') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
+                      }`}>
+                        {getDiff(oldRx.od?.cyl, newRx.od?.cyl)}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
                 <span className="text-[10px] text-gray-400 px-1">x</span>
+
+                {/* Axis (No diff needed here usually, but you could add it) */}
                 <div className="w-14 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">Axis</span>
                   <span className="text-xs font-medium">{newRx.od?.axis || '-'}</span>
@@ -179,19 +224,44 @@ function ViewRecordModal({ record, customer, onClose, onUpdatePayment }) {
               </div>
             </div>
 
+            {/* OS Row */}
             <div className="grid grid-cols-[60px_1fr_60px]">
               <div className="border-r border-gray-400 p-2"></div>
               <div className="border-r border-gray-400 p-2 flex items-center gap-2">
                 <span className="text-[10px] font-bold text-gray-600">OS:</span>
+                
+                {/* ✅ SPH with Diff */}
                 <div className="flex-1 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">SPH</span>
-                  <span className="text-xs font-medium">{newRx.os?.sph || '-'}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-medium">{newRx.os?.sph || '-'}</span>
+                    {getDiff(oldRx.os?.sph, newRx.os?.sph) && (
+                      <span className={`text-[9px] font-bold px-1 rounded ${
+                        getDiff(oldRx.os?.sph, newRx.os?.sph).startsWith('+') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
+                      }`}>
+                        {getDiff(oldRx.os?.sph, newRx.os?.sph)}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
+                {/* ✅ CYL with Diff */}
                 <div className="flex-1 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">CYL</span>
-                  <span className="text-xs font-medium">{newRx.os?.cyl || '-'}</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-xs font-medium">{newRx.os?.cyl || '-'}</span>
+                    {getDiff(oldRx.os?.cyl, newRx.os?.cyl) && (
+                      <span className={`text-[9px] font-bold px-1 rounded ${
+                        getDiff(oldRx.os?.cyl, newRx.os?.cyl).startsWith('+') ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'
+                      }`}>
+                        {getDiff(oldRx.os?.cyl, newRx.os?.cyl)}
+                      </span>
+                    )}
+                  </div>
                 </div>
+
                 <span className="text-[10px] text-gray-400 px-1">x</span>
+
                 <div className="w-14 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">Axis</span>
                   <span className="text-xs font-medium">{newRx.os?.axis || '-'}</span>

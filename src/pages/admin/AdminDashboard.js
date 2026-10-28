@@ -4,15 +4,18 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import { useAuth } from '../../contexts/AuthContext';
 import SalesChart from '../../components/SalesChart';
 import AddCustomerModal from './AddCustomerModal';
+import QuickServiceInvoiceModal from '../../components/QuickServiceInvoiceModal';
+import QuickInventoryModal from '../../components/QuickInventoryModal';
+import AppointmentWizardModal from '../../components/AppointmentWizardModal';
+import ConfirmModal from '../../components/ConfirmModal';
 
 function AdminDashboard() {
   const navigate = useNavigate();
+  const { userRole } = useAuth(); // ✅ Get the role
   const [loading, setLoading] = useState(true);
-
-  // ✅ New State for Calendar Selection
-  const [selectedDate, setSelectedDate] = useState(new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0]);
 
   // State for real data
   const [stats, setStats] = useState({
@@ -32,11 +35,18 @@ function AdminDashboard() {
   const [inventoryList, setInventoryList] = useState([]);
   const [allOrders, setAllOrders] = useState([]); 
 
+  // Calendar state
+  const [selectedDate, setSelectedDate] = useState(new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0]);
+
   // Chart states
   const [chartRange, setChartRange] = useState('Week');
 
-  // Modal state
+  // Modal states
   const [showAddCustomerModal, setShowAddCustomerModal] = useState(false);
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [showAppointmentModal, setShowAppointmentModal] = useState(false);
+  const [showInventoryModal, setShowInventoryModal] = useState(false);
+  const [alertConfig, setAlertConfig] = useState(null);
 
   // ✅ Fetch Data Function
   const fetchDashboardData = async () => {
@@ -130,10 +140,9 @@ function AdminDashboard() {
         mostRequestedService: mostRequested ? mostRequested[0] : '—',
       });
 
-      // ✅ Save ALL appointments
       setAppointments(allAppts);
       setRecentSales(recentOrdersList);
-      setInventoryList(invList.filter(i => i.isActive !== false).slice(0, 5));
+      setInventoryList(invList.filter(i => i.isActive !== false));
 
       setLoading(false);
     } catch (err) {
@@ -171,14 +180,14 @@ function AdminDashboard() {
     return total;
   }, [allOrders, chartRange]);
 
-  // ✅ Filter appointments for selected date in calendar
+  // Filter appointments for selected date in calendar
   const selectedDateAppts = useMemo(() => {
     return appointments
       .filter(a => a.date === selectedDate)
       .sort((a, b) => (a.time || '').localeCompare(b.time || ''));
   }, [appointments, selectedDate]);
 
-  // ✅ SORTING LOGIC FOR OVERVIEW APPOINTMENTS
+  // SORTING LOGIC FOR OVERVIEW APPOINTMENTS
   const todaysAppts = useMemo(() => {
     const today = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
     
@@ -231,7 +240,7 @@ function AdminDashboard() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-              Welcome back, Admin! ☀️
+              Welcome back, {userRole === 'admin' ? 'Admin' : 'Staff'}! ☀️
             </h1>
             <p className="text-gray-500 mt-1">Here's a quick look at today's optical activities.</p>
           </div>
@@ -248,15 +257,20 @@ function AdminDashboard() {
 
         {/* TOP STAT CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-[#e0e7ff] rounded-2xl p-5 relative border border-indigo-200 shadow-sm">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="bg-[#6366f1] text-white p-2 rounded-full w-10 h-10 flex items-center justify-center font-bold">₱</div>
-              <span className="text-sm font-medium text-gray-700">Sales</span>
+          
+          {/* ✅ Sales Card - Admin Only */}
+          {userRole === 'admin' && (
+            <div className="bg-[#e0e7ff] rounded-2xl p-5 relative border border-indigo-200 shadow-sm">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="bg-[#6366f1] text-white p-2 rounded-full w-10 h-10 flex items-center justify-center font-bold">₱</div>
+                <span className="text-sm font-medium text-gray-700">Sales</span>
+              </div>
+              <h2 className="text-2xl font-bold mb-2">₱ {stats.salesToday}</h2>
+              <p className="text-xs text-gray-500">Revenue generated today</p>
             </div>
-            <h2 className="text-2xl font-bold mb-2">₱ {stats.salesToday}</h2>
-            <p className="text-xs text-gray-500">Revenue generated today</p>
-          </div>
+          )}
 
+          {/* Appointments */}
           <div className="bg-[#f3e8ff] rounded-2xl p-5 relative border border-purple-200 shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <div className="bg-[#a855f7] text-white p-2 rounded-full w-10 h-10 flex items-center justify-center">📅</div>
@@ -266,6 +280,7 @@ function AdminDashboard() {
             <p className="text-xs text-gray-500">Scheduled for today</p>
           </div>
 
+          {/* Customers */}
           <div className="bg-[#dcfce7] rounded-2xl p-5 relative border border-green-200 shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <div className="bg-[#22c55e] text-white p-2 rounded-full w-10 h-10 flex items-center justify-center">👥</div>
@@ -275,6 +290,7 @@ function AdminDashboard() {
             <p className="text-xs text-gray-500">Registered today</p>
           </div>
 
+          {/* Items for Pick up */}
           <div className="bg-[#fef3c7] rounded-2xl p-5 relative border border-yellow-200 shadow-sm">
             <div className="flex items-center gap-3 mb-2">
               <div className="bg-[#eab308] text-white rounded-full w-10 h-10 flex items-center justify-center">⏰</div>
@@ -287,93 +303,117 @@ function AdminDashboard() {
 
         {/* MIDDLE ROW: Chart + Recent Sales + Quick Actions */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-          <div className="lg:col-span-4 bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-            <div className="flex justify-between items-start mb-4">
-              <div>
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-xl">💸</span>
-                  <h3 className="font-bold text-[#0035A8] text-lg">Sales Overview</h3>
+          
+          {/* ✅ Sales Chart - Admin Only */}
+          {userRole === 'admin' && (
+            <div className="lg:col-span-4 bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+              <div className="flex justify-between items-start mb-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xl">💸</span>
+                    <h3 className="font-bold text-[#0035A8] text-lg">Sales Overview</h3>
+                  </div>
+                  <div className="flex items-center gap-3 mt-2">
+                    <span className="text-2xl font-bold text-gray-900">₱ {filteredTotal.toLocaleString()}</span>
+                    <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
+                      {chartRange === 'Week' ? 'This Week' : 'This Month'}
+                    </span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 mt-2">
-                  <span className="text-2xl font-bold text-gray-900">₱ {filteredTotal.toLocaleString()}</span>
-                  <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
-                    {chartRange === 'Week' ? 'This Week' : 'This Month'}
-                  </span>
+                <div className="flex flex-col items-end gap-3">
+                  <Link to="/admin/sales" className="text-sm text-[#4A90E2] hover:underline font-medium">View Sales →</Link>
+                  <select 
+                    value={chartRange}
+                    onChange={(e) => setChartRange(e.target.value)}
+                    className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-gray-600 bg-white shadow-sm outline-none cursor-pointer"
+                  >
+                    <option value="Week">This Week</option>
+                    <option value="Month">This Month</option>
+                  </select>
                 </div>
               </div>
-              <div className="flex flex-col items-end gap-3">
-                <Link to="/admin/sales" className="text-sm text-[#4A90E2] hover:underline font-medium">View Sales →</Link>
-                <select 
-                  value={chartRange}
-                  onChange={(e) => setChartRange(e.target.value)}
-                  className="text-xs border border-gray-200 rounded-lg px-3 py-1.5 text-gray-600 bg-white shadow-sm outline-none cursor-pointer"
-                >
-                  <option value="Week">This Week</option>
-                  <option value="Month">This Month</option>
-                </select>
+              <div className="mt-4">
+                <SalesChart orders={allOrders} range={chartRange} width={400} height={220} />
               </div>
             </div>
-            <div className="mt-4">
-              <SalesChart orders={allOrders} range={chartRange} width={400} height={220} />
-            </div>
-          </div>
+          )}
 
-          <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col h-full">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="font-bold text-[#0035A8]">Recent Sales</h3>
-              <Link to="/admin/sales" className="text-xs text-blue-600 hover:underline">View All →</Link>
+          {/* ✅ Recent Sales - Admin Only */}
+          {userRole === 'admin' && (
+            <div className="lg:col-span-5 bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col h-full">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="font-bold text-[#0035A8]">Recent Sales</h3>
+                <Link to="/admin/sales" className="text-xs text-blue-600 hover:underline">View All →</Link>
+              </div>
+              
+              <div className="flex-1 flex flex-col">
+                <table className="w-full text-sm h-full">
+                  <thead>
+                    <tr className="bg-[#0E62E8]/10 text-gray-500 text-left">
+                      <th className="p-2 font-medium rounded-l-lg">Receipt no.</th>
+                      <th className="p-2 font-medium">Amount</th>
+                      <th className="p-2 font-medium rounded-r-lg">Payment</th>
+                    </tr>
+                  </thead>
+                  <tbody className="flex-1">
+                    {recentSales.length === 0 ? (
+                      <tr><td colSpan="3" className="p-4 text-center text-gray-500">No sales yet</td></tr>
+                    ) : (
+                      recentSales.slice(0, 5).map((sale) => (
+                        <tr key={sale.id} className="border-b border-gray-100 last:border-0">
+                          <td className="p-2 text-gray-700">{sale.receiptNo}</td>
+                          <td className="p-2 text-gray-900">₱{(sale.totalAmount || 0).toLocaleString()}</td>
+                          <td className="p-2">
+                            <span className={`px-2 py-1 rounded text-xs font-medium ${
+                              sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-700' :
+                              sale.paymentMethod === 'Card' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {sale.paymentMethod}
+                            </span>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-            
-            <div className="flex-1 flex flex-col">
-              <table className="w-full text-sm h-full">
-                <thead>
-                  <tr className="bg-[#0E62E8]/10 text-gray-500 text-left">
-                    <th className="p-2 font-medium rounded-l-lg">Receipt no.</th>
-                    <th className="p-2 font-medium">Amount</th>
-                    <th className="p-2 font-medium rounded-r-lg">Payment</th>
-                  </tr>
-                </thead>
-                <tbody className="flex-1">
-                  {recentSales.length === 0 ? (
-                    <tr><td colSpan="3" className="p-4 text-center text-gray-500">No sales yet</td></tr>
-                  ) : (
-                    recentSales.slice(0, 5).map((sale) => (
-                      <tr key={sale.id} className="border-b border-gray-100 last:border-0">
-                        <td className="p-2 text-gray-700">{sale.receiptNo}</td>
-                        <td className="p-2 text-gray-900">₱{(sale.totalAmount || 0).toLocaleString()}</td>
-                        <td className="p-2">
-                          <span className={`px-2 py-1 rounded text-xs font-medium ${
-                            sale.paymentMethod === 'Cash' ? 'bg-green-100 text-green-700' :
-                            sale.paymentMethod === 'Card' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                          }`}>
-                            {sale.paymentMethod}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          )}
 
-          <div className="lg:col-span-3 bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col h-full relative">
+          {/* Quick Actions (Visible to both) */}
+          <div className={`${userRole === 'admin' ? 'lg:col-span-3' : 'lg:col-span-12'} bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col h-full relative`}>
             <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center gap-2">
               <span className="text-xl">⚡</span> Quick Actions
             </h3>
-            <div className="flex flex-col gap-3 flex-1">
+            <div className={`flex gap-3 flex-1 ${userRole === 'admin' ? 'flex-col' : 'flex-col md:flex-row'}`}>
+              
               <button
                 onClick={() => setShowAddCustomerModal(true)}
-                className="flex-1 flex items-center justify-center w-full border border-green-200 bg-[#dcfce7]  text-green-900 rounded-xl font-bold text-sm hover:bg-[#4ade80] transition-colors shadow-sm"
+                className="flex-1 flex items-center justify-center w-full border border-green-200 bg-[#dcfce7]  text-green-900 rounded-xl font-bold text-sm hover:bg-[#4ade80] transition-colors shadow-sm min-h-[50px]"
               >
                 + Add Customer
               </button>
-              <Link to="/admin/appointments" className="flex-1 flex items-center justify-center w-full border border-pink-200 bg-[#ffe3fb] text-pink-900 rounded-xl font-bold text-sm hover:bg-[#f472b6] transition-colors shadow-sm">
+              
+              <button 
+                onClick={() => setShowServiceModal(true)}
+                className="flex-1 flex items-center justify-center w-full border border-blue-200 bg-[#dbeafe] text-blue-900 rounded-xl font-bold text-sm hover:bg-[#93c5fd] transition-colors shadow-sm min-h-[50px]"
+              >
+                Service Invoice
+              </button>
+
+              <button 
+                onClick={() => setShowAppointmentModal(true)}
+                className="flex-1 flex items-center justify-center w-full border border-pink-200 bg-[#ffe3fb] text-pink-900 rounded-xl font-bold text-sm hover:bg-[#f472b6] transition-colors shadow-sm min-h-[50px]"
+              >
                 Set Up Appointment
-              </Link>
-              <Link to="/admin/inventory" className="flex-1 flex items-center justify-center w-full border border-yellow-200 bg-[#fcf0c8] text-yellow-900 rounded-xl font-bold text-sm hover:bg-[#fbbf24] transition-colors shadow-sm">
+              </button>
+              
+              <button 
+                onClick={() => setShowInventoryModal(true)}
+                className="flex-1 flex items-center justify-center w-full border border-yellow-200 bg-[#fcf0c8] text-yellow-900 rounded-xl font-bold text-sm hover:bg-[#fbbf24] transition-colors shadow-sm min-h-[50px]"
+              >
                 Search Inventory
-              </Link>
+              </button>
             </div>
           </div>
         </div>
@@ -382,9 +422,9 @@ function AdminDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
           
           {/* LEFT SIDE: Appointments, Inventory, Customers (8 Columns) */}
-          <div className="lg:col-span-8 flex flex-col gap-6">
+          <div className="lg:col-span-8 flex flex-col gap-6 h-full">
             
-            {/* ✅ Appointments Card (Sorted based on logic) */}
+            {/* Appointments Card (Visible to both) */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="bg-[#f3e8ff] p-5 border-b border-purple-100">
                 <div className="flex justify-between items-start">
@@ -405,8 +445,11 @@ function AdminDashboard() {
                 </div>
               </div>
               <div className="bg-white">
+                <div className="bg-white min-h-[320px]">
                 {todaysAppts.length === 0 ? (
-                  <p className="text-gray-500 text-sm py-8 text-center">No appointments scheduled for today.</p>
+                  <div className="flex items-center justify-center h-full py-8">
+                    <p className="text-gray-500 text-sm py-8 text-center">No appointments scheduled for today.</p>
+                  </div>
                 ) : (
                   todaysAppts.map((apt, idx) => (
                     <div key={idx} className={`flex items-center justify-between py-4 px-6 ${idx !== todaysAppts.length - 1 ? 'border-b border-gray-100' : ''}`}>
@@ -430,14 +473,15 @@ function AdminDashboard() {
                     </div>
                   ))
                 )}
+                </div>
               </div>
             </div>
 
-            {/* Bottom Row of Left Side: Inventory & Customers (Horizontal Rectangles) */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Bottom Row of Left Side: Inventory & Customers */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 flex-1">
               
-              {/* Inventory */}
-              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden">
+              {/* Inventory (Visible to both) */}
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden h-full">
                 <div className="flex justify-between items-center px-5 py-3 border-b border-gray-100">
                   <h3 className="font-bold text-lg text-[#d97706] flex items-center gap-2">
                     <span className="text-xl">📦</span> Inventory <span className="text-xs font-normal text-gray-500">(Item List)</span>
@@ -447,7 +491,7 @@ function AdminDashboard() {
                   </Link>
                 </div>
                 
-                <div className="px-4 py-2">
+                <div className="px-4 py-2 flex-1">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-[#fef3c7] text-gray-800 text-left">
@@ -477,8 +521,8 @@ function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Customers Overview */}
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col">
+              {/* Customers Overview (Visible to both) */}
+              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col flex-1">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="font-bold text-lg text-[#15803d] flex items-center gap-2">
                     <span className="text-xl">👥</span> Customers
@@ -513,7 +557,7 @@ function AdminDashboard() {
           {/* RIGHT SIDE: Calendar & Items for Pick-up (4 Columns) */}
           <div className="lg:col-span-4 flex flex-col gap-6">
             
-            {/* Interactive Calendar */}
+            {/* Interactive Calendar (Visible to both) */}
             <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex flex-col flex-1">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-800 flex items-center gap-2">
@@ -594,7 +638,7 @@ function AdminDashboard() {
               </div>
             </div>
 
-            {/* Items for Pick-up (Unchanged) */}
+            {/* Items for Pick-up (Visible to both) */}
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col flex-1">
               <div className="flex justify-between items-center mb-3">
                 <h3 className="font-bold text-lg text-black flex items-center gap-2">
@@ -646,7 +690,7 @@ function AdminDashboard() {
 
       </div>
 
-      {/* ✅ Add Customer Modal */}
+      {/* ✅ Modals */}
       {showAddCustomerModal && (
         <AddCustomerModal
           onClose={(startVisitWithId) => {
@@ -657,9 +701,51 @@ function AdminDashboard() {
           }}
           onCustomerCreated={() => {
             fetchDashboardData(); 
+            setAlertConfig({ type: 'success', title: 'Customer Added', message: 'The new customer has been added successfully.' });
           }}
         />
       )}
+
+      {showServiceModal && (
+        <QuickServiceInvoiceModal 
+          onClose={() => setShowServiceModal(false)} 
+          onSuccess={() => {
+            fetchDashboardData();
+            setAlertConfig({ type: 'success', title: 'Receipt Issued!', message: 'The service invoice has been saved successfully.' });
+          }}
+        />
+      )}
+
+      {showAppointmentModal && (
+        <AppointmentWizardModal 
+          onClose={() => setShowAppointmentModal(false)}
+          onSuccess={() => {
+            fetchDashboardData(); 
+            setAlertConfig({ type: 'success', title: 'Appointment Scheduled', message: 'The appointment was added successfully.' });
+          }}
+        />
+      )}
+
+      {showInventoryModal && (
+        <QuickInventoryModal 
+          onClose={() => setShowInventoryModal(false)} 
+          inventoryList={inventoryList} 
+        />
+      )}
+
+      {alertConfig && (
+        <ConfirmModal
+          isOpen={true}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          icon={alertConfig.type === 'success' ? '✅' : '❌'}
+          confirmText="OK"
+          confirmColor={alertConfig.type === 'success' ? 'green' : 'red'}
+          isAlert
+          onConfirm={() => setAlertConfig(null)}
+        />
+      )}
+
     </div>
   );
 }

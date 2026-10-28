@@ -1,13 +1,15 @@
 // src/pages/admin/InventoryPage.js
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore'; // ✅ Removed deleteDoc
-import { db } from '../../firebase/config';
-
-// ✅ Removed ConfirmModal import since we no longer delete
-// import ConfirmModal from '../../components/ConfirmModal';
+import { collection, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore';
+import { db, storage } from '../../firebase/config';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { useAuth } from '../../contexts/AuthContext'; // ✅ Import useAuth
 
 function InventoryPage() {
+  const { userRole } = useAuth(); // ✅ Get the role
+  const isAdmin = userRole === 'admin'; // ✅ Check if admin
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,6 +26,10 @@ function InventoryPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   
+  // Image Upload State
+  const [imageFile, setImageFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
+
   // Form State
   const [formData, setFormData] = useState({
     name: '',
@@ -31,6 +37,8 @@ function InventoryPage() {
     price: '',
     description: '',
     isActive: true,
+    imageUrl: '',
+    createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     updatedBy: 'Admin Staff'
   });
@@ -55,35 +63,48 @@ function InventoryPage() {
   // 2. Handle Save (Add or Edit)
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setUploading(true);
+
     try {
+      let finalImageUrl = formData.imageUrl;
+
+      if (imageFile) {
+        const storageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
+        await uploadBytes(storageRef, imageFile);
+        finalImageUrl = await getDownloadURL(storageRef);
+      }
+
       const dataToSave = {
         name: formData.name,
         category: formData.category,
         price: parseFloat(formData.price),
         description: formData.description,
         isActive: formData.isActive,
+        imageUrl: finalImageUrl,
         updatedAt: new Date().toISOString(),
-        updatedBy: 'Admin Staff'
+        updatedBy: 'Admin Staff',
+        createdAt: formData.createdAt
       };
 
       if (editingId) {
         await updateDoc(doc(db, 'inventory', editingId), dataToSave);
       } else {
-        await addDoc(collection(db, 'inventory'), { ...dataToSave, createdAt: new Date().toISOString() });
+        await addDoc(collection(db, 'inventory'), dataToSave);
       }
       
       setIsModalOpen(false);
+      setImageFile(null);
       loadProducts();
     } catch (error) {
       console.error('Error saving product:', error);
     }
+    setUploading(false);
   };
 
   // 3. Filter, Sort & Paginate Logic
   const processedProducts = useMemo(() => {
     let result = [...products];
 
-    // A. Search
     if (searchTerm) {
       const lowerTerm = searchTerm.toLowerCase();
       result = result.filter(
@@ -91,7 +112,6 @@ function InventoryPage() {
       );
     }
 
-    // B. Category Tab
     if (activeTab !== 'All Products') {
       if (activeTab === 'Lens') {
         result = result.filter((p) => p.category === 'Lens Type');
@@ -100,11 +120,9 @@ function InventoryPage() {
       }
     }
 
-    // C. Sorting (Disabled items go last, then by price/name)
     result.sort((a, b) => {
       if (a.isActive === false && b.isActive !== false) return 1;
       if (a.isActive !== false && b.isActive === false) return -1;
-      
       if (sortBy === 'Price: Low to High') return a.price - b.price;
       if (sortBy === 'Price: High to Low') return b.price - a.price;
       if (sortBy === 'Name: A-Z') return a.name.localeCompare(b.name);
@@ -114,7 +132,6 @@ function InventoryPage() {
     return result;
   }, [products, searchTerm, activeTab, sortBy]);
 
-  // Pagination
   const totalPages = Math.ceil(processedProducts.length / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -124,8 +141,10 @@ function InventoryPage() {
 
   const tabs = ['All Products', 'Metal Frame', 'Plastic Frame', 'Lens', 'Coating', 'Package', 'Service'];
 
-  // Helper to open modal
+  // ✅ Only admins can open the modal
   const openEditModal = (item) => {
+    if (!isAdmin) return; 
+
     setEditingId(item.id);
     setFormData({
       name: item.name || '',
@@ -133,9 +152,12 @@ function InventoryPage() {
       price: item.price || '',
       description: item.description || '',
       isActive: item.isActive !== false,
+      imageUrl: item.imageUrl || '',
+      createdAt: item.createdAt || new Date().toISOString(),
       updatedAt: item.updatedAt || new Date().toISOString(),
       updatedBy: item.updatedBy || 'Admin Staff'
     });
+    setImageFile(null);
     setIsModalOpen(true);
   };
 
@@ -149,26 +171,27 @@ function InventoryPage() {
             <h1 className="text-3xl font-bold text-gray-900">Inventory</h1>
             <p className="text-gray-500 text-sm mt-1">Browse and manage frames, lenses and optical accessories.</p>
           </div>
-          <button
-            onClick={() => {
-              setEditingId(null);
-              setFormData({ name: '', category: 'Metal Frame', price: '', description: '', isActive: true });
-              setIsModalOpen(true);
-            }}
-            className="bg-[#4A90E2] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 shadow-sm"
-          >
-            + Add Product
-          </button>
+          
+          {/* ✅ Only show Add button to Admin */}
+          {isAdmin && (
+            <button
+              onClick={() => {
+                setEditingId(null);
+                setFormData({ name: '', category: 'Metal Frame', price: '', description: '', isActive: true, imageUrl: '', createdAt: new Date().toISOString() });
+                setImageFile(null);
+                setIsModalOpen(true);
+              }}
+              className="bg-[#4A90E2] text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 shadow-sm"
+            >
+              + Add Product
+            </button>
+          )}
         </div>
 
-                {/* Filter Bar */}
+        {/* Filter Bar */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 flex flex-wrap items-center gap-3 mb-4">
-          
-          {/* Search Bar */}
           <div className="relative flex-1 min-w-[250px]">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              🔍
-            </span>
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
             <input
               type="text"
               placeholder="Search by product name, category..."
@@ -177,8 +200,6 @@ function InventoryPage() {
               className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
             />
           </div>
-
-          {/* Sort Dropdown */}
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
@@ -188,7 +209,6 @@ function InventoryPage() {
             <option>Price: High to Low</option>
             <option>Name: A-Z</option>
           </select>
-
         </div>
 
         {/* Category Tabs */}
@@ -219,11 +239,18 @@ function InventoryPage() {
               <div 
                 key={item.id} 
                 onClick={() => openEditModal(item)}
-                className="bg-white border border-gray-200 rounded-xl overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+                // ✅ Admin cards are clickable, Staff cards are not
+                className={`bg-white border border-gray-200 rounded-xl overflow-hidden transition-shadow ${
+                  isAdmin ? 'cursor-pointer hover:shadow-md' : 'cursor-default'
+                }`}
               >
-                {/* Image Placeholder */}
-                <div className="w-full h-44 bg-gray-100 flex items-center justify-center border-b border-gray-100">
-                  <span className="text-5xl opacity-20">🖼️</span>
+                {/* Image */}
+                <div className="w-full h-44 bg-gray-100 flex items-center justify-center border-b border-gray-100 overflow-hidden">
+                  {item.imageUrl ? (
+                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <span className="text-5xl opacity-20">🖼️</span>
+                  )}
                 </div>
 
                 {/* Details */}
@@ -293,12 +320,11 @@ function InventoryPage() {
 
       </div>
 
-      {/* ✅ NEW LARGE EDIT/ADD MODAL */}
-      {isModalOpen && (
+      {/* ✅ EDIT/ADD MODAL (Only renders if Admin) */}
+      {isAdmin && isModalOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-xl w-full max-w-4xl shadow-2xl my-8">
             
-            {/* Modal Header */}
             <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
               <h2 className="text-xl font-bold text-gray-900">
                 {editingId ? 'Edit Product' : 'Add New Product'}
@@ -311,22 +337,29 @@ function InventoryPage() {
               </button>
             </div>
 
-            {/* Modal Body */}
             <form onSubmit={handleSubmit} className="p-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
-                {/* Left Column: Images & Description */}
                 <div className="space-y-5">
-                  <div className="w-full h-64 bg-gray-100 rounded-xl flex items-center justify-center border border-gray-200">
-                    <span className="text-6xl opacity-20">🖼️</span>
-                  </div>
-                  
-                  <div className="flex gap-3">
-                    <div className="w-20 h-20 bg-gray-100 rounded-lg border border-gray-200"></div>
-                    <div className="w-20 h-20 bg-gray-100 rounded-lg border border-gray-200"></div>
-                    <button type="button" className="w-20 h-20 bg-white rounded-lg border border-gray-300 flex items-center justify-center text-2xl text-gray-500 hover:bg-gray-50">
-                      +
-                    </button>
+                  <div className="relative w-full h-64 bg-gray-100 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300 overflow-hidden hover:bg-gray-50 transition-colors">
+                    {(imageFile || formData.imageUrl) ? (
+                      <img 
+                        src={imageFile ? URL.createObjectURL(imageFile) : formData.imageUrl} 
+                        alt="Preview" 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <div className="text-center">
+                        <span className="text-5xl opacity-20 block mb-2">🖼️</span>
+                        <p className="text-xs text-gray-500 font-medium">Click to upload image</p>
+                      </div>
+                    )}
+                    <input 
+                      type="file" 
+                      accept="image/*"
+                      onChange={(e) => setImageFile(e.target.files[0])}
+                      className="absolute inset-0 opacity-0 cursor-pointer"
+                    />
                   </div>
 
                   <div>
@@ -340,7 +373,6 @@ function InventoryPage() {
                   </div>
                 </div>
 
-                {/* Right Column: Inputs & Status */}
                 <div className="flex flex-col">
                   <div className="space-y-5 flex-1">
                     
@@ -387,7 +419,6 @@ function InventoryPage() {
 
                   </div>
 
-                  {/* Status Toggle */}
                   <div className="mt-8">
                     <label className="block text-sm font-bold text-gray-800 mb-3">Status</label>
                     <div className="flex gap-3">
@@ -420,16 +451,19 @@ function InventoryPage() {
 
               </div>
 
-              {/* Footer Banner */}
               <div className="mt-8 bg-[#dbeafe] rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4">
                 
                 <div className="flex items-center gap-6">
                   <div className="flex items-center gap-2 text-blue-900">
                     <span className="text-lg">📝</span>
                     <div>
-                      <p className="text-[10px] font-bold uppercase">Last Updated</p>
+                      <p className="text-[10px] font-bold uppercase">
+                        {editingId ? 'Last Updated' : 'Date Created'}
+                      </p>
                       <p className="text-xs font-bold">
-                        {new Date(formData.updatedAt).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+                        {new Date(editingId ? formData.updatedAt : formData.createdAt).toLocaleString('en-US', { 
+                          month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' 
+                        })}
                       </p>
                     </div>
                   </div>
@@ -442,7 +476,6 @@ function InventoryPage() {
                   </div>
                 </div>
 
-                {/* ✅ Removed Delete Button. Only Cancel and Save remain. */}
                 <div className="flex gap-3 w-full md:w-auto">
                   <button
                     type="button"
@@ -453,9 +486,10 @@ function InventoryPage() {
                   </button>
                   <button
                     type="submit"
-                    className="flex-1 md:flex-none px-6 py-2 bg-[#4A90E2] text-white rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 transition-colors shadow-sm"
+                    disabled={uploading}
+                    className="flex-1 md:flex-none px-6 py-2 bg-[#4A90E2] text-white rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 transition-colors shadow-sm disabled:opacity-50"
                   >
-                    Save Changes
+                    {uploading ? 'Uploading...' : 'Save Changes'}
                   </button>
                 </div>
 

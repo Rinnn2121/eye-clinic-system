@@ -1,6 +1,6 @@
 // src/pages/admin/SalesPage.js
 
-import React, { useState, useEffect} from 'react';
+import React, { useState, useEffect } from 'react';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import SalesChart from '../../components/SalesChart';
@@ -71,26 +71,30 @@ function SalesPage() {
     return data.filter((s) => new Date(s.orderDate) >= startDate);
   };
 
-  // ✅ Recompute when filter or sales change
+    // ✅ Recompute when filter or sales change
   useEffect(() => {
     if (sales.length === 0 && loading) return;
 
     const filtered = filterSalesByRange(sales, timeFilter);
-    computeStats(filtered);
+    
+    // ✅ Pass the filtered data AND the full sales data
+    computeStats(filtered, sales); 
     computeCategories(filtered);
   }, [timeFilter, sales, loading]);
 
-  // ✅ Stats Calculation
-  const computeStats = (data) => {
-    const totalSales = data.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
-    const productsSold = data.reduce(
+    // ✅ Stats Calculation
+  const computeStats = (filteredData, allSalesData) => {
+    // 1. Calculate stats based on the time filter (Day, Week, etc.)
+    const totalSales = filteredData.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
+    const productsSold = filteredData.reduce(
       (sum, s) => sum + (s.items?.reduce((a, i) => a + (i.qty || 1), 0) || 0),
       0
     );
-    const uniqueCustomers = new Set(data.map((s) => s.customerEmail || s.customerName)).size;
+    const uniqueCustomers = new Set(filteredData.map((s) => s.customerEmail || s.customerName)).size;
 
-    // ✅ Calculate Total Outstanding Payments (Ignore 'PAY-' receipts)
-    const outstandingPayments = data.reduce((sum, s) => {
+    // ✅ 2. Calculate Outstanding Payments based on ALL sales (unfiltered)
+    // We ignore 'PAY-' receipts so we don't double-count partial payments.
+    const outstandingPayments = allSalesData.reduce((sum, s) => {
       const isPaymentReceipt = s.receiptNo?.startsWith('PAY-');
       
       if (!isPaymentReceipt) {
@@ -103,7 +107,7 @@ function SalesPage() {
       totalSales, 
       productsSold, 
       totalCustomers: uniqueCustomers, 
-      outstandingPayments 
+      outstandingPayments // This will now always be the all-time total
     });
   };
 
@@ -227,7 +231,7 @@ function SalesPage() {
           </div>
         </div>
 
-        {/* Stat Cards */}
+                {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
             { label: 'Total Sales', value: peso(stats.totalSales), bg: 'bg-indigo-100 border border-indigo-200', iconBg: 'bg-indigo-500', icon: '₱' },
@@ -236,7 +240,7 @@ function SalesPage() {
             {
               label: 'Outstanding Payments',
               value: peso(stats.outstandingPayments),
-              bg: 'ml-10 bg-[#fef3c7] border border-yellow-200', 
+              bg: 'lg:ml-5 bg-[#fef3c7] border border-yellow-200', 
               iconBg: 'bg-[#fbbf24]', 
               icon: '⏰', 
             },
@@ -245,6 +249,10 @@ function SalesPage() {
               key={idx} 
               className={`${stat.bg} rounded-2xl p-5 shadow-sm relative`}
             >
+              {/* ✅ The Vertical Separator Line (Only on the 4th card) */}
+              {idx === 3 && (
+                <div className="absolute top-0 -left-3 w-px h-full bg-gray-300 hidden lg:block"></div>
+              )}
 
               <div className="flex items-center gap-3 mb-3">
                 <div className={`${stat.iconBg} text-white rounded-full w-10 h-10 flex items-center justify-center text-lg shadow-sm`}>
@@ -269,20 +277,26 @@ function SalesPage() {
             <SalesChart orders={sales} range={rangeForChart()} width={400} height={200} />
           </div>
 
-          {/* Sales By Product Category */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
+                    {/* Sales By Product Category */}
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Sales By Product Category</h2>
-            <div className="flex flex-col sm:flex-row items-center gap-6">
-              <div className="relative w-40 h-40 flex-shrink-0">
+            
+            {/* ✅ Added justify-center to center the donut+legend group horizontally */}
+            <div className="flex-1 flex flex-row items-center justify-center gap-8">
+              
+              {/* ✅ Slightly bigger donut */}
+              <div className="relative w-48 h-48 flex-shrink-0">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                   {buildDonut()}
                 </svg>
                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-sm font-bold">{peso(stats.totalSales)}</span>
+                  <span className="text-lg font-bold">{peso(stats.totalSales)}</span>
                   <span className="text-xs text-gray-500">Total Sales</span>
                 </div>
               </div>
-              <div className="flex-1 w-full space-y-2">
+
+              {/* ✅ Legend sits to the right, but the whole group is centered */}
+              <div className="w-full max-w-sm space-y-2">
                 {categories.map((cat, idx) => (
                   <div key={idx} className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2">
@@ -348,10 +362,12 @@ function SalesPage() {
               </select>
 
               {/* Clear Filters */}
+              
               <button 
                 onClick={clearFilters}
                 className="text-sm text-[#4A90E2] hover:underline font-bold flex items-center gap-1 px-2"
               >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
                 Clear Filters
               </button>
 

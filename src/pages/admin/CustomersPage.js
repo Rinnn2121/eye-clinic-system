@@ -14,61 +14,71 @@ function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
-  // Filter States
+  // ✅ New Time Filter State for the Top Cards
+  const [timeFilter, setTimeFilter] = useState('This Week');
+
+  // Table Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [sortBy, setSortBy] = useState('recent');
   const [balanceFilter, setBalanceFilter] = useState('All Balances');
-  const [paymentFilter, setPaymentFilter] = useState('All Payments'); // ✅ New State
+  const [paymentFilter, setPaymentFilter] = useState('All Payments');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
-  // Top Stats State
+  // Top Stats State (Now only 3)
   const [stats, setStats] = useState({
     total: 0,
     new: 0,
-    returning: 0,
-    withBalances: 0,
-    newBalancesToday: 0
+    returning: 0
   });
 
-  // ✅ Calculate Stats
+  // ✅ Calculate Stats based on the Time Filter
   const calculateStats = useCallback((data) => {
     const now = new Date();
-    let newCount = 0;
-    let returningCount = 0;
-    let withBalances = 0;
-    let newBalancesToday = 0;
-    const todayStr = now.toISOString().split('T')[0];
+    let startDate = new Date();
+
+    if (timeFilter === 'This Day') {
+      startDate.setHours(0, 0, 0, 0);
+    } else if (timeFilter === 'This Week') {
+      const day = now.getDay();
+      startDate.setDate(now.getDate() - day);
+      startDate.setHours(0, 0, 0, 0);
+    } else if (timeFilter === 'This Month') {
+      startDate.setDate(1);
+      startDate.setHours(0, 0, 0, 0);
+    }
+
+    let total = 0;
+    let firstTime = 0;
+    let returning = 0;
 
     data.forEach(c => {
+      const lastVisitDate = c.lastVisit ? new Date(c.lastVisit) : null;
       const createdDate = c.createdAt ? new Date(c.createdAt) : null;
-      
-      if (createdDate && (now - createdDate) / (1000 * 60 * 60 * 24) <= 7) {
-        newCount++;
-      }
-      
-      if (c.totalVisits > 1) {
-        returningCount++;
-      }
 
-      if ((c.latestBalance || 0) > 0) {
-        withBalances++;
-        if (c.lastVisit && c.lastVisit.startsWith(todayStr)) {
-          newBalancesToday++;
+      // Check if the customer was active in the selected time range
+      const isActiveInRange = (lastVisitDate && lastVisitDate >= startDate) || 
+                              (createdDate && createdDate >= startDate);
+
+      if (isActiveInRange) {
+        total++;
+        
+        if ((c.totalVisits || 0) > 1) {
+          returning++;
+        } else {
+          firstTime++;
         }
       }
     });
 
     setStats({
-      total: data.length,
-      new: newCount,
-      returning: returningCount,
-      withBalances,
-      newBalancesToday
+      total,
+      new: firstTime,
+      returning
     });
-  }, []);
+  }, [timeFilter]);
 
   // ✅ Load all customers
   const loadCustomers = useCallback(async () => {
@@ -80,22 +90,27 @@ function CustomersPage() {
       
       setCustomers(list);
       setFiltered(list);
-      calculateStats(list);
     } catch (err) {
       console.error('Error loading customers:', err);
     }
     setLoading(false);
-  }, [calculateStats]);
+  }, []);
 
   useEffect(() => {
     loadCustomers();
   }, [loadCustomers]);
 
-  // ✅ Search, Filter & Sort Logic
+  // ✅ Recalculate stats when timeFilter or customers change
+  useEffect(() => {
+    if (customers.length > 0) {
+      calculateStats(customers);
+    }
+  }, [calculateStats, customers]);
+
+  // ✅ Search, Filter & Sort Logic for the Table
   useEffect(() => {
     let result = [...customers];
 
-    // 1. Search Term
     const term = searchTerm.toLowerCase().trim();
     if (term) {
       result = result.filter((c) =>
@@ -106,19 +121,16 @@ function CustomersPage() {
       );
     }
 
-    // 2. Has Balances Filter
     if (balanceFilter === 'Has Balances') {
       result = result.filter((c) => (c.latestBalance || 0) > 0);
     } else if (balanceFilter === 'No Balance') {
       result = result.filter((c) => !c.latestBalance || c.latestBalance <= 0);
     }
 
-    // 3. Payment Method Filter
     if (paymentFilter !== 'All Payments') {
       result = result.filter((c) => c.latestPaymentMethod === paymentFilter);
     }
 
-    // 4. Sorting Logic
     result.sort((a, b) => {
       if (sortBy === 'recent') {
         const dateA = a.lastVisit ? new Date(a.lastVisit) : new Date(a.createdAt || 0);
@@ -142,7 +154,6 @@ function CustomersPage() {
     setCurrentPage(1);
   }, [searchTerm, balanceFilter, paymentFilter, sortBy, customers]);
 
-  // ✅ Clear All Filters Function
   const clearFilters = () => {
     setSearchTerm('');
     setSortBy('recent');
@@ -168,10 +179,21 @@ function CustomersPage() {
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
             <p className="text-gray-500 text-sm mt-1">
-              View and manage customer profiles, visits, prescriptions and payments.
+              View and manage customer profiles, visit history, prescriptions and payments.
             </p>
           </div>
           <div className="flex items-center gap-3">
+            {/* ✅ The Time Filter */}
+            <select 
+              value={timeFilter}
+              onChange={(e) => setTimeFilter(e.target.value)}
+              className="border border-gray-300 rounded-lg px-4 py-2 text-sm bg-white font-medium text-gray-700 outline-none shadow-sm cursor-pointer"
+            >
+              <option>This Day</option>
+              <option>This Week</option>
+              <option>This Month</option>
+            </select>
+
             <button
               onClick={() => setShowModal(true)}
               className="bg-[#4A90E2] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 transition-colors shadow-sm"
@@ -181,72 +203,50 @@ function CustomersPage() {
           </div>
         </div>
 
-        {/* Top Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {/* ✅ Top Stat Cards (Only 3 now) */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           
-          {/* Total */}
+          {/* Total Served */}
           <div className="bg-[#dbeafe] rounded-2xl p-5 border border-blue-200 shadow-sm relative overflow-hidden">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 mb-2">
               <div className="bg-[#4A90E2] text-white w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-inner">👥</div>
               <div>
-                <p className="text-sm font-medium text-gray-700">Total Customers</p>
+                <p className="text-sm font-bold text-gray-800">Total Customers Served</p>
                 <h2 className="text-2xl font-bold text-gray-900">{stats.total}</h2>
               </div>
             </div>
+            <p className="text-xs text-gray-500 mt-2">Customers who visited this {timeFilter === 'This Day' ? 'day' : timeFilter === 'This Week' ? 'week' : 'month'}</p>
           </div>
 
-          {/* New */}
+          {/* First-time Visitors */}
           <div className="bg-[#f3e8ff] rounded-2xl p-5 border border-purple-200 shadow-sm relative">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 mb-2">
               <div className="bg-[#a855f7] text-white w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-inner">👤</div>
               <div>
-                <p className="text-sm font-medium text-gray-700">New Customers</p>
+                <p className="text-sm font-bold text-gray-800">First-time Visitors</p>
                 <h2 className="text-2xl font-bold text-gray-900">{stats.new}</h2>
               </div>
             </div>
-            <div className="mt-3 text-xs text-green-600 font-medium flex items-center gap-1">
-              ↗ 12% <span className="text-gray-500 font-normal">from last week</span>
-            </div>
+            <p className="text-xs text-gray-500 mt-2">Customers visiting for the first time this {timeFilter === 'This Day' ? 'day' : timeFilter === 'This Week' ? 'week' : 'month'}</p>
           </div>
 
-          {/* Returning */}
+          {/* Returning Visitors */}
           <div className="bg-[#dcfce7] rounded-2xl p-5 border border-green-200 shadow-sm relative">
-            <div className="flex items-center gap-4">
-              <div className="bg-[#22c55e] text-white w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-inner">👥</div>
+            <div className="flex items-center gap-4 mb-2">
+              <div className="bg-[#22c55e] text-white w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-inner">🔄</div>
               <div>
-                <p className="text-sm font-medium text-gray-700">Returning Customers</p>
+                <p className="text-sm font-bold text-gray-800">Returning Visitors</p>
                 <h2 className="text-2xl font-bold text-gray-900">{stats.returning}</h2>
               </div>
             </div>
-            <div className="mt-3 text-xs text-green-600 font-medium flex items-center gap-1">
-              ↗ 7 <span className="text-gray-500 font-normal">new visits recently</span>
-            </div>
-          </div>
-
-          {/* Customers with Balances (Replaced Most Requested) */}
-          <div className="bg-[#fef3c7] rounded-2xl p-5 border border-yellow-200 shadow-sm relative">
-            <div className="flex items-center gap-4">
-              <div className="bg-[#fbbf24] text-white w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-inner">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7a4 4 0 11-8 0 4 4 0 018 0zM9 14a6 6 0 00-6 6v1h12v-1a6 6 0 00-6-6zM21 12h-6" />
-                </svg>
-              </div>
-              <div>
-                <p className="text-sm font-bold text-gray-800">Customers with Balances</p>
-                <h2 className="text-2xl font-bold text-gray-900">{stats.withBalances}</h2>
-              </div>
-            </div>
-            <div className="mt-3 text-xs text-gray-500 font-medium">
-              {stats.newBalancesToday} new outstanding balances
-            </div>
+            <p className="text-xs text-gray-500 mt-2">Existing customers who returned this {timeFilter === 'This Day' ? 'day' : timeFilter === 'This Week' ? 'week' : 'month'}</p>
           </div>
 
         </div>
 
-                {/* Filters Row */}
+        {/* Filters Row */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 flex flex-wrap items-center gap-3 mb-4">
           
-          {/* Search Bar */}
           <div className="relative flex-1 min-w-[250px]">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
               🔍
@@ -260,7 +260,16 @@ function CustomersPage() {
             />
           </div>
 
-          {/* Payment Method Filter */}
+          <select 
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value)}
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
+          >
+            <option value="recent">Recent Visits</option>
+            <option value="oldest">Oldest First</option>
+            <option value="alphabetical">Name (A-Z)</option>
+          </select>
+
           <select 
             value={paymentFilter}
             onChange={(e) => setPaymentFilter(e.target.value)}
@@ -272,7 +281,6 @@ function CustomersPage() {
             <option value="Card">Card</option>
           </select>
 
-          {/* Balance Filter */}
           <select 
             value={balanceFilter}
             onChange={(e) => setBalanceFilter(e.target.value)}
@@ -281,17 +289,6 @@ function CustomersPage() {
             <option value="All Balances">All Balances</option>
             <option value="Has Balances">Only Unpaid</option>
             <option value="No Balance">Fully Paid</option>
-          </select>
-
-          {/* Sort Dropdown */}
-          <select 
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
-          >
-            <option value="recent">Recent Visits</option>
-            <option value="oldest">Oldest First</option>
-            <option value="alphabetical">Name (A-Z)</option>
           </select>
 
           <button onClick={clearFilters} className="text-sm text-[#4A90E2] hover:underline font-bold flex items-center gap-1 ml-auto px-4">
@@ -390,50 +387,49 @@ function CustomersPage() {
               </table>
             </div>
           )}
-          
-          
         </div>
-        {/* Pagination */}
-          <div className="flex justify-center items-center gap-2 p-4 border-t border-gray-100">
-            <button 
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Prev
-            </button>
-            
-            <div className="flex gap-1">
-              {[...Array(totalPages)].map((_, i) => {
-                const pageNum = i + 1;
-                if (totalPages > 5 && pageNum > 2 && pageNum < totalPages - 1 && pageNum !== currentPage) {
-                  if (pageNum === 3) return <span key={pageNum} className="px-2 py-1.5 text-gray-400">...</span>;
-                  return null;
-                }
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={`px-3 py-1.5 rounded-md text-sm border ${
-                      currentPage === pageNum 
-                        ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
-                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
-                    }`}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-            </div>
 
-            <button 
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Next
-            </button>
+        {/* Pagination */}
+        <div className="flex justify-center items-center gap-2 p-4 mt-2">
+          <button 
+            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+            disabled={currentPage === 1}
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          >
+            Prev
+          </button>
+          
+          <div className="flex gap-1">
+            {[...Array(totalPages)].map((_, i) => {
+              const pageNum = i + 1;
+              if (totalPages > 5 && pageNum > 2 && pageNum < totalPages - 1 && pageNum !== currentPage) {
+                if (pageNum === 3) return <span key={pageNum} className="px-2 py-1.5 text-gray-400">...</span>;
+                return null;
+              }
+              return (
+                <button
+                  key={pageNum}
+                  onClick={() => setCurrentPage(pageNum)}
+                  className={`px-3 py-1.5 rounded-md text-sm border shadow-sm ${
+                    currentPage === pageNum 
+                      ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
+                      : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  {pageNum}
+                </button>
+              );
+            })}
           </div>
+
+          <button 
+            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+            disabled={currentPage === totalPages}
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+          >
+            Next
+          </button>
+        </div>
       </div>
 
       {/* Modal */}

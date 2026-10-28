@@ -38,17 +38,24 @@ function SalesChart({ orders = [], range = 'Week', width = 400, height = 200 }) 
       return buckets;
     }
 
-    // Existing WEEK logic
+        // Existing WEEK logic
     if (range === 'Week') {
       const totals = [0, 0, 0, 0, 0, 0, 0];
       const start = new Date();
-      start.setDate(now.getDate() - 6);
+      start.setDate(now.getDate() - now.getDay()); // Start of this week (Sunday)
       start.setHours(0, 0, 0, 0);
+
+      // ✅ Add a strict end date (End of Today)
+      const end = new Date();
+      end.setHours(23, 59, 59, 999);
       
       orders.forEach((o) => {
         if (!o.orderDate) return;
         const d = new Date(o.orderDate);
-        if (d >= start) totals[d.getDay()] += Number(o.totalAmount) || 0;
+        // ✅ Only count orders between Sunday and Today
+        if (d >= start && d <= end) {
+          totals[d.getDay()] += Number(o.totalAmount) || 0;
+        }
       });
       return dayLabels.map((l, i) => ({ label: l, total: totals[i] }));
     }
