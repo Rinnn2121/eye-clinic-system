@@ -2,13 +2,12 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, addDoc, doc, updateDoc } from 'firebase/firestore';
-import { db, storage } from '../../firebase/config';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { useAuth } from '../../contexts/AuthContext'; // ✅ Import useAuth
+import { db } from '../../firebase/config';
+import { useAuth } from '../../contexts/AuthContext';
 
 function InventoryPage() {
-  const { userRole } = useAuth(); // ✅ Get the role
-  const isAdmin = userRole === 'admin'; // ✅ Check if admin
+  const { userRole } = useAuth(); 
+  const isAdmin = userRole === 'admin'; 
 
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -60,7 +59,7 @@ function InventoryPage() {
     loadProducts();
   }, []);
 
-  // 2. Handle Save (Add or Edit)
+  // 2. Handle Save (Add or Edit) with Cloudinary
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUploading(true);
@@ -68,10 +67,28 @@ function InventoryPage() {
     try {
       let finalImageUrl = formData.imageUrl;
 
+      // ✅ UPLOAD TO CLOUDINARY
       if (imageFile) {
-        const storageRef = ref(storage, `products/${Date.now()}_${imageFile.name}`);
-        await uploadBytes(storageRef, imageFile);
-        finalImageUrl = await getDownloadURL(storageRef);
+        // 👇 REPLACE THESE WITH YOUR CLOUDINARY DETAILS
+        const cloudName = 'qqrflkm1'; 
+        const uploadPreset = 'inventory_unsigned';
+
+        const data = new FormData();
+        data.append('file', imageFile);
+        data.append('upload_preset', uploadPreset);
+
+        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+          method: 'POST',
+          body: data,
+        });
+
+        const result = await response.json();
+        
+        if (result.secure_url) {
+          finalImageUrl = result.secure_url;
+        } else {
+          throw new Error('Image upload failed');
+        }
       }
 
       const dataToSave = {
@@ -97,6 +114,7 @@ function InventoryPage() {
       loadProducts();
     } catch (error) {
       console.error('Error saving product:', error);
+      alert("Failed to save product. Please check your connection.");
     }
     setUploading(false);
   };
@@ -141,7 +159,6 @@ function InventoryPage() {
 
   const tabs = ['All Products', 'Metal Frame', 'Plastic Frame', 'Lens', 'Coating', 'Package', 'Service'];
 
-  // ✅ Only admins can open the modal
   const openEditModal = (item) => {
     if (!isAdmin) return; 
 
@@ -172,7 +189,6 @@ function InventoryPage() {
             <p className="text-gray-500 text-sm mt-1">Browse and manage frames, lenses and optical accessories.</p>
           </div>
           
-          {/* ✅ Only show Add button to Admin */}
           {isAdmin && (
             <button
               onClick={() => {
@@ -239,21 +255,18 @@ function InventoryPage() {
               <div 
                 key={item.id} 
                 onClick={() => openEditModal(item)}
-                // ✅ Admin cards are clickable, Staff cards are not
                 className={`bg-white border border-gray-200 rounded-xl overflow-hidden transition-shadow ${
                   isAdmin ? 'cursor-pointer hover:shadow-md' : 'cursor-default'
                 }`}
               >
-                {/* Image */}
                 <div className="w-full h-44 bg-gray-100 flex items-center justify-center border-b border-gray-100 overflow-hidden">
                   {item.imageUrl ? (
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain p-2" />
                   ) : (
                     <span className="text-5xl opacity-20">🖼️</span>
                   )}
                 </div>
 
-                {/* Details */}
                 <div className="p-4">
                   <h3 className="font-bold text-gray-900 text-sm truncate">{item.name}</h3>
                   <p className="text-xs text-gray-500 mb-3">{item.category}</p>
@@ -320,7 +333,7 @@ function InventoryPage() {
 
       </div>
 
-      {/* ✅ EDIT/ADD MODAL (Only renders if Admin) */}
+      {/* ✅ EDIT/ADD MODAL */}
       {isAdmin && isModalOpen && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50 overflow-y-auto">
           <div className="bg-white rounded-xl w-full max-w-4xl shadow-2xl my-8">
@@ -341,12 +354,13 @@ function InventoryPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 
                 <div className="space-y-5">
+                  {/* Image Upload Area */}
                   <div className="relative w-full h-64 bg-gray-100 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300 overflow-hidden hover:bg-gray-50 transition-colors">
                     {(imageFile || formData.imageUrl) ? (
                       <img 
                         src={imageFile ? URL.createObjectURL(imageFile) : formData.imageUrl} 
                         alt="Preview" 
-                        className="w-full h-full object-cover" 
+                        className="w-full h-full object-contain p-4 bg-white" 
                       />
                     ) : (
                       <div className="text-center">
@@ -419,6 +433,7 @@ function InventoryPage() {
 
                   </div>
 
+                  {/* Status Toggle */}
                   <div className="mt-8">
                     <label className="block text-sm font-bold text-gray-800 mb-3">Status</label>
                     <div className="flex gap-3">
@@ -451,6 +466,7 @@ function InventoryPage() {
 
               </div>
 
+              {/* Footer Banner */}
               <div className="mt-8 bg-[#dbeafe] rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4">
                 
                 <div className="flex items-center gap-6">

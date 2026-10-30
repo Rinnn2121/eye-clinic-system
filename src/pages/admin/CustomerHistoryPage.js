@@ -1,14 +1,15 @@
 // src/pages/admin/CustomerHistoryPage.js
 
 import React, { useEffect, useState, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom'; // ✅ Added useNavigate
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore'; // ✅ Added deleteDoc
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import ConfirmModal from '../../components/ConfirmModal';
+import ViewRecordModal from '../../components/ViewRecordModal'; // ✅ Import the receipt-style modal
 
 function CustomerHistoryPage() {
   const { customerId } = useParams();
-  const navigate = useNavigate(); // ✅ Added navigate hook
+  const navigate = useNavigate();
 
   const [customer, setCustomer] = useState(null);
   const [records, setRecords] = useState([]);
@@ -22,14 +23,14 @@ function CustomerHistoryPage() {
   const [newPayment, setNewPayment] = useState('');
   const [updating, setUpdating] = useState(false);
 
-  // ✅ New states for Delete Confirmation
+  // State for Delete Confirmation
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  // States for custom alerts
+  // State for custom alerts
   const [alertConfig, setAlertConfig] = useState(null);
 
-  const loadData = useCallback(async () => {
+    const loadData = useCallback(async () => {
     try {
       const cSnap = await getDoc(doc(db, 'customers', customerId));
       if (cSnap.exists()) setCustomer({ id: cSnap.id, ...cSnap.data() });
@@ -38,7 +39,14 @@ function CustomerHistoryPage() {
       const snap = await getDocs(q);
       const list = [];
       snap.forEach((d) => list.push({ id: d.id, ...d.data() }));
-      list.sort((a, b) => new Date(b.date) - new Date(a.date)); // Newest first
+      
+      // ✅ Sort by exact timestamp (Newest first)
+      list.sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.date).getTime();
+        const timeB = new Date(b.createdAt || b.date).getTime();
+        return timeB - timeA; // Descending order (Latest at top)
+      });
+
       setRecords(list);
     } catch (err) {
       console.error(err);
@@ -61,14 +69,14 @@ function CustomerHistoryPage() {
       const updatedBalance = paymentRecord.total - updatedAmountPaid;
       const newStatus = updatedBalance <= 0 ? 'paid' : 'pending';
 
-      // 1. Update the Record in Firestore
+      // 1. Update the Record
       await updateDoc(doc(db, 'records', paymentRecord.id), {
         amountPaid: updatedAmountPaid,
         balance: updatedBalance > 0 ? updatedBalance : 0,
         paymentStatus: newStatus
       });
 
-      // 2. Update the corresponding Order in Sales using receiptNo
+      // 2. Update the Order
       if (paymentRecord.receiptNo) {
         const q = query(collection(db, 'orders'), where('receiptNo', '==', paymentRecord.receiptNo));
         const ordersSnap = await getDocs(q);
@@ -109,26 +117,24 @@ function CustomerHistoryPage() {
     setUpdating(false);
   };
 
-  // ✅ Handle Delete Customer (Cascade Delete)
   const handleDeleteCustomer = async () => {
     setDeleting(true);
     try {
-      // 1. Delete all records for this customer
+      // Cascade delete records
       const recordsQuery = query(collection(db, 'records'), where('customerId', '==', customerId));
       const recordsSnap = await getDocs(recordsQuery);
       const deleteRecords = recordsSnap.docs.map(d => deleteDoc(doc(db, 'records', d.id)));
       await Promise.all(deleteRecords);
 
-      // 2. Delete all orders for this customer
+      // Cascade delete orders
       const ordersQuery = query(collection(db, 'orders'), where('customerId', '==', customerId));
       const ordersSnap = await getDocs(ordersQuery);
       const deleteOrders = ordersSnap.docs.map(d => deleteDoc(doc(db, 'orders', d.id)));
       await Promise.all(deleteOrders);
 
-      // 3. Delete the customer profile
+      // Delete customer
       await deleteDoc(doc(db, 'customers', customerId));
 
-      // 4. Redirect back to the customers list
       navigate('/admin/customers');
     } catch (err) {
       console.error('Error deleting customer:', err);
@@ -220,96 +226,16 @@ function CustomerHistoryPage() {
         </div>
       </div>
 
-      {/* VIEW RECORD MODAL */}
-      {viewRecord && (
-        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-[#4A90E2] text-white p-4 flex justify-between items-center rounded-t-2xl">
-              <div>
-                <h2 className="text-lg font-bold">Visit Details</h2>
-                <p className="text-sm opacity-90">{viewRecord.date}</p>
-              </div>
-              <button onClick={() => setViewRecord(null)} className="text-2xl leading-none hover:text-gray-200">&times;</button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-gray-50 p-4 rounded-xl">
-                  <h4 className="text-sm font-bold text-gray-500 mb-2">OLD PRESCRIPTION</h4>
-                  <p className="text-sm">PD: {viewRecord.oldPd || '—'}</p>
-                  <p className="text-sm">OD: {viewRecord.oldPrescription?.od?.sph || '—'}</p>
-                  <p className="text-sm">OS: {viewRecord.oldPrescription?.os?.sph || '—'}</p>
-                </div>
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
-                  <h4 className="text-sm font-bold text-[#4A90E2] mb-2">NEW PRESCRIPTION</h4>
-                  <p className="text-sm">PD: {viewRecord.newPd || '—'}</p>
-                  <p className="text-sm">OD: {viewRecord.newPrescription?.od?.sph || '—'}</p>
-                  <p className="text-sm">OS: {viewRecord.newPrescription?.os?.sph || '—'}</p>
-                </div>
-              </div>
-
-              <div>
-                <h4 className="text-sm font-bold text-gray-500 mb-2">FRAME & LENS</h4>
-                <div className="flex gap-4">
-                  <div className="flex-1 bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500">Frame</p>
-                    <p className="font-medium">{viewRecord.frame?.name || '—'}</p>
-                  </div>
-                  <div className="flex-1 bg-gray-50 p-3 rounded-lg">
-                    <p className="text-xs text-gray-500">Lens</p>
-                    <p className="font-medium">{viewRecord.lensType?.name || '—'}</p>
-                  </div>
-                </div>
-              </div>
-
-              {(viewRecord.prescriptionNotes || viewRecord.additionalNotes) && (
-                <div>
-                  <h4 className="text-sm font-bold text-gray-500 mb-2">NOTES</h4>
-                  <div className="bg-yellow-50 p-3 rounded-lg text-sm border border-yellow-100">
-                    {viewRecord.prescriptionNotes && <p>{viewRecord.prescriptionNotes}</p>}
-                    {viewRecord.additionalNotes && <p className="text-gray-600 mt-1">{viewRecord.additionalNotes}</p>}
-                  </div>
-                </div>
-              )}
-
-              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                <h4 className="text-sm font-bold text-gray-500 mb-3">PAYMENT BREAKDOWN</h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Subtotal (Frame + Lens)</span>
-                    <span>₱{((viewRecord.total || 0) + (Number(viewRecord.discount) || 0)).toLocaleString()}</span>
-                  </div>
-                  {Number(viewRecord.discount) > 0 && (
-                    <div className="flex justify-between text-green-600">
-                      <span>Discount</span>
-                      <span>- ₱{Number(viewRecord.discount).toLocaleString()}</span>
-                    </div>
-                  )}
-                  <div className="flex justify-between font-bold border-t pt-2">
-                    <span>Total Amount</span>
-                    <span>₱{(viewRecord.total || 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Amount Paid ({viewRecord.paymentMethod})</span>
-                    <span>₱{(viewRecord.amountPaid || 0).toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between text-red-600 font-bold">
-                    <span>Balance</span>
-                    <span>₱{(viewRecord.balance || 0).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="sticky bottom-0 bg-white border-t p-4 flex gap-3 rounded-b-2xl">
-              <button onClick={() => setViewRecord(null)} className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">Close</button>
-              {viewRecord.balance > 0 && (
-                <button onClick={() => { setPaymentRecord(viewRecord); setNewPayment(''); }} className="flex-1 bg-[#4A90E2] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90">Update Payment</button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* ✅ RECEIPT-STYLE VIEW MODAL */}
+      <ViewRecordModal 
+        record={viewRecord} 
+        customer={customer} 
+        onClose={() => setViewRecord(null)} 
+        onUpdatePayment={(record) => {
+          setPaymentRecord(record);
+          setNewPayment('');
+        }}
+      />
 
       {/* UPDATE PAYMENT MODAL */}
       {paymentRecord && (

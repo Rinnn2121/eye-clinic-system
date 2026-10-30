@@ -1,58 +1,161 @@
 // src/components/AppointmentWizardModal.js
 
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc } from 'firebase/firestore';
+import { collection, getDocs, addDoc, query, where } from 'firebase/firestore';
 import { db } from '../firebase/config';
-import AddCustomerModal from '../pages/admin/AddCustomerModal'; 
+import AddCustomerModal from '../pages/admin/AddCustomerModal';
 
-export default function AppointmentWizardModal({ onClose, onSuccess }) {
+export default function AppointmentWizardModal({ onClose, onSuccess, initialService }) {
   const [modalStep, setModalStep] = useState(1); // 1, 2, 3, 4
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [allCustomers, setAllCustomers] = useState([]);
+  const [existingAppts, setExistingAppts] = useState([]); // ✅ Store appointments for overlap check
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  // Form State
+  const todayStr = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
+
+  const [selectedServices, setSelectedServices] = useState(
+    initialService ? [initialService] : ['Eye Examination']
+  );
+
   const [formData, setFormData] = useState({
-    date: new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0],
+    date: todayStr,
     time: '09:00',
-    reason: 'Eye Examination',
     note: ''
   });
 
+  const servicesList = [
+    'Eye Examination',
+    'Fitting of Contact Lenses',
+    'Dry Eye Test',
+    'Color Vision Test',
+    'Prescribing/Dispensing of Corrective Lenses and Eyeglasses',
+    'Computerized Eye Examination'
+  ];
+
   // Fetch customers when reaching Step 2
   useEffect(() => {
-    if (modalStep === 2) {
-      const fetchCustomers = async () => {
+    const fetchCustomers = async () => {
+      if (modalStep === 2) {
         const snap = await getDocs(collection(db, 'customers'));
         const list = [];
         snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
         setAllCustomers(list);
-      };
-      fetchCustomers();
-    }
+      }
+    };
+    fetchCustomers();
   }, [modalStep]);
 
+  // ✅ Fetch existing appointments for the selected date to check overlap
+  useEffect(() => {
+    const fetchExistingAppts = async () => {
+      if (!formData.date) return;
+      
+      const q = query(collection(db, 'appointments'), where('date', '==', formData.date));
+      const snap = await getDocs(q);
+      const list = [];
+      snap.forEach(doc => {
+        const data = doc.data();
+        // Only care about pending/confirmed/scheduled appointments
+        if (data.status !== 'Cancelled' && data.status !== 'Completed') {
+          list.push(data);
+        }
+      });
+      setExistingAppts(list);
+    };
+    fetchExistingAppts();
+  }, [formData.date]);
+
+  const toggleService = (service) => {
+    if (selectedServices.includes(service)) {
+      setSelectedServices(selectedServices.filter(s => s !== service));
+    } else {
+      setSelectedServices([...selectedServices, service]);
+    }
+  };
+
+  // ✅ Helper to check if time is in the past (Only applies if date is today)
+  const isTimePast = () => {
+    if (formData.date !== todayStr) return false;
+
+    const now = new Date();
+    const currentTimeStr = now.toTimeString().slice(0, 5);
+    return formData.time < currentTimeStr;
+  };
+
+  // ✅ Helper to check for 30-minute time slot overlap
+  const isTimeSlotTaken = () => {
+    if (!formData.time || existingAppts.length === 0) return false;
+
+    // Convert selected time to minutes
+    const [selHours, selMins] = formData.time.split(':').map(Number);
+    const selectedTimeInMins = selHours * 60 + selMins;
+
+    for (const appt of existingAppts) {
+      if (!appt.time) continue;
+      
+      const [existHours, existMins] = appt.time.split(':').map(Number);
+      const existTimeInMins = existHours * 60 + existMins;
+
+      // Check if the times are within 30 minutes of each other
+      if (Math.abs(selectedTimeInMins - existTimeInMins) < 30) {
+        return true;
+      }
+    }
+    return false;
+  };
+
   const handleSubmit = async () => {
+    // Reset error
+    setErrorMsg('');
+
+    if (selectedServices.length === 0) {
+      setErrorMsg("Please select at least one service.");
+      return;
+    }
+    if (isTimePast()) {
+      setErrorMsg("The selected time has already passed today. Please choose a future time.");
+      return;
+    }
+    if (isTimeSlotTaken()) {
+      setErrorMsg("This time slot is already booked or overlaps with another appointment. Please pick a time at least 30 minutes away from existing appointments.");
+      return;
+    }
+
     setSaving(true);
     try {
       await addDoc(collection(db, 'appointments'), {
         ...formData,
         customerId: selectedCustomer.id,
         customerName: `${selectedCustomer.firstName} ${selectedCustomer.lastName}`,
+        reason: selectedServices.join(', '), 
         status: 'Pending',
         createdAt: new Date().toISOString()
       });
+
+      // Send Notification to Customer
+      await addDoc(collection(db, 'notifications'), {
+        recipient: selectedCustomer.id, 
+        type: 'booking',
+        title: 'Appointment Booked',
+        message: `Your appointment for ${selectedServices.join(', ')} on ${formData.date} at ${formData.time} has been scheduled by the clinic.`,
+        link: '/customer/appointments',
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
+
       onSuccess();
       onClose();
     } catch (error) {
       console.error(error);
+      setErrorMsg(error.message);
     }
     setSaving(false);
   };
 
-  // Filter for Step 2 search
   const filteredCustomers = allCustomers.filter(c => 
     c.firstName?.toLowerCase().includes(customerSearch.toLowerCase()) || 
     c.lastName?.toLowerCase().includes(customerSearch.toLowerCase()) ||
@@ -71,38 +174,29 @@ export default function AppointmentWizardModal({ onClose, onSuccess }) {
           </button>
         </div>
 
-        {/* ✅ Stepper - Updated to only highlight the ACTIVE step */}
+        {/* Stepper */}
         <div className="bg-gray-50 px-6 py-4 border-b border-gray-200 flex items-center justify-center gap-2 text-xs md:text-sm font-medium">
-          
           <div className={`flex items-center gap-1 ${modalStep === 1 ? 'text-blue-600' : 'text-gray-400'}`}>
-            <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${modalStep === 1 ? 'border-blue-600' : 'border-gray-300'}`}>1</span> 
-            Customer Type
+            <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${modalStep === 1 ? 'border-blue-600' : 'border-gray-300'}`}>1</span> Customer Type
           </div>
           <span className="text-gray-300">→</span>
-
           <div className={`flex items-center gap-1 ${modalStep === 2 ? 'text-blue-600' : 'text-gray-400'}`}>
-            <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${modalStep === 2 ? 'border-blue-600' : 'border-gray-300'}`}>2</span> 
-            Customer Info
+            <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${modalStep === 2 ? 'border-blue-600' : 'border-gray-300'}`}>2</span> Customer Info
           </div>
           <span className="text-gray-300">→</span>
-
           <div className={`flex items-center gap-1 ${modalStep === 3 ? 'text-blue-600' : 'text-gray-400'}`}>
-            <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${modalStep === 3 ? 'border-blue-600' : 'border-gray-300'}`}>3</span> 
-            Appointment Details
+            <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${modalStep === 3 ? 'border-blue-600' : 'border-gray-300'}`}>3</span> Appointment Details
           </div>
           <span className="text-gray-300">→</span>
-
           <div className={`flex items-center gap-1 ${modalStep === 4 ? 'text-blue-600' : 'text-gray-400'}`}>
-            <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${modalStep === 4 ? 'border-blue-600' : 'border-gray-300'}`}>4</span> 
-            Confirm
+            <span className={`w-5 h-5 rounded-full border flex items-center justify-center ${modalStep === 4 ? 'border-blue-600' : 'border-gray-300'}`}>4</span> Confirm
           </div>
-
         </div>
 
         {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1">
           
-          {/* STEP 1 */}
+          {/* STEP 1: Customer Type */}
           {modalStep === 1 && (
             <div>
               <p className="text-gray-600 mb-6">Select if the customer is new or a returning customer.</p>
@@ -169,35 +263,96 @@ export default function AppointmentWizardModal({ onClose, onSuccess }) {
             <div>
               <h3 className="font-bold text-lg text-gray-900 mb-1">Appointment Details</h3>
               <p className="text-sm text-gray-500 mb-6">Set the date, time and service for the appointment.</p>
+              
+              {/* ✅ Show Error Message */}
+              {errorMsg && (
+                <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4 text-sm">
+                  {errorMsg}
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Date *</label>
-                  <input type="date" value={formData.date} onChange={(e) => setFormData({...formData, date: e.target.value})} className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" />
+                  <input 
+                    type="date" 
+                    required 
+                    min={todayStr} 
+                    value={formData.date} 
+                    onChange={(e) => setFormData({...formData, date: e.target.value})} 
+                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" 
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
-                  <input type="time" value={formData.time} onChange={(e) => setFormData({...formData, time: e.target.value})} className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" />
+                  <input 
+                    type="time" 
+                    required 
+                    value={formData.time} 
+                    onChange={(e) => setFormData({...formData, time: e.target.value})} 
+                    className={`w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] ${
+                      isTimePast() || isTimeSlotTaken() ? 'border-red-500 bg-red-50' : ''
+                    }`}
+                  />
+                  {/* ✅ Show inline warnings */}
+                  {isTimePast() && (
+                    <p className="text-xs text-red-500 mt-1 font-medium">This time has already passed today.</p>
+                  )}
+                  {isTimeSlotTaken() && !isTimePast() && (
+                    <p className="text-xs text-red-500 mt-1 font-medium">This time is already booked. Please pick a time 30 mins away.</p>
+                  )}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Service *</label>
-                  <select value={formData.reason} onChange={(e) => setFormData({...formData, reason: e.target.value})} className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] bg-white">
-                    <option value="Eye Examination">Eye Examination</option>
-                    <option value="Dry Eye Test">Dry Eye Test</option>
-                    <option value="Color Vision Test">Color Vision Test</option>
-                    <option value="Contact Lens Fitting">Contact Lens Fitting</option>
-                    <option value="Prescribing">Prescribing</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Note (Optional)</label>
-                  <textarea value={formData.note} onChange={(e) => setFormData({...formData, note: e.target.value})} rows="2" className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] resize-none"></textarea>
+
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Services * <span className="text-xs font-normal text-gray-500">(Select all that apply)</span></label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-h-48 overflow-y-auto p-1">
+                  {servicesList.map(service => {
+                    const isChecked = selectedServices.includes(service);
+                    return (
+                      <div 
+                        key={service}
+                        onClick={() => toggleService(service)}
+                        className={`flex items-start gap-2 p-2.5 rounded-lg border cursor-pointer transition-colors ${
+                          isChecked ? 'border-blue-500 bg-blue-50' : 'border-gray-200 hover:bg-gray-50'
+                        }`}
+                      >
+                        <input 
+                          type="checkbox" 
+                          checked={isChecked}
+                          onChange={() => {}}
+                          className="mt-0.5 w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <span className="text-xs font-medium text-gray-800 leading-tight">{service}</span>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
+
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Note (Optional)</label>
+                <textarea value={formData.note} onChange={(e) => setFormData({...formData, note: e.target.value})} rows="2" className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] resize-none"></textarea>
+              </div>
+
               <div className="flex justify-between pt-2">
                 <button onClick={() => setModalStep(2)} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">Back</button>
-                <button onClick={() => setModalStep(4)} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700">Next</button>
+                <button 
+                  onClick={() => {
+                    if (isTimePast() || isTimeSlotTaken()) {
+                      setErrorMsg("Please fix the time/date errors before proceeding.");
+                      return;
+                    }
+                    if (selectedServices.length === 0) {
+                      setErrorMsg("Please select at least one service.");
+                      return;
+                    }
+                    setModalStep(4);
+                  }} 
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                >
+                  Next
+                </button>
               </div>
             </div>
           )}
@@ -221,28 +376,33 @@ export default function AppointmentWizardModal({ onClose, onSuccess }) {
                     <div className="text-gray-600"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg></div>
                     <div>
                       <p className="text-xs text-gray-500 font-medium">Date & Time</p>
-                      <p className="font-semibold text-gray-800 text-sm">{new Date(formData.date).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})} • {new Date(`2000-01-01T${formData.time}`).toLocaleTimeString('en-US', {hour: 'numeric', minute: '2-digit'})}</p>
+                      <p className="font-semibold text-gray-800 text-sm">{new Date(formData.date).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})} • {formData.time}</p>
                     </div>
                   </div>
-                  <div className="flex gap-4 items-center">
-                    <div className="text-gray-600"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></div>
+                  <div className="flex gap-4 items-start">
+                    <div className="text-gray-600 mt-1"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg></div>
                     <div>
-                      <p className="text-xs text-gray-500 font-medium">Service</p>
-                      <p className="font-semibold text-gray-800 text-sm">{formData.reason}</p>
+                      <p className="text-xs text-gray-500 font-medium">Services</p>
+                      <p className="font-semibold text-gray-800 text-sm">{selectedServices.join(', ')}</p>
                     </div>
                   </div>
                 </div>
               </div>
               <div className="flex justify-between pt-2 border-t border-gray-200">
                 <button onClick={() => setModalStep(3)} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">Back</button>
-                <button onClick={handleSubmit} disabled={saving} className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 shadow-sm disabled:opacity-50">{saving ? 'Saving...' : 'Confirm Appointment'}</button>
+                <button 
+                  onClick={handleSubmit} 
+                  disabled={saving} 
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 shadow-sm disabled:opacity-50"
+                >
+                  {saving ? 'Saving...' : 'Confirm Appointment'}
+                </button>
               </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* ✅ Nested Modal for New Customer */}
       {isAddingNew && (
         <AddCustomerModal 
           onClose={(startVisitId) => {

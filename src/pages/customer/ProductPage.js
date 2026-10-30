@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Link } from 'react-router-dom';
+import Footer from '../../components/Footer'; // ✅ Import the Footer
 
 function ProductPage() {
   const [allFrames, setAllFrames] = useState([]);
@@ -11,9 +12,13 @@ function ProductPage() {
 
   // ✅ Filter States
   const [searchTerm, setSearchTerm] = useState('');
-  const [maxPrice, setMaxPrice] = useState(5000); // Default max price
+  const [maxPrice, setMaxPrice] = useState(5000); 
   const [selectedTypes, setSelectedTypes] = useState(['Metal Frame', 'Plastic Frame']);
   const [sortBy, setSortBy] = useState('Newest');
+
+  // ✅ Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 12;
 
   // 1. Fetch only Frames from the database
   useEffect(() => {
@@ -32,7 +37,7 @@ function ProductPage() {
         });
         setAllFrames(items);
 
-        // Auto-adjust the max price slider based on the most expensive frame
+        // Auto-adjust the max price slider
         if (items.length > 0) {
           const highestPrice = Math.max(...items.map(i => Number(i.price) || 0));
           setMaxPrice(Math.ceil(highestPrice / 100) * 100);
@@ -52,6 +57,7 @@ function ProductPage() {
     } else {
       setSelectedTypes([...selectedTypes, type]);
     }
+    setCurrentPage(1); // Reset to page 1 on filter change
   };
 
   // 3. Filter & Sort Logic
@@ -80,14 +86,20 @@ function ProductPage() {
       if (sortBy === 'Price: Low to High') return Number(a.price) - Number(b.price);
       if (sortBy === 'Price: High to Low') return Number(b.price) - Number(a.price);
       if (sortBy === 'Name: A-Z') return a.name.localeCompare(b.name);
-      return 0; // Newest (default from Firestore)
+      return 0; 
     });
 
     return result;
   }, [allFrames, searchTerm, selectedTypes, maxPrice, sortBy]);
 
+  // ✅ Pagination Calculation
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage) || 1;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
+
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex flex-col">
       
       {/* Top Bar: Search & Sort */}
       <div className="bg-white border-b border-gray-200">
@@ -100,7 +112,7 @@ function ProductPage() {
               type="text"
               placeholder="Search for frames..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
               className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
             />
           </div>
@@ -123,7 +135,7 @@ function ProductPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="max-w-7xl mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">
+      <div className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 flex flex-col md:flex-row gap-8">
         
         {/* LEFT SIDEBAR: Filters */}
         <div className="w-full md:w-64 flex-shrink-0 space-y-8">
@@ -140,7 +152,7 @@ function ProductPage() {
                 max="10000" 
                 step="100"
                 value={maxPrice}
-                onChange={(e) => setMaxPrice(Number(e.target.value))}
+                onChange={(e) => { setMaxPrice(Number(e.target.value)); setCurrentPage(1); }}
                 className="w-full accent-[#4A90E2] cursor-pointer"
               />
               <div className="flex justify-between text-xs text-gray-500">
@@ -181,7 +193,7 @@ function ProductPage() {
         </div>
 
         {/* RIGHT SIDE: Product Grid */}
-        <div className="flex-1">
+        <div className="flex-1 flex flex-col">
           {loading ? (
             <div className="text-center py-20">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4A90E2] mx-auto"></div>
@@ -196,48 +208,84 @@ function ProductPage() {
               </button>
             </div>
           ) : (
-            <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredProducts.map((product) => (
-                <div 
-                  key={product.id} 
-                  className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group"
-                >
-                  
-                  {/* Image */}
-                  <div className="w-full aspect-square bg-gray-100 flex items-center justify-center overflow-hidden relative">
-                    {product.imageUrl ? (
-                      <img 
+            <>
+              {/* Product Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-10">
+                {currentItems.map((product) => (
+                  <Link 
+                    to={`/customer/products/${product.id}`}
+                    key={product.id} 
+                    className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group"
+                  >
+                    <div className="w-full aspect-square bg-gray-100 flex items-center justify-center overflow-hidden relative">
+                      {product.imageUrl ? (
+                        <img 
                         src={product.imageUrl} 
                         alt={product.name} 
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                        className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500" 
                       />
-                    ) : (
-                      <span className="text-5xl opacity-20">🖼️</span>
-                    )}
-                  </div>
+                      ) : (
+                        <span className="text-5xl opacity-20">🖼️</span>
+                      )}
+                    </div>
+                    <div className="p-4 flex flex-col flex-1 text-center">
+                      <h3 className="font-semibold text-gray-900 text-sm truncate">{product.name}</h3>
+                      <p className="text-base font-bold text-gray-900 mt-2">₱{Number(product.price).toLocaleString()}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
 
-                  {/* Details */}
-                  <div className="p-4 flex flex-col flex-1 text-center">
-                    <h3 className="font-semibold text-gray-900 text-sm truncate">{product.name}</h3>
-                    
-                    <p className="text-base font-bold text-gray-900 mt-2">
-                      ₱{Number(product.price).toLocaleString()}
-                    </p>
-                    
-                    <Link
-                      to={`/contact?product=${encodeURIComponent(product.name)}&id=${product.id}`}
-                      className="block w-full mt-3 bg-white border border-gray-300 text-gray-700 text-center py-1.5 rounded-lg hover:bg-gray-50 transition-colors font-medium text-xs"
-                    >
-                      Inquire
-                    </Link>
-                  </div>
-
+              {/* ✅ Pagination Controls */}
+              <div className="flex justify-center items-center gap-2 mt-auto">
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage === 1}
+                  className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Prev
+                </button>
+                
+                <div className="flex gap-1">
+                  {[...Array(totalPages)].map((_, i) => {
+                    const pageNum = i + 1;
+                    // Show dots for very long pagination
+                    if (totalPages > 7 && pageNum > 3 && pageNum < totalPages - 1 && pageNum !== currentPage) {
+                      if (pageNum === 4) return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
+                      return null;
+                    }
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`px-3 py-1.5 rounded-md text-sm border ${
+                          currentPage === pageNum 
+                            ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
+                            : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage === totalPages}
+                  className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
+
+      {/* ✅ Footer */}
+      <Footer />
+
     </div>
   );
 }

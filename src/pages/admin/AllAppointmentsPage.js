@@ -5,6 +5,7 @@ import { Link } from 'react-router-dom';
 import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import AppointmentDetailsModal from '../../components/AppointmentDetailsModal';
+import ConfirmModal from '../../components/ConfirmModal'; // ✅ Import Confirm Modal
 
 function AllAppointmentsPage() {
   const [appointments, setAppointments] = useState([]);
@@ -19,72 +20,100 @@ function AllAppointmentsPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
-  // ✅ Modal State
-  const [selectedAppointment, setSelectedAppointment] = useState(null);
+  // ✅ Modal & Alert States
+  const [selectedAppointment, setSelectedAppointment] = useState(null); // For View Details
+  const [apptToCancel, setApptToCancel] = useState(null); // For Cancel Confirmation
+  const [alertConfig, setAlertConfig] = useState(null); // For Success/Error Alerts
+
+  // ✅ Fetch Appointments
+  const fetchAppointments = async () => {
+    try {
+      const snap = await getDocs(collection(db, 'appointments'));
+      const list = [];
+      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+
+      const now = new Date();
+      const todayStr = new Date(now.getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
+      const currentTimeStr = now.toTimeString().slice(0, 5);
+
+      // Auto-cancel past appointments
+      const updatedItems = await Promise.all(list.map(async (apt) => {
+        const statusLower = (apt.status || '').toLowerCase();
+        
+        if (statusLower === 'pending' || statusLower === 'scheduled') {
+          const isPastDate = apt.date < todayStr;
+          const isTodayButPastTime = apt.date === todayStr && apt.time < currentTimeStr;
+
+          if (isPastDate || isTodayButPastTime) {
+            await updateDoc(doc(db, 'appointments', apt.id), { status: 'Cancelled' });
+            return { ...apt, status: 'Cancelled' };
+          }
+        }
+        return apt;
+      }));
+
+      // Sort: Pending/Scheduled -> Completed -> Cancelled
+      const sorted = updatedItems.sort((a, b) => {
+        const getStatusWeight = (status) => {
+          const s = (status || '').toLowerCase();
+          if (s === 'pending' || s === 'scheduled') return 1;
+          if (s === 'completed') return 2;
+          if (s === 'cancelled') return 3;
+          return 4;
+        };
+
+        const weightA = getStatusWeight(a.status);
+        const weightB = getStatusWeight(b.status);
+
+        if (weightA !== weightB) return weightA - weightB;
+
+        const dateA = new Date(`${a.date}T${a.time || '00:00'}`).getTime();
+        const dateB = new Date(`${b.date}T${b.time || '00:00'}`).getTime();
+        
+        if (weightA === 1) {
+          return dateA - dateB; 
+        } else {
+          return dateB - dateA; 
+        }
+      });
+
+      setAppointments(sorted);
+    } catch (error) {
+      console.error("Error fetching appointments:", error);
+    }
+    setLoading(false);
+  };
 
   useEffect(() => {
-    const fetchAppointments = async () => {
-      try {
-        const snap = await getDocs(collection(db, 'appointments'));
-        const list = [];
-        snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
-
-                const now = new Date();
-        const todayStr = now.toISOString().split('T')[0];
-        const currentTimeStr = now.toTimeString().slice(0, 5); // HH:MM
-
-        // 1. Auto-cancel past appointments (Treat 'scheduled' as 'Pending')
-        const updatedItems = await Promise.all(list.map(async (apt) => {
-          const statusLower = (apt.status || '').toLowerCase();
-          
-          if (statusLower === 'pending' || statusLower === 'scheduled') {
-            const isPastDate = apt.date < todayStr;
-            const isTodayButPastTime = apt.date === todayStr && apt.time < currentTimeStr;
-
-            if (isPastDate || isTodayButPastTime) {
-              await updateDoc(doc(db, 'appointments', apt.id), { status: 'Cancelled' });
-              return { ...apt, status: 'Cancelled' };
-            }
-          }
-          return apt;
-        }));
-
-        // 2. Sort: Active (Pending/Scheduled) -> Completed -> Cancelled
-        const sorted = updatedItems.sort((a, b) => {
-          const getStatusWeight = (status) => {
-            const s = (status || '').toLowerCase();
-            if (s === 'pending' || s === 'scheduled') return 1; // Active goes to top
-            if (s === 'completed') return 2;
-            if (s === 'cancelled') return 3;
-            return 4;
-          };
-
-          const weightA = getStatusWeight(a.status);
-          const weightB = getStatusWeight(b.status);
-
-          // Sort by Weight (Active -> Completed -> Cancelled)
-          if (weightA !== weightB) return weightA - weightB;
-
-          // If same status, sort by closest date
-          const dateA = new Date(`${a.date}T${a.time || '00:00'}`).getTime();
-          const dateB = new Date(`${b.date}T${b.time || '00:00'}`).getTime();
-          
-          if (weightA === 1) {
-            return dateA - dateB; // Upcoming first for active
-          } else {
-            return dateB - dateA; // Most recent first for completed/cancelled
-          }
-        });
-
-        setAppointments(sorted);
-      } catch (error) {
-        console.error("Error fetching appointments:", error);
-      }
-      setLoading(false);
-    };
-
     fetchAppointments();
   }, []);
+
+  // ✅ Handle Cancel Appointment
+  const handleCancelConfirm = async () => {
+    if (!apptToCancel) return;
+
+    try {
+      await updateDoc(doc(db, 'appointments', apptToCancel.id), {
+        status: 'Cancelled'
+      });
+      
+      setApptToCancel(null);
+      fetchAppointments(); // Refresh list
+      
+      setAlertConfig({
+        type: 'success',
+        title: 'Appointment Cancelled',
+        message: 'The appointment has been successfully cancelled.'
+      });
+    } catch (err) {
+      console.error(err);
+      setAlertConfig({
+        type: 'error',
+        title: 'Action Failed',
+        message: 'Could not cancel the appointment. Please try again.'
+      });
+    }
+  };
 
   // ✅ Filter & Search Logic
   const filteredAppointments = useMemo(() => {
@@ -106,18 +135,18 @@ function AllAppointmentsPage() {
     return result;
   }, [appointments, searchTerm, serviceFilter, statusFilter]);
 
-  // ✅ Reset page when filters change
+  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, serviceFilter, statusFilter]);
 
-  // ✅ Pagination Calculation
+  // Pagination Calculation
   const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredAppointments.slice(indexOfFirstItem, indexOfLastItem);
 
-  // ✅ Clear Filters
+  // Clear Filters
   const clearFilters = () => {
     setSearchTerm('');
     setServiceFilter('All Service');
@@ -201,7 +230,7 @@ function AllAppointmentsPage() {
                   <tr><td colSpan="5" className="text-center py-8 text-gray-500">No appointments found.</td></tr>
                 ) : (
                   currentItems.map((apt) => (
-                    <tr key={apt.id} onClick={() => setSelectedAppointment(apt)} className="hover:bg-gray-50 text-gray-700 cursor-pointer transition-colors">
+                    <tr key={apt.id} className="hover:bg-gray-50 text-gray-700">
                       <td className="px-6 py-4">
                         <div className="font-medium text-gray-800">
                           {new Date(apt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -223,9 +252,24 @@ function AllAppointmentsPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 text-center">
-                        <button onClick={(e) => { e.stopPropagation(); setSelectedAppointment(apt); }} className="bg-white border border-gray-300 text-gray-700 px-4 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors">
-                          View
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          {/* ✅ View Button */}
+                          <button 
+                            onClick={() => setSelectedAppointment(apt)}
+                            className="bg-white border border-gray-300 text-gray-700 px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-50 transition-colors"
+                          >
+                            View
+                          </button>
+                          {/* ✅ Cancel Button */}
+                          {apt.status !== 'Cancelled' && apt.status !== 'Completed' && (
+                            <button 
+                              onClick={() => setApptToCancel(apt)}
+                              className="bg-red-50 border border-red-200 text-red-600 px-3 py-1.5 rounded text-xs font-medium hover:bg-red-100 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))
@@ -261,6 +305,32 @@ function AllAppointmentsPage() {
 
       {/* ✅ Appointment Details Modal */}
       <AppointmentDetailsModal appointment={selectedAppointment} onClose={() => setSelectedAppointment(null)} />
+
+      {/* ✅ Cancel Confirmation Modal */}
+      <ConfirmModal
+        isOpen={!!apptToCancel}
+        title="Cancel Appointment?"
+        message={`Are you sure you want to cancel the appointment for ${apptToCancel?.customerName} on ${apptToCancel?.date} at ${apptToCancel?.time}?`}
+        icon="⚠️"
+        confirmText="Yes, Cancel"
+        confirmColor="red"
+        onCancel={() => setApptToCancel(null)}
+        onConfirm={handleCancelConfirm}
+      />
+
+      {/* ✅ Success/Error Alerts */}
+      {alertConfig && (
+        <ConfirmModal
+          isOpen={true}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          icon={alertConfig.type === 'success' ? '✅' : '❌'}
+          confirmText="OK"
+          confirmColor={alertConfig.type === 'success' ? 'green' : 'red'}
+          isAlert
+          onConfirm={() => setAlertConfig(null)}
+        />
+      )}
 
     </div>
   );
