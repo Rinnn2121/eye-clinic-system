@@ -163,7 +163,7 @@ function ProductDetailPage() {
         <span className="text-gray-800 truncate">{product.name}</span>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 pb-20">
+      <div className="w-full max-w-[1440px] mx-auto px-4 pb-20">
         
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           

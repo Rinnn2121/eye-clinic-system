@@ -234,7 +234,7 @@ function AdminDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6 font-sans">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full mx-auto space-y-6">
 
         {/* HEADER ROW */}
         <div className="flex justify-between items-start">

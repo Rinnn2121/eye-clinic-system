@@ -126,7 +126,7 @@ function LandingPage() {
         </div>
 
                  {/* HERO SECTION */}
-        <div className="max-w-7xl mx-auto px-4">
+        <div className="w-full max-w-[1440px] mx-auto px-4">
           <section className="relative flex flex-col md:flex-row items-stretch rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-200">
             
             {/* Left Side: Text Content */}
@@ -174,7 +174,7 @@ function LandingPage() {
       </div>
 
       {/* ✅ REST OF THE PAGE */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-4 py-6 space-y-12">
+      <div className="flex-1 w-full max-w-[1440px] mx-auto px-4 py-6 space-y-12">
         
         {/* BEST SELLER CAROUSEL */}
         <section>

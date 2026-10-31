@@ -135,8 +135,7 @@ function ProductPage() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-4 py-8 flex flex-col md:flex-row gap-8">
-        
+<div className="flex-1 w-full max-w-[1440px] mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">        
         {/* LEFT SIDEBAR: Filters */}
         <div className="w-full md:w-64 flex-shrink-0 space-y-8">
           

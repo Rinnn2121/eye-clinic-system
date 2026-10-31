@@ -64,7 +64,7 @@ function ServicesPage() {
     <div className="min-h-screen bg-white flex flex-col">
       
       {/* Main Content */}
-      <div className="flex-1 max-w-7xl mx-auto w-full px-6 py-12">
+      <div className="flex-1 w-full max-w-[1440px] mx-auto px-6 py-12">
         
         <h1 className="text-3xl md:text-4xl font-bold text-gray-900 mb-8">Our Services</h1>
 

@@ -122,7 +122,7 @@ function WishlistPage() {
         <span className="text-gray-800">Wishlist</span>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 pb-20">
+      <div className="w-full max-w-[1200px] mx-auto px-4 pb-20">
         <h1 className="text-3xl font-medium text-gray-900 mb-8">My Wishlist</h1>
 
         {loading ? (

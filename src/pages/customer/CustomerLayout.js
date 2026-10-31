@@ -73,8 +73,8 @@ function CustomerLayout() {
           </div>
         </div>
 
-        {/* The actual page content will render here */}
-        <div className="p-8 flex-1">
+                {/* The actual page content will render here */}
+        <div className="p-4 md:p-6 lg:p-8 flex-1 w-full">
           <Outlet />
         </div>
       </div>

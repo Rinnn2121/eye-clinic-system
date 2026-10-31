@@ -8,8 +8,7 @@ function AboutPage() {
     <div className="min-h-screen bg-white flex flex-col">
       
       {/* Main Content */}
-      <div className="flex-1 w-full max-w-7xl mx-auto px-4 py-8">
-        
+<div className="flex-1 w-full max-w-[1440px] mx-auto px-4 py-8">        
         {/* HERO SECTION */}
         <section className="flex flex-col md:flex-row items-stretch rounded-2xl overflow-hidden bg-white mb-8">
           

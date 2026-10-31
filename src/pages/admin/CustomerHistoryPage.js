@@ -154,7 +154,7 @@ function CustomerHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-4xl mx-auto">
+      <div className="w-full max-w-5xl mx-auto">
         <div className="flex justify-between items-center mb-6">
           <h1 className="text-2xl font-bold">
             📜 History — {customer?.lastName}, {customer?.firstName}
