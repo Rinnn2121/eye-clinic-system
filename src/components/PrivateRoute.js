@@ -1,3 +1,5 @@
+// src/components/PrivateRoute.js
+
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -5,8 +7,6 @@ import { useAuth } from '../contexts/AuthContext';
 function PrivateRoute({ children, allowedRoles }) {
   const { currentUser, userRole, loading } = useAuth();
 
-  // ✅ 1. If Firebase is still checking the session, show the spinner!
-  // This prevents the "instant logout" bug.
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -15,12 +15,11 @@ function PrivateRoute({ children, allowedRoles }) {
     );
   }
 
-  // ✅ 2. Only redirect to login if Firebase is DONE loading and there is no user.
   if (!currentUser) {
-    return <Navigate to="/customer/login" replace />;
+    // ✅ Redirect to unified login
+    return <Navigate to="/login" replace />;
   }
 
-  // ✅ 3. Check roles
   if (allowedRoles && !allowedRoles.includes(userRole)) {
     return <Navigate to="/" replace />;
   }

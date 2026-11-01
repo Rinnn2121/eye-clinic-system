@@ -8,14 +8,14 @@ import PrivateRoute from './components/PrivateRoute';
 
 // --- PUBLIC PAGES ---
 import LandingPage from './pages/customer/LandingPage';
-import CustomerLogin from './pages/customer/CustomerLogin';
+import Login from './pages/customer/CustomerLogin'; // ✅ Unified Login
 import CustomerRegister from './pages/customer/CustomerRegister';
 import ProductPage from './pages/customer/ProductPage';
 import ProductDetailPage from './pages/customer/ProductDetailPage';
 import AboutPage from './pages/customer/AboutPage';
 import ServicesPage from './pages/customer/ServicesPage';
 
-// --- CUSTOMER PORTAL (Requires Login) ---
+// --- CUSTOMER PORTAL ---
 import CustomerLayout from './pages/customer/CustomerLayout';
 import CustomerDashboard from './pages/customer/CustomerDashboard';
 import CustomerProfile from './pages/customer/CustomerProfile';
@@ -26,7 +26,7 @@ import WishlistPage from './pages/customer/WishlistPage';
 import ItemStatusPage from './pages/customer/ItemStatusPage';
 
 // --- ADMIN PAGES ---
-import Login from './pages/Login';
+// ❌ Removed the import for the old Login
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AppointmentPage from './pages/admin/AppointmentPage';
 import CustomersPage from './pages/admin/CustomersPage';
@@ -46,10 +46,13 @@ function App() {
         <Routes>
           
           {/* =========================================
-              PUBLIC ROUTES (No Login Required)
+              PUBLIC ROUTES
           ========================================= */}
           <Route path="/" element={<LandingPage />} />
-          <Route path="/customer/login" element={<CustomerLogin />} />
+          
+          {/* ✅ Unified Login Route */}
+          <Route path="/login" element={<Login />} /> 
+          
           <Route path="/customer/register" element={<CustomerRegister />} />
           <Route path="/customer/products" element={<ProductPage />} />
           <Route path="/customer/products/:productId" element={<ProductDetailPage />} />
@@ -57,17 +60,14 @@ function App() {
           <Route path="/services" element={<ServicesPage />} />
 
           {/* =========================================
-              CUSTOMER PORTAL (Login Required)
-              All pages here share the Sidebar Layout
+              CUSTOMER PORTAL
           ========================================= */}
           <Route path="/customer" element={
             <PrivateRoute allowedRoles={['customer']}>
               <CustomerLayout />
             </PrivateRoute>
           }>
-            {/* The default page when navigating to /customer */}
             <Route index element={<Navigate to="/customer/dashboard" replace />} />
-            
             <Route path="dashboard" element={<CustomerDashboard />} />
             <Route path="profile" element={<CustomerProfile />} />
             <Route path="appointments" element={<CustomerAppointments />} />
@@ -80,7 +80,7 @@ function App() {
           {/* =========================================
               ADMIN / STAFF PORTAL
           ========================================= */}
-          <Route path="/admin/login" element={<Login />} />
+          {/* ❌ Removed /admin/login */}
           
           <Route path="/admin/dashboard" element={
             <PrivateRoute allowedRoles={['admin', 'staff']}>
@@ -112,6 +112,12 @@ function App() {
             </PrivateRoute>
           } />
 
+          <Route path="/admin/reports" element={
+            <PrivateRoute allowedRoles={['admin']}>
+              <ReportsPage />
+            </PrivateRoute>
+          } />
+
           <Route path="/admin/transactions" element={
             <PrivateRoute allowedRoles={['admin', 'staff']}>
               <AllTransactionsPage />
@@ -135,16 +141,7 @@ function App() {
               <CustomerHistoryPage />
             </PrivateRoute>
           } />
-
-          <Route path="/admin/reports" element={
-            <PrivateRoute allowedRoles={['admin']}>
-              <ReportsPage />
-            </PrivateRoute>
-          } />
           
-          {/* =========================================
-              CATCH-ALL (Redirects unknown URLs to Home)
-          ========================================= */}
           <Route path="*" element={<Navigate to="/" replace />} />
           
         </Routes>
