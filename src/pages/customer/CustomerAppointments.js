@@ -6,6 +6,7 @@ import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import AppointmentDetailsModal from '../../components/AppointmentDetailsModal';
 import ConfirmModal from '../../components/ConfirmModal';
+import BookingWizardModal from '../../components/BookingWizardModal'; // ✅ Import the booking modal
 
 function CustomerAppointments() {
   const { currentUser } = useAuth();
@@ -15,6 +16,9 @@ function CustomerAppointments() {
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [apptToCancel, setApptToCancel] = useState(null);
   const [alertConfig, setAlertConfig] = useState(null);
+
+  // ✅ State for the Booking Modal
+  const [showBookingModal, setShowBookingModal] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     if (!currentUser?.email) return;
@@ -68,10 +72,8 @@ function CustomerAppointments() {
   const upcomingAppts = appointments.filter(a => a.status === 'Pending' || a.status === 'Confirmed' || a.status === 'Scheduled');
   const pastAppts = appointments.filter(a => a.status === 'Completed' || a.status === 'Cancelled');
 
-  // ✅ Count of pending appointments
   const pendingCount = upcomingAppts.filter(a => a.status === 'Pending').length;
 
-  // ✅ Badge color/text per status
   const getStatusStyle = (status) => {
     switch (status) {
       case 'Scheduled':
@@ -90,10 +92,24 @@ function CustomerAppointments() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-1">My Appointments</h1>
-      <p className="text-gray-500 text-sm mb-6">View and manage your appointments.</p>
+      {/* ✅ Header with Book Button */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-3xl font-bold mb-1">My Appointments</h1>
+          <p className="text-gray-500 text-sm">View and manage your appointments.</p>
+        </div>
+        <button
+          onClick={() => setShowBookingModal(true)}
+          className="bg-[#4A90E2] text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 transition-colors shadow-sm flex items-center gap-2 w-fit"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
+          </svg>
+          Book New Appointment
+        </button>
+      </div>
 
-      {/* ✅ Pending confirmation banner */}
+      {/* Pending confirmation banner */}
       {pendingCount > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6 flex gap-3 items-start">
           <div className="w-8 h-8 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center flex-shrink-0">
@@ -113,6 +129,8 @@ function CustomerAppointments() {
       )}
 
       {/* UPCOMING APPOINTMENTS */}
+      {/* ... (rest of your existing code stays exactly the same) ... */}
+      
       <div className="mb-8">
         <h2 className="text-lg font-bold text-blue-600 border-b-2 border-blue-600 inline-block pb-1 mb-4">
           Upcoming ({upcomingAppts.length})
@@ -140,7 +158,6 @@ function CustomerAppointments() {
                 </div>
 
                 <div className="flex flex-col md:items-end gap-2">
-                  {/* ✅ Status badge */}
                   <span className={`text-xs font-bold px-3 py-1 rounded-full ${badge.bg} ${badge.text}`}>
                     {badge.label}
                   </span>
@@ -165,6 +182,7 @@ function CustomerAppointments() {
       </div>
 
       {/* PAST APPOINTMENTS */}
+      {/* ... (rest of your existing code stays exactly the same) ... */}
       <div>
         <h2 className="text-lg font-bold text-gray-800 mb-4">Past Appointments</h2>
         
@@ -208,9 +226,9 @@ function CustomerAppointments() {
       </div>
 
       <AppointmentDetailsModal 
-  appointment={selectedAppt} 
-  onClose={() => setSelectedAppt(null)} 
-/>
+        appointment={selectedAppt} 
+        onClose={() => setSelectedAppt(null)} 
+      />
 
       <ConfirmModal
         isOpen={!!apptToCancel}
@@ -235,6 +253,18 @@ function CustomerAppointments() {
           onConfirm={() => setAlertConfig(null)}
         />
       )}
+
+      {/* ✅ Render the Booking Modal */}
+      {showBookingModal && (
+        <BookingWizardModal 
+          onClose={() => setShowBookingModal(false)} 
+          onSuccess={() => {
+            setShowBookingModal(false);
+            fetchAppointments(); // Refresh the list after booking!
+          }}
+        />
+      )}
+
     </div>
   );
 }

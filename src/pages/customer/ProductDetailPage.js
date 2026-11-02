@@ -121,12 +121,42 @@ function ProductDetailPage() {
         await setDoc(cartRef, { items: [cartItem] });
       } else {
         const existingItems = cartSnap.data().items || [];
-        const existingIndex = existingItems.findIndex(i => i.id === product.id && i.color === cartItem.color);
+                const existingIndex = existingItems.findIndex(i => i.id === product.id && i.color === cartItem.color);
         
         if (existingIndex > -1) {
-          existingItems[existingIndex].quantity += quantity;
+          // ✅ 1. Check current quantity in cart
+          const currentQty = existingItems[existingIndex].quantity;
+          const maxAddable = 5 - currentQty;
+          
+          // ✅ 2. If cart already has 5, block the add
+          if (maxAddable <= 0) {
+            setAlertConfig({ 
+              type: 'error', 
+              title: 'Limit Reached', 
+              message: 'You can only order up to 5 of this item.' 
+            });
+            return;
+          }
+          
+          // ✅ 3. Add only up to the limit
+          const qtyToAdd = Math.min(quantity, maxAddable);
+          existingItems[existingIndex].quantity += qtyToAdd;
           await updateDoc(cartRef, { items: existingItems });
+          
+          // ✅ 4. Warn the user if they didn't get exactly what they asked for
+          if (qtyToAdd < quantity) {
+            setAlertConfig({ 
+              type: 'success', 
+              title: 'Added with Limit', 
+              message: `Only ${qtyToAdd} could be added because you already have ${currentQty} in your cart (Max 5).` 
+            });
+            return;
+          }
+
         } else {
+          // ✅ 5. If it's a new item, make sure the first add doesn't exceed 5
+          const qtyToAdd = Math.min(quantity, 5);
+          cartItem.quantity = qtyToAdd;
           await updateDoc(cartRef, { items: arrayUnion(cartItem) });
         }
       }
@@ -220,7 +250,14 @@ function ProductDetailPage() {
               <div className="flex items-center border border-gray-400 h-10 w-24">
                 <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-2 text-gray-600 hover:bg-gray-50 flex-1">-</button>
                 <span className="flex-1 text-center text-sm font-medium">{quantity}</span>
-                <button onClick={() => setQuantity(quantity + 1)} className="px-2 text-gray-600 hover:bg-gray-50 flex-1">+</button>
+                {/* ✅ Limit to 5 */}
+                <button 
+                  onClick={() => setQuantity(Math.min(5, quantity + 1))} 
+                  disabled={quantity >= 5}
+                  className={`px-2 flex-1 ${quantity >= 5 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-50'}`}
+                >
+                  +
+                </button>
               </div>
               <button 
                 onClick={handleAddToCart}

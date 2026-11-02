@@ -60,18 +60,19 @@ function CartPage() {
   }, [currentUser]);
 
   const handleUpdateQuantity = async (id, newQty) => {
-    if (newQty < 1) return;
-    
-    const updatedCart = cartItems.map(item => 
-      item.id === id ? { ...item, quantity: newQty } : item
-    );
-    setCartItems(updatedCart);
+  // ✅ Prevent going below 1 or above 5
+  if (newQty < 1 || newQty > 5) return;
+  
+  const updatedCart = cartItems.map(item => 
+    item.id === id ? { ...item, quantity: newQty } : item
+  );
+  setCartItems(updatedCart);
 
-    if (currentUser?.email) {
-      const cartRef = doc(db, 'carts', currentUser.email);
-      await updateDoc(cartRef, { items: updatedCart });
-    }
-  };
+  if (currentUser?.email) {
+    const cartRef = doc(db, 'carts', currentUser.email);
+    await updateDoc(cartRef, { items: updatedCart });
+  }
+};
 
   const handleRemove = async (itemToRemove) => {
     const updatedCart = cartItems.filter(item => item.id !== itemToRemove.id);
@@ -169,10 +170,17 @@ function CartPage() {
 
                   <div className="col-span-3 flex justify-center">
                     <div className="flex items-center border border-gray-300 h-9 w-24">
-                      <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)} className="px-2 text-gray-600 hover:bg-gray-50 flex-1 h-full">-</button>
-                      <span className="flex-1 text-center text-sm font-medium">{item.quantity}</span>
-                      <button onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)} className="px-2 text-gray-600 hover:bg-gray-50 flex-1 h-full">+</button>
-                    </div>
+                    <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1} className="px-2 text-gray-600 hover:bg-gray-50 flex-1 h-full disabled:opacity-50">-</button>
+                    <span className="flex-1 text-center text-sm font-medium">{item.quantity}</span>
+                    {/* ✅ Disable + button when quantity reaches 5 */}
+                    <button 
+                      onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)} 
+                      disabled={item.quantity >= 5}
+                      className={`px-2 flex-1 h-full ${item.quantity >= 5 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-50'}`}
+                    >
+                      +
+                    </button>
+                  </div>
                   </div>
 
                   <div className="col-span-2 text-center font-bold text-gray-900">

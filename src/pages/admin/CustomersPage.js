@@ -14,7 +14,7 @@ function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
 
-  // ✅ New Time Filter State for the Top Cards
+  // Top Stats Time Filter
   const [timeFilter, setTimeFilter] = useState('This Week');
 
   // Table Filter States
@@ -25,16 +25,15 @@ function CustomersPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10;
+  const itemsPerPage = 10; // ✅ 10 per page
 
-  // Top Stats State (Now only 3)
+  // Top Stats State
   const [stats, setStats] = useState({
     total: 0,
     new: 0,
     returning: 0
   });
 
-  // ✅ Calculate Stats based on the Time Filter
   const calculateStats = useCallback((data) => {
     const now = new Date();
     let startDate = new Date();
@@ -58,7 +57,6 @@ function CustomersPage() {
       const lastVisitDate = c.lastVisit ? new Date(c.lastVisit) : null;
       const createdDate = c.createdAt ? new Date(c.createdAt) : null;
 
-      // Check if the customer was active in the selected time range
       const isActiveInRange = (lastVisitDate && lastVisitDate >= startDate) || 
                               (createdDate && createdDate >= startDate);
 
@@ -73,14 +71,9 @@ function CustomersPage() {
       }
     });
 
-    setStats({
-      total,
-      new: firstTime,
-      returning
-    });
+    setStats({ total, new: firstTime, returning });
   }, [timeFilter]);
 
-  // ✅ Load all customers
   const loadCustomers = useCallback(async () => {
     try {
       const q = query(collection(db, 'customers'));
@@ -100,14 +93,13 @@ function CustomersPage() {
     loadCustomers();
   }, [loadCustomers]);
 
-  // ✅ Recalculate stats when timeFilter or customers change
   useEffect(() => {
     if (customers.length > 0) {
       calculateStats(customers);
     }
   }, [calculateStats, customers]);
 
-  // ✅ Search, Filter & Sort Logic for the Table
+  // Search, Filter & Sort Logic
   useEffect(() => {
     let result = [...customers];
 
@@ -178,16 +170,15 @@ function CustomersPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
-            <p className="text-gray-500 text-sm mt-1">
+            <p className="text-gray-500 text-base mt-1">
               View and manage customer profiles, visit history, prescriptions and payments.
             </p>
           </div>
           <div className="flex items-center gap-3">
-            {/* ✅ The Time Filter */}
             <select 
               value={timeFilter}
               onChange={(e) => setTimeFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-4 py-2 text-sm bg-white font-medium text-gray-700 outline-none shadow-sm cursor-pointer"
+              className="border border-gray-300 rounded-lg px-4 py-2 text-base bg-white font-medium text-gray-700 outline-none shadow-sm cursor-pointer"
             >
               <option>This Day</option>
               <option>This Week</option>
@@ -196,67 +187,59 @@ function CustomersPage() {
 
             <button
               onClick={() => setShowModal(true)}
-              className="bg-[#4A90E2] text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 transition-colors shadow-sm"
+              className="bg-[#4A90E2] text-white px-5 py-2 rounded-lg text-base font-medium hover:bg-[#4A90E2]/90 transition-colors shadow-sm"
             >
               + Add Customer
             </button>
           </div>
         </div>
 
-        {/* ✅ Top Stat Cards (Only 3 now) */}
+        {/* Top Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          
-          {/* Total Served */}
           <div className="bg-[#dbeafe] rounded-2xl p-5 border border-blue-200 shadow-sm relative overflow-hidden">
             <div className="flex items-center gap-4 mb-2">
               <div className="bg-[#4A90E2] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-inner">
-                {/* ✅ SVG Users */}
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-800">Total Customers Served</p>
-                <h2 className="text-2xl font-bold text-gray-900">{stats.total}</h2>
+                <p className="text-base font-bold text-gray-800">Total Customers Served</p>
+                <h2 className="text-3xl font-bold text-gray-900">{stats.total}</h2>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Customers who visited this {timeFilter === 'This Day' ? 'day' : timeFilter === 'This Week' ? 'week' : 'month'}</p>
+            <p className="text-sm text-gray-500 mt-2">Customers who visited this {timeFilter === 'This Day' ? 'day' : timeFilter === 'This Week' ? 'week' : 'month'}</p>
           </div>
 
-          {/* First-time Visitors */}
           <div className="bg-[#f3e8ff] rounded-2xl p-5 border border-purple-200 shadow-sm relative">
             <div className="flex items-center gap-4 mb-2">
               <div className="bg-[#a855f7] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-inner">
-                {/* ✅ SVG User */}
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-800">First-time Visitors</p>
-                <h2 className="text-2xl font-bold text-gray-900">{stats.new}</h2>
+                <p className="text-base font-bold text-gray-800">First-time Visitors</p>
+                <h2 className="text-3xl font-bold text-gray-900">{stats.new}</h2>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Customers visiting for the first time this {timeFilter === 'This Day' ? 'day' : timeFilter === 'This Week' ? 'week' : 'month'}</p>
+            <p className="text-sm text-gray-500 mt-2">Customers visiting for the first time this {timeFilter === 'This Day' ? 'day' : timeFilter === 'This Week' ? 'week' : 'month'}</p>
           </div>
 
-          {/* Returning Visitors */}
           <div className="bg-[#dcfce7] rounded-2xl p-5 border border-green-200 shadow-sm relative">
             <div className="flex items-center gap-4 mb-2">
               <div className="bg-[#22c55e] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-inner">
-                {/* ✅ SVG Refresh */}
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
               </div>
               <div>
-                <p className="text-sm font-bold text-gray-800">Returning Visitors</p>
-                <h2 className="text-2xl font-bold text-gray-900">{stats.returning}</h2>
+                <p className="text-base font-bold text-gray-800">Returning Visitors</p>
+                <h2 className="text-3xl font-bold text-gray-900">{stats.returning}</h2>
               </div>
             </div>
-            <p className="text-xs text-gray-500 mt-2">Existing customers who returned this {timeFilter === 'This Day' ? 'day' : timeFilter === 'This Week' ? 'week' : 'month'}</p>
+            <p className="text-sm text-gray-500 mt-2">Existing customers who returned this {timeFilter === 'This Day' ? 'day' : timeFilter === 'This Week' ? 'week' : 'month'}</p>
           </div>
-
         </div>
 
         {/* Filters Row */}
@@ -264,7 +247,6 @@ function CustomersPage() {
           
           <div className="relative flex-1 min-w-[250px]">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              {/* ✅ SVG Search */}
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -274,14 +256,14 @@ function CustomersPage() {
               placeholder="Search by reference id, name, or phone..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
             />
           </div>
 
           <select 
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-base bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
           >
             <option value="recent">Recent Visits</option>
             <option value="oldest">Oldest First</option>
@@ -291,7 +273,7 @@ function CustomersPage() {
           <select 
             value={paymentFilter}
             onChange={(e) => setPaymentFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-base bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
           >
             <option value="All Payments">All Payment Methods</option>
             <option value="Cash">Cash</option>
@@ -302,14 +284,14 @@ function CustomersPage() {
           <select 
             value={balanceFilter}
             onChange={(e) => setBalanceFilter(e.target.value)}
-            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
+            className="border border-gray-200 rounded-lg px-3 py-2 text-base bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
           >
             <option value="All Balances">All Balances</option>
             <option value="Has Balances">Only Unpaid</option>
             <option value="No Balance">Fully Paid</option>
           </select>
 
-          <button onClick={clearFilters} className="text-sm text-[#4A90E2] hover:underline font-bold flex items-center gap-1 ml-auto px-4">
+          <button onClick={clearFilters} className="text-base text-[#4A90E2] hover:underline font-bold flex items-center gap-1 ml-auto px-4">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
             Clear All Filters
           </button>
@@ -321,26 +303,26 @@ function CustomersPage() {
           {loading ? (
             <div className="p-12 text-center">
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#4A90E2] mx-auto"></div>
-              <p className="text-gray-500 mt-3">Loading customers...</p>
+              <p className="text-gray-500 mt-3 text-base">Loading customers...</p>
             </div>
           ) : filtered.length === 0 ? (
-            <div className="p-12 text-center text-gray-500">
+            <div className="p-12 text-center text-gray-500 text-base">
               No customers found matching your filters.
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-base">
                 <thead>
                   <tr className="bg-[#dbeafe] text-gray-800 text-left">
-                    <th className="px-4 py-3 font-semibold">Reference ID</th>
-                    <th className="px-4 py-3 font-semibold">Customer Name</th>
-                    <th className="px-4 py-3 font-semibold">Phone No.</th>
-                    <th className="px-4 py-3 font-semibold">Last Visit</th>
-                    <th className="px-4 py-3 font-semibold text-center">Total Visits</th>
-                    <th className="px-4 py-3 font-semibold">Payment Method</th>
-                    <th className="px-4 py-3 font-semibold">Balance</th>
-                    <th className="px-4 py-3 font-semibold">Status</th>
-                    <th className="px-4 py-3 font-semibold text-center">Actions</th>
+                    <th className="px-4 py-4 font-bold">Reference ID</th>
+                    <th className="px-4 py-4 font-bold">Customer Name</th>
+                    <th className="px-4 py-4 font-bold">Phone No.</th>
+                    <th className="px-4 py-4 font-bold">Last Visit</th>
+                    <th className="px-4 py-4 font-bold text-center">Total Visits</th>
+                    <th className="px-4 py-4 font-bold">Payment Method</th>
+                    <th className="px-4 py-4 font-bold">Balance</th>
+                    <th className="px-4 py-4 font-bold">Status</th>
+                    <th className="px-4 py-4 font-bold text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -352,18 +334,19 @@ function CustomersPage() {
                     
                     return (
                       <tr key={c.id} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-mono text-[#4A90E2] font-medium text-xs">{c.referenceId}</td>
-                        <td className="px-4 py-3 text-gray-800 font-medium">
+                        {/* ✅ Increased py-4 to give rows more vertical space */}
+                        <td className="px-4 py-4 font-mono text-[#4A90E2] font-semibold text-sm">{c.referenceId}</td>
+                        <td className="px-4 py-4 text-gray-800 font-semibold">
                           {c.lastName}, {c.firstName}
                           {c.nickname && <span className="text-gray-400 font-normal"> ({c.nickname})</span>}
                         </td>
-                        <td className="px-4 py-3 text-gray-600">{c.phone || '—'}</td>
-                        <td className="px-4 py-3 text-gray-600">
+                        <td className="px-4 py-4 text-gray-600">{c.phone || '—'}</td>
+                        <td className="px-4 py-4 text-gray-600">
                           {c.lastVisit ? new Date(c.lastVisit).toLocaleDateString() : '—'}
                         </td>
-                        <td className="px-4 py-3 text-gray-600 text-center font-medium">{c.totalVisits || 0}</td>
-                        <td className="px-4 py-3">
-                           <span className={`font-medium text-xs ${
+                        <td className="px-4 py-4 text-gray-600 text-center font-bold">{c.totalVisits || 0}</td>
+                        <td className="px-4 py-4">
+                           <span className={`font-semibold text-sm ${
                              paymentMethod === 'Cash' ? 'text-green-600' : 
                              paymentMethod === 'GCash' ? 'text-blue-600' : 
                              paymentMethod === 'Card' ? 'text-purple-600' : 'text-gray-400'
@@ -371,36 +354,34 @@ function CustomersPage() {
                              {paymentMethod}
                            </span>
                         </td>
-                        <td className="px-4 py-3 text-gray-800 font-semibold">
+                        <td className="px-4 py-4 text-gray-800 font-bold">
                           {hasBalance ? `₱ ${balanceAmount.toLocaleString()}` : '₱ 0'}
                         </td>
-                        <td className="px-4 py-3">
-                          <span className={`font-bold text-xs uppercase ${
+                        <td className="px-4 py-4">
+                          <span className={`font-bold text-sm uppercase ${
                             status === 'Paid' ? 'text-green-500' : 
                             status === 'Partial' ? 'text-orange-500' : 'text-gray-400'
                           }`}>
                             {status}
                           </span>
                         </td>
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-4">
                           <div className="flex items-center justify-center gap-2">
-                            {/* ✅ New Visit Button with Plus Icon */}
                             <button
                               onClick={() => handleNewVisit(c.id)}
-                              className="bg-[#4A90E2] text-white px-3 py-1 rounded text-xs font-medium hover:bg-[#4A90E2]/90 transition-colors flex items-center gap-1"
+                              className="bg-[#4A90E2] text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-[#4A90E2]/90 transition-colors flex items-center gap-1"
                             >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                               </svg>
                               New Visit
                             </button>
                             
-                            {/* ✅ History Button with Eye/Clock Icon */}
                             <button
                               onClick={() => handleViewHistory(c.id)}
-                              className="border border-gray-300 text-gray-700 px-3 py-1 rounded text-xs font-medium hover:bg-gray-100 transition-colors flex items-center gap-1"
+                              className="border border-gray-300 text-gray-700 px-3 py-1.5 rounded text-sm font-medium hover:bg-gray-100 transition-colors flex items-center gap-1"
                             >
-                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
                               History
@@ -421,7 +402,7 @@ function CustomersPage() {
           <button 
             onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
             disabled={currentPage === 1}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             Prev
           </button>
@@ -437,7 +418,7 @@ function CustomersPage() {
                 <button
                   key={pageNum}
                   onClick={() => setCurrentPage(pageNum)}
-                  className={`px-3 py-1.5 rounded-md text-sm border shadow-sm ${
+                  className={`px-3 py-1.5 rounded-md text-base border shadow-sm ${
                     currentPage === pageNum 
                       ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
                       : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
@@ -452,7 +433,7 @@ function CustomersPage() {
           <button 
             onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
             disabled={currentPage === totalPages}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+            className="px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
           >
             Next
           </button>

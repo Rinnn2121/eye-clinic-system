@@ -8,6 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
 import AppointmentWizardModal from '../../components/AppointmentWizardModal';
 import AppointmentDetailsModal from '../../components/AppointmentDetailsModal';
+import PendingAppointmentsModal from '../../components/PendingAppointmentsModal'; // ✅ Import new modal
 
 function AppointmentPage() {
   const [appointments, setAppointments] = useState([]);
@@ -29,6 +30,7 @@ function AppointmentPage() {
   const [selectedAppointment, setSelectedAppointment] = useState(null); 
   const [apptToCancel, setApptToCancel] = useState(null); 
   const [alertConfig, setAlertConfig] = useState(null); 
+  const [showPendingModal, setShowPendingModal] = useState(false); // ✅ New state
 
   const loadAppointments = async () => {
     try {
@@ -98,8 +100,8 @@ function AppointmentPage() {
     try {
       await updateDoc(doc(db, 'appointments', apptToCancel.id), {
         status: 'Cancelled',
-        cancelledBy: loggedInName, // ✅ Add this
-        cancelledAt: new Date().toISOString() // ✅ Add this
+        cancelledBy: loggedInName,
+        cancelledAt: new Date().toISOString()
       });
       
       setApptToCancel(null);
@@ -116,8 +118,8 @@ function AppointmentPage() {
     try {
       await updateDoc(doc(db, 'appointments', apt.id), {
         status: 'Scheduled',
-        confirmedBy: loggedInName, // ✅ Add this
-        confirmedAt: new Date().toISOString() // ✅ Add this
+        confirmedBy: loggedInName,
+        confirmedAt: new Date().toISOString()
       });
       loadAppointments();
       setAlertConfig({ type: 'success', title: 'Booking Confirmed', message: 'The appointment has been marked as Scheduled.' });
@@ -132,6 +134,10 @@ function AppointmentPage() {
     const completed = appointments.filter(a => a.status === 'Completed').length;
     const cancelled = appointments.filter(a => a.status === 'Cancelled').length;
     
+    // ✅ Calculate Pending and Scheduled/Upcoming
+    const pending = appointments.filter(a => a.status === 'Pending').length;
+    const scheduled = appointments.filter(a => a.status === 'Scheduled').length;
+    
     const dateAppts = appointments
       .filter(a => a.date === selectedDate)
       .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
@@ -142,8 +148,15 @@ function AppointmentPage() {
           : ''
       }));
 
-    return { total, completed, cancelled, dateAppts };
+    return { total, completed, cancelled, pending, scheduled, dateAppts };
   }, [appointments, selectedDate]);
+
+  // ✅ Filter out the pending list specifically for the modal
+  const pendingAppointmentsList = useMemo(() => {
+    return appointments
+      .filter(a => a.status === 'Pending')
+      .sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
+  }, [appointments]);
 
   const filteredAppointments = useMemo(() => {
     let result = [...appointments];
@@ -223,8 +236,21 @@ function AppointmentPage() {
           </div>
         </div>
 
-        {/* TOP STAT CARDS */}
+        {/* ✅ TOP STAT CARDS (Updated to match screenshot) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="bg-[#fef3c7] rounded-2xl p-5 relative border border-yellow-200 shadow-sm flex items-center gap-4">
+            <div className="bg-[#eab308] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-inner flex-shrink-0">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-base font-bold text-gray-800">Pending Confirmation</p>
+              <h2 className="text-3xl font-bold text-gray-900">{stats.pending}</h2>
+              <p className="text-xs text-gray-500 mt-1">Appointments need confirmation</p>
+            </div>
+          </div>
+
           <div className="bg-[#dbeafe] rounded-2xl p-5 relative border border-blue-200 shadow-sm flex items-center gap-4">
             <div className="bg-[#4A90E2] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-inner flex-shrink-0">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -232,8 +258,9 @@ function AppointmentPage() {
               </svg>
             </div>
             <div>
-              <p className="text-base font-semibold text-gray-700">Total Appointments</p>
-              <h2 className="text-3xl font-bold text-gray-900">{stats.total}</h2>
+              <p className="text-base font-bold text-gray-800">Confirmed/Upcoming</p>
+              <h2 className="text-3xl font-bold text-gray-900">{stats.scheduled}</h2>
+              <p className="text-xs text-gray-500 mt-1">Appointments scheduled this week</p>
             </div>
           </div>
 
@@ -244,23 +271,36 @@ function AppointmentPage() {
               </svg>
             </div>
             <div>
-              <p className="text-base font-semibold text-gray-700">Completed Appointments</p>
+              <p className="text-base font-bold text-gray-800">Completed Appointments</p>
               <h2 className="text-3xl font-bold text-gray-900">{stats.completed}</h2>
-            </div>
-          </div>
-
-          <div className="bg-[#fee2e2] rounded-2xl p-5 relative border border-red-200 shadow-sm flex items-center gap-4">
-            <div className="bg-[#ef4444] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-inner flex-shrink-0">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-base font-semibold text-gray-700">Cancelled/No-Show</p>
-              <h2 className="text-3xl font-bold text-gray-900">{stats.cancelled}</h2>
+              <p className="text-xs text-gray-500 mt-1">Appointments completed this week</p>
             </div>
           </div>
         </div>
+
+        {/* ✅ NEEDS CONFIRMATION ALERT BANNER */}
+        {stats.pending > 0 && (
+          <div className="bg-[#fffbeb] rounded-2xl p-4 border border-yellow-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex items-start md:items-center gap-3">
+              <div className="w-10 h-10 bg-yellow-100 text-yellow-600 rounded-full flex items-center justify-center flex-shrink-0 mt-1 md:mt-0">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-yellow-900">{stats.pending} Appointments Need Confirmation</h3>
+                <p className="text-yellow-800 text-sm mt-0.5">Review and confirm the requested appointments to keep your schedule updated.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => setShowPendingModal(true)}
+              className="bg-white border-2 border-yellow-500 text-yellow-700 px-6 py-2 rounded-xl text-base font-bold hover:bg-yellow-50 transition-colors shadow-sm flex items-center gap-2 whitespace-nowrap"
+            >
+              View Pending ({stats.pending}) 
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
+            </button>
+          </div>
+        )}
 
         {/* MAIN CONTENT ROW */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
@@ -317,7 +357,6 @@ function AppointmentPage() {
                           onClick={() => setSelectedAppointment(apt)}
                           className="hover:bg-gray-50 text-gray-700 cursor-pointer transition-colors"
                         >
-                          {/* ✅ Increased padding to py-4 to space out the rows */}
                           <td className="px-5 py-4">
                             <div className="font-semibold text-gray-800 text-base">
                               {new Date(apt.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
@@ -419,7 +458,7 @@ function AppointmentPage() {
               </div>
             </div>
 
-            {/* ✅ Selected Date Schedule Card - Reverted text size, smaller box */}
+            {/* Selected Date Schedule Card */}
             <div className="bg-[#dbeafe] rounded-2xl p-5 border border-gray-200 shadow-sm flex-shrink-0">
               <h3 className="font-bold mb-4 rounded-lg text-gray-900 flex justify-between items-center text-xl">
                 <span>Schedule</span>
@@ -428,7 +467,6 @@ function AppointmentPage() {
                 </span>
               </h3>
               
-              {/* ✅ Smaller max height to prevent layout stretching, bigger text restored */}
               <div className="space-y-3 overflow-y-auto pr-1 max-h-[160px]">
                 {stats.dateAppts.length === 0 ? (
                   <p className="text-base text-gray-500 text-center py-4">No appointments for this day.</p>
@@ -452,6 +490,15 @@ function AppointmentPage() {
           </div>
         </div>
       </div>
+
+      {/* ✅ Pending Modal */}
+      {showPendingModal && (
+        <PendingAppointmentsModal 
+          pendingAppointments={pendingAppointmentsList}
+          onClose={() => setShowPendingModal(false)}
+          onSelectAppointment={(apt) => setSelectedAppointment(apt)}
+        />
+      )}
 
       <AppointmentDetailsModal 
         appointment={selectedAppointment} 

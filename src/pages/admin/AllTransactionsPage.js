@@ -1,6 +1,6 @@
 // src/pages/admin/AllTransactionsPage.js
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -14,16 +14,23 @@ function AllTransactionsPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('All Payment Methods');
   const [statusFilter, setStatusFilter] = useState('All Status');
+  
+  // ✅ Date Range Filter States
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+
   const [selectedSale, setSelectedSale] = useState(null);
 
-    // ✅ Clear Filters Function
+  // ✅ Clear Filters Function
   const clearFilters = () => {
     setSearchTerm('');
     setPaymentFilter('All Payment Methods');
     setStatusFilter('All Status');
+    setStartDate('');
+    setEndDate('');
   };
   
-  // Pagination (Mockup for now)
+  // ✅ Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
 
@@ -54,22 +61,58 @@ function AllTransactionsPage() {
   const peso = (num) =>
     `₱ ${Number(num).toLocaleString('en-PH', { minimumFractionDigits: 0 })}`;
 
-  // Filter Logic
-  const filteredTransactions = sales.filter((sale) => {
-    const matchesSearch = 
-      (sale.receiptNo?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
-      (sale.customerName?.toLowerCase() || '').includes(searchTerm.toLowerCase());
-      
-    const matchesPayment = paymentFilter === 'All Payment Methods' || sale.paymentMethod === paymentFilter;
-    
-    const currentStatus = sale.paymentStatus || (sale.balance > 0 ? 'Partial' : 'Paid');
-    const matchesStatus = statusFilter === 'All Status' || 
-      currentStatus.toLowerCase() === statusFilter.toLowerCase() ||
-      (statusFilter === 'Paid' && sale.balance <= 0) ||
-      (statusFilter === 'Partial' && sale.balance > 0);
+  // ✅ Filter Logic
+  const filteredTransactions = useMemo(() => {
+    let result = [...sales];
 
-    return matchesSearch && matchesPayment && matchesStatus;
-  });
+    // 1. Search
+    if (searchTerm) {
+      const lower = searchTerm.toLowerCase();
+      result = result.filter(sale => 
+        (sale.receiptNo?.toLowerCase() || '').includes(lower) ||
+        (sale.customerName?.toLowerCase() || '').includes(lower)
+      );
+    }
+    
+    // 2. Payment Method
+    if (paymentFilter !== 'All Payment Methods') {
+      result = result.filter(sale => sale.paymentMethod === paymentFilter);
+    }
+    
+    // 3. Status
+    if (statusFilter !== 'All Status') {
+      result = result.filter(sale => {
+        const currentStatus = sale.paymentStatus || (sale.balance > 0 ? 'Partial' : 'Paid');
+        return currentStatus.toLowerCase() === statusFilter.toLowerCase() ||
+          (statusFilter === 'Paid' && sale.balance <= 0) ||
+          (statusFilter === 'Partial' && sale.balance > 0);
+      });
+    }
+
+    // 4. ✅ Date Range Filter
+    if (startDate) {
+      result = result.filter(sale => {
+        if (!sale.orderDate) return false;
+        // Extract YYYY-MM-DD from ISO string and compare
+        const saleDate = sale.orderDate.split('T')[0];
+        return saleDate >= startDate;
+      });
+    }
+    if (endDate) {
+      result = result.filter(sale => {
+        if (!sale.orderDate) return false;
+        const saleDate = sale.orderDate.split('T')[0];
+        return saleDate <= endDate;
+      });
+    }
+
+    return result;
+  }, [sales, searchTerm, paymentFilter, statusFilter, startDate, endDate]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, paymentFilter, statusFilter, startDate, endDate]);
 
   // Pagination Logic
   const totalPages = Math.ceil(filteredTransactions.length / itemsPerPage) || 1;
@@ -89,10 +132,9 @@ function AllTransactionsPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="w-full mx-auto">
         
-                {/* ✅ Combined Header & Controls */}
+        {/* Combined Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
           
-          {/* Left Side: Back Link & Title */}
           <div className="flex flex-col gap-1">
             <Link to="/admin/sales" 
             className="text-sm text-[#4A90E2] flex items-center gap-1 font-bold transition-colors mb-2 w-fit">
@@ -104,22 +146,29 @@ function AllTransactionsPage() {
             <h1 className="text-3xl font-bold text-gray-900">All Transactions</h1>
           </div>
 
-          {/* Right Side: Date Range & Export Buttons */}
-          <div className="flex items-center gap-3">
-            <button className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 shadow-sm">
-              <span>📅</span> Date Range <span className="text-xs text-gray-400">▼</span>
-            </button>
-            <button className="flex items-center gap-2 px-4 py-2 bg-[#4A90E2] text-white rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 shadow-sm">
-              <span>⬇</span> Export Sales
-            </button>
+          {/* ✅ Date Range Inputs */}
+          <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+            <span className="text-sm font-bold text-gray-700 ml-1">From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-[#4A90E2]"
+            />
+            <span className="text-sm font-bold text-gray-700">To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-[#4A90E2]"
+            />
           </div>
 
         </div>
 
-                {/* Filter Bar */}
+        {/* Filter Bar */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 flex flex-wrap items-center gap-3 mb-6">
           
-          {/* Search Bar */}
           <div className="relative flex-1 min-w-[250px]">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
@@ -133,7 +182,6 @@ function AllTransactionsPage() {
             />
           </div>
           
-          {/* Payment Filter */}
           <select 
             value={paymentFilter}
             onChange={(e) => setPaymentFilter(e.target.value)}
@@ -145,7 +193,6 @@ function AllTransactionsPage() {
             <option value="Card">Card</option>
           </select>
 
-          {/* Status Filter */}
           <select 
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -156,7 +203,6 @@ function AllTransactionsPage() {
             <option value="Partial">Partial</option>
           </select>
 
-          {/* Clear Filters */}
           <button 
             onClick={clearFilters}
             className="text-sm text-[#4A90E2] hover:underline font-bold flex items-center gap-1 px-2"
@@ -194,7 +240,6 @@ function AllTransactionsPage() {
                     const statusText = sale.paymentStatus === 'paid' || !isPartial ? 'Paid' : 'Partial';
 
                     return (
-                      /* ✅ Added onClick and cursor-pointer class here */
                       <tr 
                         key={sale.id} 
                         onClick={() => setSelectedSale(sale)}
@@ -247,7 +292,6 @@ function AllTransactionsPage() {
           <div className="flex gap-1">
             {[...Array(totalPages)].map((_, i) => {
               const pageNum = i + 1;
-              // Only show up to 5 page numbers for clean UI
               if (totalPages > 5 && pageNum > 2 && pageNum < totalPages - 1 && pageNum !== currentPage) {
                  if (pageNum === 3) return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
                  return null;
@@ -278,6 +322,7 @@ function AllTransactionsPage() {
         </div>
 
       </div>
+
       {/* ✅ Transaction Details Modal */}
       <TransactionDetailsModal 
         sale={selectedSale} 
