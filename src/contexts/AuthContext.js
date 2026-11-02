@@ -8,9 +8,9 @@ import {
   signOut, 
   onAuthStateChanged,
   setPersistence,
-  browserSessionPersistence // ✅ Changed to localPersistence
+  browserSessionPersistence
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc,updateDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
 
@@ -27,7 +27,6 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const configurePersistence = async () => {
       try {
-        // ✅ Changed to localPersistence so it stays logged in across tabs
         await setPersistence(auth, browserSessionPersistence);
       } catch (error) {
         console.error('Error setting persistence:', error);
@@ -41,25 +40,53 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  const signup = async (email, password) => {
+  // ✅ Updated signup function to save initial customer data
+  const signup = async (email, password, customerData) => {
     const result = await createUserWithEmailAndPassword(auth, email, password);
+    
+    // 1. Create the User Role document
     await setDoc(doc(db, 'users', email), {
       email: email,
       role: 'customer',
-      name: email.split('@')[0],
+      name: `${customerData.firstName} ${customerData.lastName}`,
       createdAt: new Date().toISOString()
     });
+
+    // 2. Create a "Pending" Customer document
+    // We use the email as the temporary ID. When they link a Reference ID,
+    // the system will merge this data into the official clinic record.
+    await setDoc(doc(db, 'onlineAccounts', email), {
+      firstName: customerData.firstName,
+      lastName: customerData.lastName,
+      nickname: customerData.nickname || '',
+      phone: customerData.phone,
+      email: email,
+      createdAt: new Date().toISOString(),
+      totalVisits: 0,
+    });
+
     return result;
   };
 
   const logout = async () => {
-    // ✅ Removed localStorage.clear() to prevent wiping Firebase's session
     await signOut(auth);
+  };
+
+  // ✅ Add this function to update the profile picture
+  const updateProfilePicture = async (newPhotoUrl) => {
+    if (!currentUser?.email) return;
+    
+    // Update Firestore
+    await updateDoc(doc(db, 'users', currentUser.email), {
+      photoUrl: newPhotoUrl
+    });
+    
+    // Update local state so the UI changes immediately
+    setUserData(prev => ({ ...prev, photoUrl: newPhotoUrl }));
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      // ✅ Start loading whenever auth state changes
       setLoading(true); 
       
       if (user) {
@@ -92,7 +119,6 @@ export function AuthProvider({ children }) {
         setUserData(null);
       }
       
-      // ✅ Only stop loading AFTER Firestore role is fetched
       setLoading(false);
     });
     return unsubscribe;
@@ -105,12 +131,12 @@ export function AuthProvider({ children }) {
     login,
     signup,
     logout,
-    loading
+    loading,
+    updateProfilePicture 
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {/* ✅ Removed !loading from here so PrivateRoute can handle the spinner */}
       {children}
     </AuthContext.Provider>
   );

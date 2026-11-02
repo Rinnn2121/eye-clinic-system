@@ -4,12 +4,12 @@ import React, { useState, useEffect } from 'react';
 import { useParams, Link} from 'react-router-dom';
 import { doc, getDoc, collection, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../../firebase/config';
-import { useAuth } from '../../contexts/AuthContext'; // ✅ Import Auth
-import ConfirmModal from '../../components/ConfirmModal'; // ✅ Add this
+import { useAuth } from '../../contexts/AuthContext';
+import ConfirmModal from '../../components/ConfirmModal';
 
 function ProductDetailPage() {
   const { productId } = useParams();
-  const { currentUser } = useAuth(); // ✅ Get current user
+  const { currentUser } = useAuth();
   
   const [product, setProduct] = useState(null);
   const [relatedProducts, setRelatedProducts] = useState([]);
@@ -18,7 +18,6 @@ function ProductDetailPage() {
   const [selectedColor, setSelectedColor] = useState('');
   const [alertConfig, setAlertConfig] = useState(null);
   
-  // ✅ Wishlist State
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [savingWishlist, setSavingWishlist] = useState(false);
 
@@ -32,7 +31,6 @@ function ProductDetailPage() {
           const data = { id: docSnap.id, ...docSnap.data() };
           setProduct(data);
 
-          // Fetch related products
           const q = collection(db, 'inventory');
           const snap = await getDocs(q);
           const related = [];
@@ -45,7 +43,6 @@ function ProductDetailPage() {
           setRelatedProducts(related.slice(0, 4));
         }
 
-        // ✅ Check if product is already in the user's wishlist
         if (currentUser?.email) {
           const wishlistRef = doc(db, 'wishlists', currentUser.email);
           const wishlistSnap = await getDoc(wishlistRef);
@@ -64,7 +61,6 @@ function ProductDetailPage() {
     loadProduct();
   }, [productId, currentUser]);
 
-  // ✅ Toggle Wishlist Function
   const handleToggleWishlist = async () => {
     if (!currentUser) {
       setAlertConfig({ type: 'error', title: 'Login Required', message: 'Please login to save items to your wishlist.' });
@@ -85,16 +81,13 @@ function ProductDetailPage() {
       };
 
       if (!wishlistSnap.exists()) {
-        // Create new wishlist document if it doesn't exist
         await setDoc(wishlistRef, { items: [productData] });
         setIsWishlisted(true);
       } else {
         if (isWishlisted) {
-          // Remove from wishlist
           await updateDoc(wishlistRef, { items: arrayRemove(productData) });
           setIsWishlisted(false);
         } else {
-          // Add to wishlist
           await updateDoc(wishlistRef, { items: arrayUnion(productData) });
           setIsWishlisted(true);
         }
@@ -131,11 +124,9 @@ function ProductDetailPage() {
         const existingIndex = existingItems.findIndex(i => i.id === product.id && i.color === cartItem.color);
         
         if (existingIndex > -1) {
-          // Update quantity if item already exists
           existingItems[existingIndex].quantity += quantity;
           await updateDoc(cartRef, { items: existingItems });
         } else {
-          // Add new item to array
           await updateDoc(cartRef, { items: arrayUnion(cartItem) });
         }
       }
@@ -154,7 +145,6 @@ function ProductDetailPage() {
   return (
     <div className="min-h-screen bg-white">
       
-      {/* Breadcrumb ... (Keep your existing Breadcrumb code here) */}
       <div className="max-w-7xl mx-auto px-4 py-6 flex items-center gap-2 text-sm text-gray-500">
         <Link to="/" className="hover:text-[#4A90E2]">Home</Link>
         <span>&gt;</span>
@@ -167,20 +157,31 @@ function ProductDetailPage() {
         
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           
-          {/* LEFT COLUMN ... (Keep your existing Image and Accordion code here) */}
           <div className="w-full lg:w-8/12 space-y-4">
             <div className="flex gap-4 h-[400px]">
               <div className="flex flex-col items-center gap-2">
                 <button className="text-gray-400 hover:text-gray-700 text-xs">▲</button>
-                <div className="w-20 h-20 bg-[#f3f4f6] flex items-center justify-center"><span className="text-2xl text-gray-300">🖼️</span></div>
-                <div className="w-20 h-20 bg-[#f3f4f6] flex items-center justify-center"><span className="text-2xl text-gray-300">🖼️</span></div>
+                <div className="w-20 h-20 bg-[#f3f4f6] flex items-center justify-center">
+                  {/* ✅ SVG Image Placeholder */}
+                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <div className="w-20 h-20 bg-[#f3f4f6] flex items-center justify-center">
+                  {/* ✅ SVG Image Placeholder */}
+                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                </div>
                 <button className="text-gray-400 hover:text-gray-700 text-xs">▼</button>
               </div>
               <div className="flex-1 bg-[#f3f4f6] flex items-center justify-center relative">
                 {product.imageUrl ? (
                   <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain p-6" />
                 ) : (
-                  <span className="text-8xl text-gray-300">🖼️</span>
+                  <svg className="w-20 h-20 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
                 )}
               </div>
             </div>
@@ -199,7 +200,6 @@ function ProductDetailPage() {
             </div>
           </div>
 
-          {/* RIGHT COLUMN: Details */}
           <div className="w-full lg:w-4/12 p-6 border border-gray-100 shadow-[0_0_15px_rgba(0,0,0,0.05)] rounded-md">
             <h1 className="text-2xl font-bold text-gray-900 leading-tight mb-4">{product.name}</h1>
             <div className="w-full h-px bg-gray-300 my-4"></div>
@@ -231,7 +231,6 @@ function ProductDetailPage() {
                 </button>
             </div>
 
-            {/* ✅ WISHLIST BUTTON */}
             <button 
               onClick={handleToggleWishlist}
               disabled={savingWishlist}
@@ -252,7 +251,7 @@ function ProductDetailPage() {
           </div>
         </div>
 
-        {/* NOTICE BANNER & RELATED PRODUCTS ... (Keep your existing code here) */}
+        {/* ✅ Info Banner with SVG */}
         <div className="mt-8 bg-[#d0e2fd] text-blue-900 px-6 py-4 rounded-md flex items-center gap-3 w-full lg:w-8/12">
           <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           <p className="text-sm font-medium">Our clinic team will help recommend suitable lenses and coating during your visit.</p>
@@ -274,7 +273,10 @@ function ProductDetailPage() {
                   {rp.imageUrl ? (
                     <img src={rp.imageUrl} alt={rp.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                   ) : (
-                    <span className="text-6xl text-gray-300">🖼️</span>
+                    /* ✅ SVG Image Placeholder */
+                    <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
                   )}
                 </div>
                 <div className="flex justify-between items-start">
@@ -287,13 +289,13 @@ function ProductDetailPage() {
             ))}
           </div>
         </div>
-                      {/* ✅ Custom Alerts */}
+
       {alertConfig && (
         <ConfirmModal
           isOpen={true}
           title={alertConfig.title}
           message={alertConfig.message}
-          icon={alertConfig.type === 'success' ? '✅' : '⚠️'}
+          iconType={alertConfig.type === 'success' ? 'success' : 'warning'}
           confirmText="OK"
           confirmColor={alertConfig.type === 'success' ? 'green' : 'red'}
           isAlert

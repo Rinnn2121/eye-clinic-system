@@ -71,7 +71,7 @@ function SalesPage() {
     return data.filter((s) => new Date(s.orderDate) >= startDate);
   };
 
-    // ✅ Recompute when filter or sales change
+  // ✅ Recompute when filter or sales change
   useEffect(() => {
     if (sales.length === 0 && loading) return;
 
@@ -82,7 +82,7 @@ function SalesPage() {
     computeCategories(filtered);
   }, [timeFilter, sales, loading]);
 
-    // ✅ Stats Calculation
+  // ✅ Stats Calculation
   const computeStats = (filteredData, allSalesData) => {
     // 1. Calculate stats based on the time filter (Day, Week, etc.)
     const totalSales = filteredData.reduce((sum, s) => sum + (s.totalAmount || 0), 0);
@@ -93,7 +93,6 @@ function SalesPage() {
     const uniqueCustomers = new Set(filteredData.map((s) => s.customerEmail || s.customerName)).size;
 
     // ✅ 2. Calculate Outstanding Payments based on ALL sales (unfiltered)
-    // We ignore 'PAY-' receipts so we don't double-count partial payments.
     const outstandingPayments = allSalesData.reduce((sum, s) => {
       const isPaymentReceipt = s.receiptNo?.startsWith('PAY-');
       
@@ -107,7 +106,7 @@ function SalesPage() {
       totalSales, 
       productsSold, 
       totalCustomers: uniqueCustomers, 
-      outstandingPayments // This will now always be the all-time total
+      outstandingPayments
     });
   };
 
@@ -177,7 +176,7 @@ function SalesPage() {
     setStatusFilter('All Status');
   };
 
-  // ✅ Filter the table data based on Search, Payment, and Status
+  // ✅ Filter the table data
   const filteredTransactions = sales.filter((sale) => {
     const matchesSearch = 
       (sale.receiptNo?.toLowerCase() || '').includes(searchTerm.toLowerCase()) ||
@@ -231,31 +230,68 @@ function SalesPage() {
           </div>
         </div>
 
-                {/* Stat Cards */}
+        {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           {[
-            { label: 'Total Sales', value: peso(stats.totalSales), bg: 'bg-indigo-100 border border-indigo-200', iconBg: 'bg-indigo-500', icon: '₱' },
-            { label: 'Products Sold', value: stats.productsSold, bg: 'bg-purple-100 border border-purple-200', iconBg: 'bg-purple-500', icon: '👓' },
-            { label: 'Total Customers', value: stats.totalCustomers, bg: 'bg-green-100 border border-green-200', iconBg: 'bg-green-500', icon: '👥' },
-            {
-              label: 'Outstanding Payments',
-              value: peso(stats.outstandingPayments),
+            { 
+              label: 'Total Sales', 
+              value: peso(stats.totalSales), 
+              bg: 'bg-indigo-100 border border-indigo-200', 
+              iconBg: 'bg-indigo-500', 
+              // ✅ SVG Banknotes
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) 
+            },
+            { 
+              label: 'Products Sold', 
+              value: stats.productsSold, 
+              bg: 'bg-purple-100 border border-purple-200', 
+              iconBg: 'bg-purple-500', 
+              // ✅ SVG Glasses
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                </svg>
+              ) 
+            },
+            { 
+              label: 'Total Customers', 
+              value: stats.totalCustomers, 
+              bg: 'bg-green-100 border border-green-200', 
+              iconBg: 'bg-green-500', 
+              // ✅ SVG Users
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              ) 
+            },
+            { 
+              label: 'Outstanding Payments', 
+              value: peso(stats.outstandingPayments), 
               bg: 'lg:ml-5 bg-[#fef3c7] border border-yellow-200', 
               iconBg: 'bg-[#fbbf24]', 
-              icon: '⏰', 
+              // ✅ SVG Clock
+              icon: (
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              ) 
             },
           ].map((stat, idx) => (
             <div 
               key={idx} 
               className={`${stat.bg} rounded-2xl p-5 shadow-sm relative`}
             >
-              {/* ✅ The Vertical Separator Line (Only on the 4th card) */}
               {idx === 3 && (
                 <div className="absolute top-0 -left-3 w-px h-full bg-gray-300 hidden lg:block"></div>
               )}
 
               <div className="flex items-center gap-3 mb-3">
-                <div className={`${stat.iconBg} text-white rounded-full w-10 h-10 flex items-center justify-center text-lg shadow-sm`}>
+                <div className={`${stat.iconBg} text-white rounded-full w-10 h-10 flex items-center justify-center shadow-sm`}>
                   {stat.icon}
                 </div>
                 <span className="text-sm text-gray-800 font-bold">{stat.label}</span>
@@ -277,14 +313,12 @@ function SalesPage() {
             <SalesChart orders={sales} range={rangeForChart()} width={400} height={200} />
           </div>
 
-                    {/* Sales By Product Category */}
+          {/* Sales By Product Category */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm flex flex-col">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Sales By Product Category</h2>
             
-            {/* ✅ Added justify-center to center the donut+legend group horizontally */}
             <div className="flex-1 flex flex-row items-center justify-center gap-8">
               
-              {/* ✅ Slightly bigger donut */}
               <div className="relative w-48 h-48 flex-shrink-0">
                 <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
                   {buildDonut()}
@@ -295,7 +329,6 @@ function SalesPage() {
                 </div>
               </div>
 
-              {/* ✅ Legend sits to the right, but the whole group is centered */}
               <div className="w-full max-w-sm space-y-2">
                 {categories.map((cat, idx) => (
                   <div key={idx} className="flex items-center justify-between text-xs">
@@ -317,17 +350,19 @@ function SalesPage() {
           </div>
         </div>
 
-        {/* ✅ Recent Transactions Table with Enclosed Filters */}
+        {/* Recent Transactions Table with Enclosed Filters */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           
           {/* Filter Bar */}
           <div className="bg-white p-2 border-b border-gray-200">
             <div className="flex flex-wrap items-center gap-3">
               
-              {/* Search Bar */}
               <div className="relative flex-1 min-w-[250px]">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                  {/* ✅ SVG Search */}
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </span>
                 <input
                   type="text"
@@ -338,7 +373,6 @@ function SalesPage() {
                 />
               </div>
 
-              {/* Payment Filter */}
               <select
                 value={paymentFilter}
                 onChange={(e) => setPaymentFilter(e.target.value)}
@@ -350,7 +384,6 @@ function SalesPage() {
                 <option value="Card">Card</option>
               </select>
 
-              {/* Status Filter */}
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
@@ -361,8 +394,6 @@ function SalesPage() {
                 <option value="Partial">Partial</option>
               </select>
 
-              {/* Clear Filters */}
-              
               <button 
                 onClick={clearFilters}
                 className="text-sm text-[#4A90E2] hover:underline font-bold flex items-center gap-1 px-2"

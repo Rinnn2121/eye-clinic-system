@@ -2,19 +2,25 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { doc, getDoc, updateDoc, arrayRemove, setDoc, arrayUnion } from 'firebase/firestore'; // ✅ Added setDoc, arrayUnion
+import { doc, getDoc, updateDoc, setDoc, arrayUnion } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 
 function WishlistPage() {
-  const { currentUser } = useAuth();
+  const { currentUser, loading: authLoading } = useAuth(); // ✅ Added authLoading
   const [wishlistItems, setWishlistItems] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [addingId, setAddingId] = useState(null); // ✅ Track which item is being added
+  const [addingId, setAddingId] = useState(null);
 
+  // ✅ Wait for Auth before fetching
   useEffect(() => {
+    if (authLoading) return;
+
     const fetchWishlist = async () => {
-      if (!currentUser?.email) return;
+      if (!currentUser?.email) {
+        setLoading(false);
+        return;
+      }
       
       try {
         const wishlistRef = doc(db, 'wishlists', currentUser.email);
@@ -52,27 +58,39 @@ function WishlistPage() {
       }
       setLoading(false);
     };
+    
     fetchWishlist();
-  }, [currentUser]);
+  }, [currentUser, authLoading]);
 
-  // Remove Item
+  // ✅ Fixed Remove Logic (Filters by ID and saves the array)
   const handleRemove = async (itemToRemove) => {
     if (!currentUser?.email) return;
     
     try {
       const wishlistRef = doc(db, 'wishlists', currentUser.email);
-      await updateDoc(wishlistRef, { items: arrayRemove(itemToRemove) });
-      setWishlistItems(wishlistItems.filter(item => item.id !== itemToRemove.id));
+      const snap = await getDoc(wishlistRef);
+      
+      if (snap.exists()) {
+        const existingItems = snap.data().items || [];
+        // Filter out the item by ID
+        const newItems = existingItems.filter(i => i.id !== itemToRemove.id);
+        
+        // Save the updated array
+        await updateDoc(wishlistRef, { items: newItems });
+        
+        // Update UI state
+        setWishlistItems(wishlistItems.filter(item => item.id !== itemToRemove.id));
+      }
     } catch (err) {
-      console.error(err);
+      console.error("Error removing from wishlist:", err);
     }
   };
 
-  // ✅ Add to Cart Function
+  // Add to Cart Function
   const handleAddToCart = async (item) => {
     if (!currentUser?.email) return;
     
-    setAddingId(item.id); // Show loading state on this specific button
+    setAddingId(item.id);
 
     try {
       const cartRef = doc(db, 'carts', currentUser.email);
@@ -84,7 +102,7 @@ function WishlistPage() {
         price: Number(item.price),
         imageUrl: item.imageUrl || '',
         quantity: 1,
-        color: 'Standard', // Default color since wishlist doesn't track specific color
+        color: 'Standard',
         isActive: true
       };
 
@@ -102,13 +120,16 @@ function WishlistPage() {
         }
       }
 
-      // Show success feedback briefly
       setTimeout(() => setAddingId(null), 1500);
     } catch (err) {
       console.error(err);
       setAddingId(null);
     }
   };
+
+  if (loading || authLoading) {
+    return <div className="text-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4A90E2] mx-auto"></div></div>;
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -125,9 +146,7 @@ function WishlistPage() {
       <div className="w-full max-w-[1200px] mx-auto px-4 pb-20">
         <h1 className="text-3xl font-medium text-gray-900 mb-8">My Wishlist</h1>
 
-        {loading ? (
-          <div className="text-center py-20"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4A90E2] mx-auto"></div></div>
-        ) : wishlistItems.length === 0 ? (
+        {wishlistItems.length === 0 ? (
           <div className="text-center py-20 text-gray-500">
             Your wishlist is empty.
           </div>
@@ -151,7 +170,9 @@ function WishlistPage() {
                     {item.imageUrl ? (
                       <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                     ) : (
-                      <span className="text-4xl text-gray-300">🖼️</span>
+                      <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
                     )}
                   </div>
                   <div>
@@ -169,7 +190,6 @@ function WishlistPage() {
                   {item.isActive ? 'Available' : 'Not Available'}
                 </div>
 
-                {/* ✅ Add to Cart Button */}
                 <div className="col-span-2 text-center">
                   <button 
                     onClick={() => handleAddToCart(item)}

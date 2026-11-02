@@ -121,76 +121,75 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
   };
 
   const handleConfirm = async () => {
-    setErrorMsg('');
+  setErrorMsg('');
 
-    if (visitTypes.length === 0) {
-      setErrorMsg("Please select at least one service.");
-      return;
-    }
-    if (!selectedDate || selectedDate < getTodayStr()) {
-      setErrorMsg("Please select a valid future date.");
-      return;
-    }
-    if (isTimePast()) {
-      setErrorMsg("The selected time has already passed today. Please choose a future time.");
-      return;
-    }
-    if (isTimeSlotTaken()) {
-      setErrorMsg("This time slot is already booked. Please pick a time at least 30 minutes away from existing appointments.");
-      return;
-    }
+  if (visitTypes.length === 0) {
+    setErrorMsg("Please select at least one service.");
+    return;
+  }
+  if (!selectedDate || selectedDate < getTodayStr()) {
+    setErrorMsg("Please select a valid future date.");
+    return;
+  }
+  if (isTimePast()) {
+    setErrorMsg("The selected time has already passed today. Please choose a future time.");
+    return;
+  }
+  if (isTimeSlotTaken()) {
+    setErrorMsg("This time slot is already booked. Please pick a time at least 30 minutes away from existing appointments.");
+    return;
+  }
 
-    setLoading(true);
-    try {
-      const selectedCartItems = cartItems.filter(item => includedItems.includes(item.id));
-      
-      // 1. Save Appointment
-      await addDoc(collection(db, 'appointments'), {
-        customerId: currentUser.email,
-        customerName: currentUser.email.split('@')[0],
-        date: selectedDate,
-        time: selectedTime,
-        reason: visitTypes.join(', '), 
-        status: 'Pending',
-        createdAt: new Date().toISOString(),
-        interestedItems: selectedCartItems.map(item => ({
-          name: item.name,
-          price: item.price,
-          color: item.color,
-          qty: item.quantity
-        }))
-      });
+  setLoading(true);
+  try {
+    const selectedCartItems = cartItems.filter(item => includedItems.includes(item.id));
+    
+// 1. Save Appointment
+await addDoc(collection(db, 'appointments'), {
+  customerId: currentUser.email, // ✅ Email
+  customerName: currentUser.email.split('@')[0],
+  date: selectedDate,
+  time: selectedTime,
+  reason: visitTypes.join(', '), 
+  status: 'Pending',
+  createdAt: new Date().toISOString(),
+  interestedItems: selectedCartItems.map(item => ({
+    name: item.name,
+    price: item.price,
+    color: item.color,
+    qty: item.quantity
+  }))
+});
 
-      // 2. Notify Admin
-      await addDoc(collection(db, 'notifications'), {
-        recipient: 'admin', 
-        type: 'booking',
-        title: 'New Appointment Booked',
-        message: `${currentUser.email.split('@')[0]} booked a ${visitTypes.join(', ')} on ${selectedDate} at ${selectedTime}.`,
-        link: '/admin/appointments',
-        isRead: false,
-        createdAt: new Date().toISOString()
-      });
+// 2. Notify Admin
+await addDoc(collection(db, 'notifications'), {
+  recipient: 'admin', 
+  type: 'booking',
+  title: 'New Appointment Booked',
+  message: `${currentUser.email.split('@')[0]} booked a ${visitTypes.join(', ')} on ${selectedDate} at ${selectedTime}.`,
+  link: '/admin/appointments',
+  isRead: false,
+  createdAt: new Date().toISOString()
+});
 
-      // 3. Notify Customer
-      await addDoc(collection(db, 'notifications'), {
-        recipient: currentUser.email,
-        type: 'booking',
-        title: 'Booking Confirmed',
-        message: `Your appointment for ${visitTypes.join(', ')} on ${selectedDate} at ${selectedTime} is now pending confirmation.`,
-        link: '/customer/appointments',
-        isRead: false,
-        createdAt: new Date().toISOString()
-      });
+// 3. Notify Customer
+await addDoc(collection(db, 'notifications'), {
+  recipient: currentUser.email, // ✅ MUST BE EMAIL
+  type: 'booking',
+  title: 'Appointment Booked — Awaiting Confirmation',
+  message: `Your appointment for ${visitTypes.join(', ')} on ${selectedDate} at ${selectedTime} has been received. The clinic will confirm it shortly.`,
+  link: '/customer/appointments',
+  isRead: false,
+  createdAt: new Date().toISOString()
+});
+    setShowSuccessModal(true);
 
-      setShowSuccessModal(true);
-
-    } catch (err) {
-      console.error(err);
-      setErrorMsg("Failed to book appointment. Please try again.");
-    }
-    setLoading(false);
-  };
+  } catch (err) {
+    console.error(err);
+    setErrorMsg("Failed to book appointment. Please try again.");
+  }
+  setLoading(false);
+};
 
   // --- CALENDAR LOGIC ---
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -433,7 +432,12 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                   <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
                     <div className="flex"><span className="w-24 text-gray-500">Services</span><span className="font-medium text-gray-900">{visitTypes.join(', ')}</span></div>
                     <div className="flex"><span className="w-24 text-gray-500">Date</span><span className="font-medium text-gray-900">{selectedDate}</span></div>
-                    <div className="flex"><span className="w-24 text-gray-500">Time</span><span className="font-medium text-gray-900">{selectedTime}</span></div>
+                    <div className="flex">
+                    <span className="w-24 text-gray-500">Time</span>
+                    <span className="font-medium text-gray-900">
+                      {selectedTime ? new Date(`2000-01-01T${selectedTime}`).toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' }) : '—'}
+                    </span>
+                  </div>
                   </div>
                 </div>
 

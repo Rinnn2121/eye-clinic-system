@@ -78,7 +78,11 @@ function ServicesPage() {
               {/* Header Row: Image + Title */}
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-20 h-20 bg-gray-200 rounded-full flex-shrink-0 flex items-center justify-center">
-                  <span className="text-3xl text-gray-300">🖼️</span>
+                  {/* ✅ SVG Eye/Service Placeholder */}
+                  <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
                 </div>
                 <h2 className="font-bold text-gray-900 leading-snug text-sm md:text-base">
                   {service.title}
@@ -121,14 +125,14 @@ function ServicesPage() {
           isOpen={true}
           title={alertConfig.title}
           message={alertConfig.message}
-          icon={alertConfig.type === 'success' ? '✅' : '⚠️'}
+          iconType={alertConfig.type === 'success' ? 'success' : 'warning'}
           confirmText={alertConfig.type === 'success' ? 'OK' : 'Go to Login'}
           confirmColor={alertConfig.type === 'success' ? 'green' : 'blue'}
           isAlert
           onConfirm={() => {
             setAlertConfig(null);
             if (alertConfig.type !== 'success') {
-              navigate('/customer/login');
+              navigate('/login');
             }
           }}
         />

@@ -214,7 +214,7 @@ function PatientRecordPage() {
         receiptNo: generatedReceipt,
       });
 
-      // 3. Save the order for sales tracking (WITH FALLBACKS)
+      // 3. Save the order for sales tracking
       await addDoc(collection(db, 'orders'), {
         receiptNo: generatedReceipt || '', 
         customerId: customerId || '', 
@@ -272,7 +272,7 @@ function PatientRecordPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 py-8 px-4">
-<div className="w-full max-w-5xl mx-auto bg-white rounded-2xl shadow-sm p-8">
+      <div className="w-full max-w-5xl mx-auto bg-white rounded-2xl shadow-sm p-8">
   
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold">VITUG-SUMAYA</h1>
@@ -400,23 +400,23 @@ function PatientRecordPage() {
                 <select value={record.frame} onChange={(e) => setRecord({ ...record, frame: e.target.value })}
                   className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent">
                   <option value="">Select frame</option>
-                  <option value="custom">👤 Customer's Own Frame (No Charge)</option>
-                  <optgroup label="📦 Packages (Frame + Lens)">
+                  <option value="custom">Customer's Own Frame (No Charge)</option>
+                  <optgroup label="Packages (Frame + Lens)">
                     {inventory.filter((i) => i.name?.toLowerCase().includes('package')).map((i) => (
                       <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
                     ))}
                   </optgroup>
-                  <optgroup label="👓 Metal Frames">
+                  <optgroup label="Metal Frames">
                     {inventory.filter((i) => i.category === 'Metal Frame').map((i) => (
                       <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
                     ))}
                   </optgroup>
-                  <optgroup label="👓 Plastic Frames">
+                  <optgroup label="Plastic Frames">
                     {inventory.filter((i) => i.category === 'Plastic Frame').map((i) => (
                       <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
                     ))}
                   </optgroup>
-                  <option value="others">➕ Others (Custom Input)</option>
+                  <option value="others">Others (Custom Input)</option>
                 </select>
               </div>
               {record.frame === 'others' && (
@@ -435,7 +435,7 @@ function PatientRecordPage() {
                   {inventory.filter((i) => i.category === 'Lens Type').map((i) => (
                     <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
                   ))}
-                  <option value="others">➕ Others (Custom Input)</option>
+                  <option value="others">Others (Custom Input)</option>
                 </select>
               </div>
               {record.lensType === 'others' && (
@@ -454,7 +454,7 @@ function PatientRecordPage() {
                   {inventory.filter((i) => i.category === 'Coating').map((i) => (
                     <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
                   ))}
-                  <option value="others">➕ Others (Custom Input)</option>
+                  <option value="others">Others (Custom Input)</option>
                 </select>
               </div>
               {record.coating === 'others' && (
@@ -537,7 +537,7 @@ function PatientRecordPage() {
         isOpen={showPrescriptionError}
         title="Missing Prescription"
         message="Please enter at least the new prescription SPH for OD or OS."
-        icon="⚠️"
+        iconType="warning"
         confirmText="OK"
         confirmColor="red"
         isAlert
@@ -548,7 +548,7 @@ function PatientRecordPage() {
         isOpen={!!saveError}
         title="Save Failed"
         message={saveError}
-        icon="❌"
+        iconType="error"
         confirmText="OK"
         confirmColor="red"
         isAlert
@@ -559,7 +559,7 @@ function PatientRecordPage() {
         isOpen={showSuccess}
         title="Record Saved!"
         message={`Receipt No: ${receiptNo}\nThe record has been successfully saved.`}
-        icon="✅"
+        iconType="success"
         confirmText="Go to Customers"
         confirmColor="green"
         isAlert

@@ -1,77 +1,121 @@
 // src/components/NotificationBell.js
 
 import React, { useState, useEffect, useRef } from 'react';
-import { collection, query, where, onSnapshot, doc, updateDoc, orderBy } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, doc, updateDoc } from 'firebase/firestore'; // ✅ Removed orderBy
 import { db } from '../firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
-export default function NotificationBell() {
-  const { currentUser, userRole } = useAuth();
+export default function NotificationBell({ align = 'right' }) {
+  const { currentUser, userRole, loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef(null);
 
-  // Determine the role to listen to (Admin sees admin alerts, Customer sees their own)
-  const targetRole = userRole === 'admin' || userRole === 'staff' ? 'admin' : currentUser?.email;
+  const isAdmin = userRole === 'admin' || userRole === 'staff';
+  const recipientId = isAdmin ? 'admin' : currentUser?.email?.toLowerCase();
 
-  // ✅ Fetch notifications in real-time
   useEffect(() => {
-    if (!targetRole) return;
+    if (authLoading) return; 
+    if (!recipientId) {
+      setNotifications([]);
+      return;
+    }
 
+    // ✅ REMOVED orderBy - This prevents the query from crashing due to missing indexes or strict rules
     const q = query(
       collection(db, 'notifications'),
-      where('recipient', '==', targetRole),
-      orderBy('createdAt', 'desc')
+      where('recipient', '==', recipientId)
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const list = [];
       snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+      
+      // ✅ Sort manually in JavaScript (Newest first)
+      list.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      
       setNotifications(list);
+    }, (error) => {
+      // ✅ If there is an error, show it in the console
+      console.error("Notification Error: ", error);
     });
 
     return () => unsubscribe();
-  }, [targetRole]);
+  }, [recipientId, authLoading]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
         setIsOpen(false);
       }
     };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const unreadCount = notifications.filter(n => !n.isRead).length;
 
-  // ✅ Mark all as read
-  const markAllAsRead = async () => {
-    const unread = notifications.filter(n => !n.isRead);
-    unread.forEach(async (n) => {
-      await updateDoc(doc(db, 'notifications', n.id), { isRead: true });
-    });
+  const markOneAsRead = async (notification) => {
+    if (notification.isRead) return;
+    try {
+      await updateDoc(doc(db, 'notifications', notification.id), { isRead: true });
+    } catch (error) {
+      console.error("Error marking as read:", error);
+    }
   };
 
-  const handleOpen = () => {
-    setIsOpen(!isOpen);
-    if (!isOpen) markAllAsRead();
+  const markAllAsRead = async () => {
+    const unread = notifications.filter(n => !n.isRead);
+    if (unread.length === 0) return;
+    try {
+      await Promise.all(unread.map(n => updateDoc(doc(db, 'notifications', n.id), { isRead: true })));
+    } catch (error) {
+      console.error("Error marking all as read:", error);
+    }
   };
+
+  const formatDate = (isoString) => {
+    if (!isoString) return '';
+    const d = new Date(isoString);
+    const today = new Date();
+    if (d.toDateString() === today.toDateString()) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) + ' · ' +
+           d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  };
+
+  const getNotificationIcon = (type) => {
+    const iconClass = "w-4 h-4";
+    if (type === 'booking') {
+      return (
+        <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      );
+    }
+    return (
+      <svg className={iconClass} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+      </svg>
+    );
+  };
+
+  const dropdownPosition = align === 'sidebar' 
+    ? 'absolute left-full bottom-full mb-2' 
+    : 'absolute right-0 top-full mt-2';
 
   return (
     <div className="relative" ref={dropdownRef}>
-      {/* Bell Icon */}
-      <button 
-        onClick={handleOpen}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
         className="relative p-2 text-gray-700 hover:text-[#4A90E2] transition-colors rounded-full hover:bg-gray-100"
       >
         <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
-        
-        {/* Red Badge for Unread */}
+
         {unreadCount > 0 && (
           <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full border-2 border-white">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -79,39 +123,44 @@ export default function NotificationBell() {
         )}
       </button>
 
-      {/* Dropdown */}
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-50 overflow-hidden">
-          <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+        <div className={`${dropdownPosition} w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[999] overflow-hidden flex flex-col max-h-[70vh]`}>
+          
+          <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
             <h3 className="font-bold text-gray-800">Notifications</h3>
-            <span className="text-xs text-gray-500">{notifications.length} total</span>
+            {unreadCount > 0 && (
+              <button onClick={markAllAsRead} className="text-xs text-[#4A90E2] hover:underline font-medium">
+                Mark all as read
+              </button>
+            )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto">
-            {notifications.length === 0 ? (
-              <div className="p-6 text-center text-gray-500 text-sm">
-                No notifications yet.
-              </div>
+          <div className="overflow-y-auto flex-1 min-h-[150px]">
+            {authLoading ? (
+              <div className="p-6 text-center text-gray-400 text-sm animate-pulse">Checking for notifications...</div>
+            ) : notifications.length === 0 ? (
+              <div className="p-6 text-center text-gray-500 text-sm">No notifications yet.</div>
             ) : (
               notifications.map(n => (
-                <Link 
-                  key={n.id} 
-                  to={n.link || '#'} 
-                  onClick={() => setIsOpen(false)}
+                <Link
+                  key={n.id}
+                  to={n.link || '#'}
+                  onClick={() => { markOneAsRead(n); setIsOpen(false); }}
                   className={`block p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors ${!n.isRead ? 'bg-blue-50/50' : ''}`}
                 >
                   <div className="flex gap-3">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${
-                      n.type === 'booking' ? 'bg-blue-100 text-blue-600' :
-                      n.type === 'order' ? 'bg-green-100 text-green-600' : 'bg-yellow-100 text-yellow-600'
-                    }`}>
-                      {n.type === 'booking' ? '📅' : n.type === 'order' ? '🛒' : '🔔'}
+                    <div className={`w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0 ${n.type === 'booking' ? 'bg-blue-100 text-blue-600' : 'bg-yellow-100 text-yellow-600'}`}>
+                      {getNotificationIcon(n.type)}
                     </div>
-                    <div>
-                      <p className="text-sm font-bold text-gray-800">{n.title}</p>
-                      <p className="text-xs text-gray-600 mt-1">{n.message}</p>
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm ${!n.isRead ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>
+                        {n.title}
+                      </p>
+                      <p className={`text-xs mt-1 ${!n.isRead ? 'text-gray-700' : 'text-gray-500'}`}>
+                        {n.message}
+                      </p>
                       <p className="text-[10px] text-gray-400 mt-1">
-                        {new Date(n.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {formatDate(n.createdAt)}
                       </p>
                     </div>
                   </div>

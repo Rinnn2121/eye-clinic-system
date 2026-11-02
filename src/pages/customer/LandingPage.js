@@ -118,6 +118,7 @@ function LandingPage() {
             <div className="h-6 w-px bg-gray-300"></div>
 
             <Link to="/customer/products" className="px-5 py-3 text-gray-600 hover:text-[#4A90E2] transition-colors">
+              {/* ✅ SVG Search */}
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
@@ -125,7 +126,7 @@ function LandingPage() {
           </div>
         </div>
 
-                 {/* HERO SECTION */}
+        {/* HERO SECTION */}
         <div className="w-full max-w-[1440px] mx-auto px-4">
           <section className="relative flex flex-col md:flex-row items-stretch rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-200">
             
@@ -143,30 +144,34 @@ function LandingPage() {
                   to="/customer/products" 
                   className="bg-[#4A90E2] text-white px-6 py-3 rounded-md font-medium text-sm hover:bg-[#4A90E2]/90 transition-colors flex items-center gap-2 shadow-sm"
                 >
-                  <span>👓</span> Browse Products
+                  {/* ✅ SVG Glasses */}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                  Browse Products
                 </Link>
                 <button 
                   onClick={handleBookClick}
                   className="bg-white border border-gray-300 text-gray-700 px-6 py-3 rounded-md font-medium text-sm hover:bg-gray-50 transition-colors shadow-sm flex items-center gap-2"
                 >
-                  <span>📅</span> Book an Appointment
+                  {/* ✅ SVG Calendar */}
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  Book an Appointment
                 </button>
               </div>
             </div>
 
             {/* Right Side: Image (Full Fit + Fade) */}
             <div className="w-full md:w-1/2 relative bg-white">
-              
-              {/* ✅ The Image now uses object-contain so it never crops */}
               <img 
                 src="/images/aoc.jpg" 
                 alt="Eyewear Collection"
                 className="w-full h-full object-contain"
               />
               
-              {/* ✅ Fade overlay to blend into the text */}
               <div className="absolute inset-0 bg-gradient-to-r from-white via-white/40 to-transparent pointer-events-none"></div>
-              
             </div>
 
           </section>
@@ -186,7 +191,12 @@ function LandingPage() {
                   {product.imageUrl ? (
                     <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500" />
                   ) : (
-                    <div className="w-full h-full flex items-center justify-center text-6xl text-gray-200">🖼️</div>
+                    <div className="w-full h-full flex items-center justify-center text-gray-300">
+                      {/* ✅ SVG Image Placeholder */}
+                      <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                    </div>
                   )}
                 </div>
                 <div className="flex justify-between items-start">
@@ -223,7 +233,12 @@ function LandingPage() {
                     {product.imageUrl ? (
                       <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-5xl text-gray-200">🖼️</div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        {/* ✅ SVG Image Placeholder */}
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
                     )}
                   </div>
                   <div>
@@ -251,7 +266,12 @@ function LandingPage() {
                     {product.imageUrl ? (
                       <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500" />
                     ) : (
-                      <div className="w-full h-full flex items-center justify-center text-5xl text-gray-200">🖼️</div>
+                      <div className="w-full h-full flex items-center justify-center text-gray-300">
+                        {/* ✅ SVG Image Placeholder */}
+                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                        </svg>
+                      </div>
                     )}
                   </div>
                   <div>
@@ -276,7 +296,10 @@ function LandingPage() {
               {packages.map((product) => (
                 <Link to={`/customer/products/${product.id}`} key={product.id} className="group cursor-pointer block">
                   <div className="w-full aspect-square bg-gray-100 rounded-xl overflow-hidden mb-3 flex items-center justify-center">
-                    <span className="text-5xl text-gray-300">🎁</span>
+                    {/* ✅ SVG Gift/Package Icon */}
+                    <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
                   </div>
                   <h3 className="font-medium text-gray-900 text-sm">{product.name}</h3>
                   <p className="font-bold text-gray-900 text-sm">₱ {Number(product.price).toLocaleString()}</p>
@@ -306,14 +329,14 @@ function LandingPage() {
           isOpen={true}
           title={alertConfig.title}
           message={alertConfig.message}
-          icon={alertConfig.type === 'success' ? '✅' : '⚠️'}
+          iconType={alertConfig.type === 'success' ? 'success' : 'warning'}
           confirmText={alertConfig.type === 'success' ? 'OK' : 'Go to Login'}
           confirmColor={alertConfig.type === 'success' ? 'green' : 'blue'}
           isAlert
           onConfirm={() => {
             setAlertConfig(null);
             if (alertConfig.type !== 'success') {
-              navigate('/customer/login');
+              navigate('/login');
             }
           }}
         />
