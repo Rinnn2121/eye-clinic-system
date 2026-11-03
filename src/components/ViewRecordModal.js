@@ -25,22 +25,16 @@ function ViewRecordModal({ record, customer, onClose, onUpdatePayment }) {
   const phone = record.phone || customer?.phone || '';
   const occupation = record.occupation || customer?.occupation || '';
 
-  // ✅ Helper function to calculate the difference
-const getDiff = (oldVal, newVal) => {
-  // Convert strings to numbers
-  const o = parseFloat(oldVal);
-  const n = parseFloat(newVal);
-  
-  // If either is empty or not a number, return null (no badge)
-  if (isNaN(o) || isNaN(n)) return null;
-  
-  const diff = n - o;
-  if (diff === 0) return null; // No change
-  
-  // Format as "+0.50" or "-0.50"
-  const sign = diff > 0 ? '+' : '';
-  return `${sign}${diff.toFixed(2)}`;
-};
+  // Helper function to calculate the difference
+  const getDiff = (oldVal, newVal) => {
+    const o = parseFloat(oldVal);
+    const n = parseFloat(newVal);
+    if (isNaN(o) || isNaN(n)) return null;
+    const diff = n - o;
+    if (diff === 0) return null; 
+    const sign = diff > 0 ? '+' : '';
+    return `${sign}${diff.toFixed(2)}`;
+  };
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-start justify-center p-4 pt-10 pb-10 z-50 overflow-y-auto">
@@ -163,7 +157,7 @@ const getDiff = (oldVal, newVal) => {
             </div>
           </div>
 
-                    {/* NEW PRESCRIPTION TABLE */}
+          {/* NEW PRESCRIPTION TABLE */}
           <div className="border border-gray-400 rounded-md overflow-hidden">
             <div className="grid grid-cols-[60px_1fr_60px] bg-gray-100 border-b border-gray-400">
               <div className="border-r border-gray-400 p-2 text-center font-bold text-[10px] uppercase">PD</div>
@@ -179,7 +173,7 @@ const getDiff = (oldVal, newVal) => {
               <div className="border-r border-gray-400 p-2 flex items-center gap-2">
                 <span className="text-[10px] font-bold text-gray-600">OD:</span>
                 
-                {/* ✅ SPH with Diff */}
+                {/* SPH with Diff */}
                 <div className="flex-1 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">SPH</span>
                   <div className="flex items-center gap-1">
@@ -196,7 +190,7 @@ const getDiff = (oldVal, newVal) => {
                   </div>
                 </div>
 
-                {/* ✅ CYL with Diff */}
+                {/* CYL with Diff */}
                 <div className="flex-1 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">CYL</span>
                   <div className="flex items-center gap-1">
@@ -213,7 +207,6 @@ const getDiff = (oldVal, newVal) => {
 
                 <span className="text-[10px] text-gray-400 px-1">x</span>
 
-                {/* Axis (No diff needed here usually, but you could add it) */}
                 <div className="w-14 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">Axis</span>
                   <span className="text-xs font-medium">{newRx.od?.axis || '-'}</span>
@@ -230,7 +223,6 @@ const getDiff = (oldVal, newVal) => {
               <div className="border-r border-gray-400 p-2 flex items-center gap-2">
                 <span className="text-[10px] font-bold text-gray-600">OS:</span>
                 
-                {/* ✅ SPH with Diff */}
                 <div className="flex-1 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">SPH</span>
                   <div className="flex items-center gap-1">
@@ -245,7 +237,6 @@ const getDiff = (oldVal, newVal) => {
                   </div>
                 </div>
 
-                {/* ✅ CYL with Diff */}
                 <div className="flex-1 flex flex-col border-b border-gray-300">
                   <span className="text-[8px] text-gray-400">CYL</span>
                   <div className="flex items-center gap-1">
@@ -287,27 +278,24 @@ const getDiff = (oldVal, newVal) => {
             </div>
           </div>
 
-          {/* Dropdowns (Read Only) */}
+          {/* Package Details (Read Only) */}
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold w-20 text-gray-700">FRAME:</span>
-              <div className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50 flex justify-between items-center">
-                {record.frame?.name || 'Select frame'}
-                <span className="text-gray-400 text-xs">▼</span>
+              <div className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50">
+                {record.frame?.name || '—'}
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-[11px] font-bold w-20 text-gray-700">LENS TYPE:</span>
-              <div className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50 flex justify-between items-center">
-                {record.lensType?.name || 'Select lens type'}
-                <span className="text-gray-400 text-xs">▼</span>
+              <span className="text-[11px] font-bold w-20 text-gray-700">LENS:</span>
+              <div className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50">
+                {record.lensType?.name || '—'}
               </div>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold w-20 text-gray-700">COATING:</span>
-              <div className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50 flex justify-between items-center">
-                {record.coating?.name || 'Select coating'}
-                <span className="text-gray-400 text-xs">▼</span>
+              <div className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50">
+                {record.coating?.name || '—'}
               </div>
             </div>
           </div>
@@ -336,49 +324,26 @@ const getDiff = (oldVal, newVal) => {
             <div className="grid grid-cols-2 gap-4 pt-2">
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-gray-600">PAYMENT METHOD:</span>
-                <div className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm bg-white flex justify-between">
-                  {record.paymentMethod || 'Cash'} <span className="text-gray-400 text-xs">▼</span>
+                <div className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm bg-white">
+                  {record.paymentMethod || 'Cash'}
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[10px] font-bold text-gray-600">STATUS:</span>
-                <div className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm bg-gray-100 text-gray-500 flex justify-between">
+                <div className="flex-1 border border-gray-300 rounded px-2 py-1 text-sm bg-gray-100 text-gray-500">
                   {record.paymentStatus === 'paid' ? 'Fully Paid' : 'Pending (May Balance)'}
-                  <span className="text-gray-400 text-xs">▼</span>
                 </div>
               </div>
             </div>
           </div>
 
-                    {/* Optometrist */}
+          {/* Optometrist */}
           <div className="flex items-center gap-4 pt-2">
             <span className="text-[11px] font-bold text-gray-700 w-24">OPTOMETRIST:</span>
             <div className="flex-1 border-b border-gray-400 pb-1 text-sm font-bold">
               {record.optometrist || ''}
             </div>
           </div>
-
-          {/* ✅ NEW: Payment History Ledger */}
-          {record.paymentHistory && record.paymentHistory.length > 0 && (
-            <div className="border border-gray-200 rounded-xl p-4 bg-gray-50 mt-6">
-              <h4 className="text-xs font-bold text-gray-800 mb-3 uppercase tracking-wide">Payment History Ledger</h4>
-              <div className="space-y-2">
-                {record.paymentHistory.map((payment, index) => (
-                  <div key={index} className="flex justify-between items-center text-xs text-gray-600 border-b border-gray-200 last:border-0 pb-2 last:pb-0">
-                    <div className="flex items-center gap-3">
-                      <span className="text-green-500">✓</span>
-                      <span className="font-medium">
-                        {new Date(payment.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                      </span>
-                      <span className="text-gray-400">|</span>
-                      <span>{payment.method}</span>
-                    </div>
-                    <span className="font-bold text-gray-900">₱ {Number(payment.amount).toLocaleString()}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Action Buttons */}
           <div className="flex gap-3 pt-6 border-t border-gray-200 mt-6">

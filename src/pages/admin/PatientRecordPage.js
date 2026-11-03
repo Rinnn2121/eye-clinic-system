@@ -6,6 +6,27 @@ import { doc, getDoc, addDoc, collection, getDocs, updateDoc, query, where, orde
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
+import LabOrderModal from '../../components/LabOrderModal';
+
+// ✅ Base prices
+const FRAME_TYPES = {
+  'Plastic': 900,
+  'Metal': 1500,
+  'Branded': 2500,
+  'Own Frame': 0,
+  'Custom': 0,
+};
+
+const LENS_TYPES = ['Single Vision', 'Kryptok', 'Progressive', 'Custom'];
+const COATING_TYPES = [
+  'Ordinary', 
+  'Multicoated', 
+  'Blue Blocker', 
+  'Photochromic', 
+  'Photochromic Blue Blocker', 
+  'Photochromic Multicoated',
+  'Custom'
+];
 
 function PatientRecordPage() {
   const { customerId } = useParams();
@@ -13,23 +34,17 @@ function PatientRecordPage() {
   const { currentUser } = useAuth();
 
   const [customer, setCustomer] = useState(null);
-  const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Modal states
   const [showPrescriptionError, setShowPrescriptionError] = useState(false);
+  const [showSelectionError, setShowSelectionError] = useState(false);
   const [saveError, setSaveError] = useState('');
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [receiptNo, setReceiptNo] = useState('');
-
-  // Manual total override state
-  const [isManualTotal, setIsManualTotal] = useState(false);
-
-  // ✅ State for Custom "Others" Inputs
-  const [customFrame, setCustomFrame] = useState({ name: '', price: '' });
-  const [customLens, setCustomLens] = useState({ name: '', price: '' });
-  const [customCoating, setCustomCoating] = useState({ name: '', price: '' });
+  
+  // Lab Modal State
+  const [showLabModal, setShowLabModal] = useState(false);
+  const [savedRecordForLab, setSavedRecordForLab] = useState(null);
 
   const [record, setRecord] = useState({
     date: new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0],
@@ -42,20 +57,25 @@ function PatientRecordPage() {
     newOSsph: '', newOScyl: '', newOSaxis: '', newADD: '',
     prescriptionNotes: '', additionalNotes: '',
     
-    frame: '', 
-    lensType: '',
-    coating: '',
+    frameText: '', 
+    lensText: '',  
+    coatingText: '', 
     
-    total: 0, amountPaid: '', balance: 0,
+    customFrame: '',
+    customLens: '',
+    customCoating: '',
+    
+    total: 0, deposit: '', balance: 0,
     paymentStatus: 'pending', paymentMethod: 'Cash',
     optometrist: '',
+    
+    isManualTotal: false,
   });
 
-  // Load customer, inventory, and previous record for Rx Carry-Forward
+  // Load customer and previous record
   useEffect(() => {
     const load = async () => {
       try {
-        // 1. Load Customer Data
         const custSnap = await getDoc(doc(db, 'customers', customerId));
         if (custSnap.exists()) {
           const custData = { id: custSnap.id, ...custSnap.data() };
@@ -72,13 +92,6 @@ function PatientRecordPage() {
           return;
         }
 
-        // 2. Load Inventory
-        const invSnap = await getDocs(collection(db, 'inventory'));
-        const invList = [];
-        invSnap.forEach((d) => invList.push({ id: d.id, ...d.data() }));
-        setInventory(invList);
-
-        // ✅ 3. Load the PREVIOUS record and auto-fill "Old Prescription"
         const prevRecordsQuery = query(
           collection(db, 'records'),
           where('customerId', '==', customerId),
@@ -114,39 +127,22 @@ function PatientRecordPage() {
     load();
   }, [customerId, navigate]);
 
-  // ✅ Auto-calculate total (Handles "Others" custom inputs)
+  // ✅ Auto-calculate total based on Frame Type
   useEffect(() => {
-    if (isManualTotal) return;
+    if (record.isManualTotal) return;
+    if (record.frameText === 'Custom' || record.frameText === 'Own Frame') return; 
 
-    const f = inventory.find((i) => i.id === record.frame);
-    const lt = inventory.find((i) => i.id === record.lensType);
-    const c = inventory.find((i) => i.id === record.coating);
-    
-    const isPackage = f?.name?.toLowerCase().includes('package');
-    
-    const framePrice = record.frame === 'others' ? (Number(customFrame.price) || 0) : (f?.price || 0);
-    const lensPrice = record.lensType === 'others' ? (Number(customLens.price) || 0) : (lt?.price || 0);
-    const coatingPrice = record.coating === 'others' ? (Number(customCoating.price) || 0) : (c?.price || 0);
+    const basePrice = FRAME_TYPES[record.frameText] || 0;
+    setRecord(p => ({ ...p, total: basePrice }));
+  }, [record.frameText, record.isManualTotal]);
 
-    let subtotal = 0;
-    if (isPackage && record.frame !== 'others') {
-      subtotal = f?.price || 0;
-    } else {
-      subtotal = framePrice + lensPrice + coatingPrice;
-    }
-
-    if (subtotal > 0) {
-      setRecord((p) => ({ ...p, total: subtotal }));
-    }
-  }, [record.frame, record.lensType, record.coating, inventory, isManualTotal, customFrame.price, customLens.price, customCoating.price]);
-    
-  // Auto-calculate balance
+  // Auto-calculate balance based on Deposit
   useEffect(() => {
-    const paid = Number(record.amountPaid) || 0;
-    const balance = record.total - paid;
+    const deposited = Number(record.deposit) || 0;
+    const balance = record.total - deposited;
 
     let calculatedStatus = 'pending';
-    if (record.total > 0 && paid >= record.total) {
+    if (record.total > 0 && deposited >= record.total) {
       calculatedStatus = 'paid';
     }
 
@@ -155,7 +151,7 @@ function PatientRecordPage() {
       balance: balance > 0 ? balance : 0,
       paymentStatus: calculatedStatus
     }));
-  }, [record.amountPaid, record.total]);
+  }, [record.deposit, record.total]);
 
   const handleSave = async () => {
     if (!record.newODsph && !record.newOSsph) {
@@ -163,37 +159,38 @@ function PatientRecordPage() {
       return;
     }
 
+    // Validation: Must select Lens and Coating
+    if (!record.lensText || !record.coatingText) {
+      setShowSelectionError(true);
+      return;
+    }
+
+    if (record.frameText === 'Custom' && !record.customFrame) {
+      setShowSelectionError(true);
+      return;
+    }
+    if (record.lensText === 'Custom' && !record.customLens) {
+      setShowSelectionError(true);
+      return;
+    }
+    if (record.coatingText === 'Custom' && !record.customCoating) {
+      setShowSelectionError(true);
+      return;
+    }
+
     setSaving(true);
     try {
-      // ✅ Safety check for "Others" custom inputs
-      const f = record.frame === 'others' 
-        ? { id: 'custom', name: customFrame.name.trim() || 'Custom Frame', price: Number(customFrame.price) || 0, category: 'Frame' } 
-        : inventory.find((i) => i.id === record.frame);
-        
-      const lt = record.lensType === 'others' 
-        ? { id: 'custom', name: customLens.name.trim() || 'Custom Lens', price: Number(customLens.price) || 0, category: 'Lens Type' } 
-        : inventory.find((i) => i.id === record.lensType);
-        
-      const c = record.coating === 'others' 
-        ? { id: 'custom', name: customCoating.name.trim() || 'Custom Coating', price: Number(customCoating.price) || 0, category: 'Coating' } 
-        : inventory.find((i) => i.id === record.coating);
-
       const generatedReceipt = `SO-${Date.now().toString().slice(-5)}`;
-      const isPackage = f?.name?.toLowerCase().includes('package');
+      
+      const finalFrame = record.frameText === 'Custom' ? record.customFrame : record.frameText;
+      const finalLens = record.lensText === 'Custom' ? record.customLens : record.lensText;
+      const finalCoating = record.coatingText === 'Custom' ? record.customCoating : record.coatingText;
 
-      // 1. Update customer stats
-      await updateDoc(doc(db, 'customers', customerId), {
-        firstName: record.firstName, lastName: record.lastName, nickname: record.nickname,
-        address: record.address, age: record.age, phone: record.phone, occupation: record.occupation,
-        lastVisit: new Date().toISOString(), totalVisits: (customer.totalVisits || 0) + 1,
-        latestBalance: record.balance || 0,
-        latestPaymentMethod: record.paymentMethod || 'Cash',
-        latestPaymentStatus: record.paymentStatus || 'pending'
-      });
-
-      // 2. Save the clinical record
+      // 1. Save the record
       await addDoc(collection(db, 'records'), {
-        customerId, customerName: `${record.lastName}, ${record.firstName}`, date: record.date,
+        customerId, 
+        customerName: `${record.lastName}, ${record.firstName}`, 
+        date: record.date,
         oldPd: record.oldPd, newPd: record.newPd,
         oldPrescription: {
           od: { sph: record.oldODsph, cyl: record.oldODcyl, axis: record.oldODaxis },
@@ -204,14 +201,28 @@ function PatientRecordPage() {
           os: { sph: record.newOSsph, cyl: record.newOScyl, axis: record.newOSaxis }, add: record.newADD,
         },
         prescriptionNotes: record.prescriptionNotes, additionalNotes: record.additionalNotes,
-        frame: f ? { id: f.id, name: f.name, price: f.price, isPackage } : null,
-        lensType: lt ? { id: lt.id, name: lt.name, price: lt.price } : null,
-        coating: c ? { id: c.id, name: c.name, price: c.price } : null,
+        frame: { name: finalFrame },
+        lensType: { name: finalLens },
+        coating: { name: finalCoating },
         total: record.total,
-        amountPaid: Number(record.amountPaid) || 0, balance: record.balance,
-        paymentStatus: record.paymentStatus, paymentMethod: record.paymentMethod,
-        optometrist: record.optometrist, createdBy: currentUser?.email, createdAt: new Date().toISOString(),
+        amountPaid: Number(record.deposit) || 0, 
+        balance: record.balance,
+        paymentStatus: record.paymentStatus, 
+        paymentMethod: record.paymentMethod,
+        optometrist: record.optometrist, 
+        createdBy: currentUser?.email, 
+        createdAt: new Date().toISOString(),
         receiptNo: generatedReceipt,
+      });
+
+      // 2. Update Customer Stats
+      await updateDoc(doc(db, 'customers', customerId), {
+        firstName: record.firstName, lastName: record.lastName, nickname: record.nickname,
+        address: record.address, age: record.age, phone: record.phone, occupation: record.occupation,
+        lastVisit: new Date().toISOString(), totalVisits: (customer.totalVisits || 0) + 1,
+        latestBalance: record.balance || 0,
+        latestPaymentMethod: record.paymentMethod || 'Cash',
+        latestPaymentStatus: record.paymentStatus || 'pending'
       });
 
       // 3. Save the order for sales tracking
@@ -221,22 +232,20 @@ function PatientRecordPage() {
         customerName: `${record.lastName || ''}, ${record.firstName || ''}`,
         customerPhone: record.phone || '', 
         notes: record.additionalNotes || record.prescriptionNotes || '',
-        
         totalAmount: record.total || 0, 
-        amountPaid: Number(record.amountPaid) || 0, 
+        amountPaid: Number(record.deposit) || 0, 
         balance: record.balance || 0,
         paymentStatus: record.paymentStatus || 'pending', 
         paymentMethod: record.paymentMethod || 'Cash', 
         orderDate: new Date().toISOString(),
-        
         items: [
-          ...(f ? [{ name: f.name || 'Unknown Frame', category: isPackage ? 'Package' : (f.category || 'Frame'), qty: 1, price: f.price || 0 }] : []),
-          ...(!isPackage && lt ? [{ name: lt.name || 'Unknown Lens', category: 'Lens Type', qty: 1, price: lt.price || 0 }] : []),
-          ...(!isPackage && c ? [{ name: c.name || 'Unknown Coating', category: 'Coating', qty: 1, price: c.price || 0 }] : []),
+          { name: finalFrame || 'Frame', category: record.frameText || 'Frame', qty: 1, price: FRAME_TYPES[record.frameText] || 0 },
+          { name: finalLens || 'Lens', category: 'Lens', qty: 1, price: 0 },
+          { name: finalCoating || 'Coating', category: 'Coating', qty: 1, price: 0 },
         ],
       });
 
-      // ✅ 4. Mark today's pending appointment as Completed
+      // ✅ 4. Mark appointment as completed (Handles early walk-ins)
       const apptQuery = query(
         collection(db, 'appointments'),
         where('customerId', '==', customerId),
@@ -247,21 +256,39 @@ function PatientRecordPage() {
       if (!apptSnap.empty) {
         const pendingAppts = [];
         apptSnap.forEach(doc => pendingAppts.push({ id: doc.id, ...doc.data() }));
+        // Sort to get the closest upcoming appointment
         pendingAppts.sort((a, b) => a.date.localeCompare(b.date));
         
+        // Mark it as Completed
         await updateDoc(doc(db, 'appointments', pendingAppts[0].id), {
           status: 'Completed'
         });
       }
 
-      // 5. Show success modal
-      setReceiptNo(generatedReceipt);
-      setShowSuccess(true);
+      // 5. Prepare for Lab Modal
+      setSavedRecordForLab({
+        id: generatedReceipt,
+        customerId,
+        customerName: `${record.lastName}, ${record.firstName}`,
+        date: record.date,
+        frameCategory: finalFrame, 
+        lensType: finalLens, 
+        coating: finalCoating, 
+        totalAmount: record.total, // ✅ Pass total to lab order
+        newODsph: record.newODsph, newODcyl: record.newODcyl, newODaxis: record.newODaxis,
+        newOSsph: record.newOSsph, newOScyl: record.newOScyl, newOSaxis: record.newOSaxis,
+        newADD: record.newADD, newPd: record.newPd,
+        balance: record.balance
+      });
+      
+      setTimeout(() => setShowLabModal(true), 100);
+      setSaving(false);
+
     } catch (err) {
       console.error(err); 
       setSaveError(err.message);
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   if (loading) return (
@@ -280,6 +307,7 @@ function PatientRecordPage() {
           <p className="text-sm text-gray-500 mt-1">PATIENT'S RECORD</p>
         </div>
 
+        {/* Basic Info */}
         <div className="grid grid-cols-3 gap-4 mb-4">
           <div><input value={record.lastName} onChange={(e) => setRecord({ ...record, lastName: e.target.value })} className="w-full border-b-2 border-gray-400 pb-1 text-sm outline-none focus:border-[#4A90E2]" /><p className="text-xs text-center mt-1">LAST NAME</p></div>
           <div><input value={record.firstName} onChange={(e) => setRecord({ ...record, firstName: e.target.value })} className="w-full border-b-2 border-gray-400 pb-1 text-sm outline-none focus:border-[#4A90E2]" /><p className="text-xs text-center mt-1">FIRST NAME</p></div>
@@ -344,7 +372,7 @@ function PatientRecordPage() {
             <div className="border-r-2 border-gray-700 row-span-2 flex items-center justify-center p-2">
               <input type="text" value={record.newPd} onChange={(e) => setRecord({ ...record, newPd: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="PD" />
             </div>
-            <div className="border-r-2  border-b-2 border-gray-700 p-2">
+            <div className="border-r-2 border-b-2 border-gray-700 p-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium w-8">OD:</span>
                 <input value={record.newODsph} onChange={(e) => setRecord({ ...record, newODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
@@ -374,97 +402,71 @@ function PatientRecordPage() {
           <div><label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label><input type="text" value={record.additionalNotes} onChange={(e) => setRecord({ ...record, additionalNotes: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" /></div>
         </div>
 
-        {/* FRAME, LENS TYPE, & COATING SECTION */}
-        <div className="space-y-3 mb-6">
+        {/* ✅ FRAME, LENS, COATING SECTION */}
+        <div className="space-y-4 mb-6 bg-blue-50 p-4 rounded-xl border border-blue-200">
           
-          {inventory.find((i) => i.id === record.frame)?.name?.toLowerCase().includes('package') ? (
-            <div className="flex items-end gap-2">
-              <span className="text-sm font-medium w-20 text-[#4A90E2]">PACKAGE:</span>
-              <select value={record.frame} onChange={(e) => setRecord({ ...record, frame: e.target.value, lensType: '', coating: '' })}
-                className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent font-semibold text-[#4A90E2]">
-                <option value="">Select Package</option>
-                {inventory.filter((i) => i.name?.toLowerCase().includes('package')).map((i) => (
-                  <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
-                ))}
-                <option value="custom">--- Custom Frame & Lens ---</option>
-              </select>
-              {record.frame && record.frame !== 'custom' && (
-                <button onClick={() => setRecord({ ...record, frame: '', lensType: '', coating: '' })} className="text-xs text-red-500 hover:underline">Clear</button>
-              )}
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-[#1e40af] w-24">FRAME TYPE:</span>
+            <select 
+              value={record.frameText} 
+              onChange={(e) => {
+                const isCustom = e.target.value === 'Custom';
+                setRecord({ ...record, frameText: e.target.value, isManualTotal: isCustom });
+              }}
+              className="flex-1 border-b-2 border-blue-400 pb-1 text-sm outline-none bg-transparent font-bold text-[#1e40af]"
+            >
+              <option value="">-- Select Frame Type --</option>
+              <option value="Plastic">Plastic (₱900 Base)</option>
+              <option value="Metal">Metal (₱1,500 Base)</option>
+              <option value="Branded">Branded (₱2,500 Base)</option>
+              <option value="Own Frame">Customer's Own Frame (₱0)</option>
+              <option value="Custom">Custom / Promo</option>
+            </select>
+          </div>
+          {record.frameText === 'Custom' && (
+            <div className="flex items-center gap-3 ml-24">
+              <input type="text" placeholder="Type custom frame here..." value={record.customFrame} onChange={(e) => setRecord({ ...record, customFrame: e.target.value })} className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" />
             </div>
-          ) : (
-            <>
-              {/* FRAME */}
-              <div className="flex items-end gap-2">
-                <span className="text-sm font-medium w-20">FRAME:</span>
-                <select value={record.frame} onChange={(e) => setRecord({ ...record, frame: e.target.value })}
-                  className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent">
-                  <option value="">Select frame</option>
-                  <option value="custom">Customer's Own Frame (No Charge)</option>
-                  <optgroup label="Packages (Frame + Lens)">
-                    {inventory.filter((i) => i.name?.toLowerCase().includes('package')).map((i) => (
-                      <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Metal Frames">
-                    {inventory.filter((i) => i.category === 'Metal Frame').map((i) => (
-                      <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Plastic Frames">
-                    {inventory.filter((i) => i.category === 'Plastic Frame').map((i) => (
-                      <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
-                    ))}
-                  </optgroup>
-                  <option value="others">Others (Custom Input)</option>
-                </select>
-              </div>
-              {record.frame === 'others' && (
-                <div className="flex gap-2 ml-24">
-                  <input type="text" placeholder="Custom Frame Name" value={customFrame.name} onChange={(e) => setCustomFrame({...customFrame, name: e.target.value})} className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
-                  <input type="number" placeholder="Price" value={customFrame.price} onChange={(e) => setCustomFrame({...customFrame, price: e.target.value})} className="w-24 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
-                </div>
-              )}
-
-              {/* LENS TYPE */}
-              <div className="flex items-end gap-2">
-                <span className="text-sm font-medium w-20">LENS TYPE:</span>
-                <select value={record.lensType} onChange={(e) => setRecord({ ...record, lensType: e.target.value })}
-                  className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent">
-                  <option value="">Select lens type</option>
-                  {inventory.filter((i) => i.category === 'Lens Type').map((i) => (
-                    <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
-                  ))}
-                  <option value="others">Others (Custom Input)</option>
-                </select>
-              </div>
-              {record.lensType === 'others' && (
-                <div className="flex gap-2 ml-24">
-                  <input type="text" placeholder="Custom Lens Name" value={customLens.name} onChange={(e) => setCustomLens({...customLens, name: e.target.value})} className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
-                  <input type="number" placeholder="Price" value={customLens.price} onChange={(e) => setCustomLens({...customLens, price: e.target.value})} className="w-24 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
-                </div>
-              )}
-
-              {/* COATING */}
-              <div className="flex items-end gap-2">
-                <span className="text-sm font-medium w-20">COATING:</span>
-                <select value={record.coating} onChange={(e) => setRecord({ ...record, coating: e.target.value })}
-                  className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent">
-                  <option value="">Select coating</option>
-                  {inventory.filter((i) => i.category === 'Coating').map((i) => (
-                    <option key={i.id} value={i.id}>{i.name} — ₱{i.price}</option>
-                  ))}
-                  <option value="others">Others (Custom Input)</option>
-                </select>
-              </div>
-              {record.coating === 'others' && (
-                <div className="flex gap-2 ml-24">
-                  <input type="text" placeholder="Custom Coating Name" value={customCoating.name} onChange={(e) => setCustomCoating({...customCoating, name: e.target.value})} className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
-                  <input type="number" placeholder="Price" value={customCoating.price} onChange={(e) => setCustomCoating({...customCoating, price: e.target.value})} className="w-24 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none" />
-                </div>
-              )}
-            </>
           )}
+
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-gray-700 w-24">LENS:</span>
+            <select 
+              value={record.lensText} 
+              onChange={(e) => setRecord({ ...record, lensText: e.target.value })}
+              className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent focus:border-[#4A90E2] font-medium"
+            >
+              <option value="">-- Select Lens --</option>
+              {LENS_TYPES.map(lens => (
+                <option key={lens} value={lens}>{lens}</option>
+              ))}
+            </select>
+          </div>
+          {record.lensText === 'Custom' && (
+            <div className="flex items-center gap-3 ml-24">
+              <input type="text" placeholder="Type custom lens here..." value={record.customLens} onChange={(e) => setRecord({ ...record, customLens: e.target.value })} className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" />
+            </div>
+          )}
+
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-bold text-gray-700 w-24">COATING:</span>
+            <select 
+              value={record.coatingText} 
+              onChange={(e) => setRecord({ ...record, coatingText: e.target.value })}
+              className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent focus:border-[#4A90E2] font-medium"
+            >
+              <option value="">-- Select Coating --</option>
+              {COATING_TYPES.map(coat => (
+                <option key={coat} value={coat}>{coat}</option>
+              ))}
+            </select>
+          </div>
+          {record.coatingText === 'Custom' && (
+            <div className="flex items-center gap-3 ml-24">
+              <input type="text" placeholder="Type custom coating here..." value={record.customCoating} onChange={(e) => setRecord({ ...record, customCoating: e.target.value })} className="flex-1 border border-gray-300 rounded-lg px-3 py-1 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" />
+            </div>
+          )}
+          
         </div>
 
         {/* PAYMENT SECTION */}
@@ -477,21 +479,20 @@ function PatientRecordPage() {
               type="number"
               value={record.total}
               onChange={(e) => {
-                setIsManualTotal(true); 
-                setRecord({ ...record, total: Number(e.target.value)});
+                setRecord({ ...record, total: Number(e.target.value), isManualTotal: true });
               }}
               className="w-full text-lg font-bold outline-none bg-transparent border-b border-gray-300 focus:border-[#4A90E2]"
               />
                </div>
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm font-medium w-20 text-gray-600">AMOUNT PAID:</span>
-            <input type="number" value={record.amountPaid} onChange={(e) => setRecord({ ...record, amountPaid: e.target.value })}
+            <span className="text-sm font-medium w-20 text-gray-600">DEPOSIT:</span>
+            <input type="number" value={record.deposit} onChange={(e) => setRecord({ ...record, deposit: e.target.value })}
               className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent" placeholder="0" />
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium w-20 text-gray-600">BALANCE:</span>
-            <span className="flex-1 text-sm font-semibold text-red-600">₱{record.balance.toLocaleString()}</span>
+            <span className="flex-1 text-sm font-semibold text-red-600">₱{(record.balance || 0).toLocaleString()}</span>
           </div>
           <div className="grid grid-cols-2 gap-4 pt-2">
             <div className="flex items-center gap-2">
@@ -528,7 +529,7 @@ function PatientRecordPage() {
 
         <div className="flex gap-3">
           <button onClick={() => navigate('/admin/customers')} className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
-          <button onClick={handleSave} disabled={saving} className="flex-1 bg-[#4A90E2] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 disabled:opacity-50">{saving ? 'Saving...' : 'Save & Print'}</button>
+          <button onClick={handleSave} disabled={saving} className="flex-1 bg-[#4A90E2] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 disabled:opacity-50">{saving ? 'Saving...' : 'Save & Send to Lab'}</button>
         </div>
       </div>
 
@@ -545,6 +546,17 @@ function PatientRecordPage() {
       />
 
       <ConfirmModal
+        isOpen={showSelectionError}
+        title="Incomplete Selection"
+        message="Please make sure you have selected a Lens and a Coating (and filled in the custom text if 'Custom' is selected)."
+        iconType="warning"
+        confirmText="OK"
+        confirmColor="red"
+        isAlert
+        onConfirm={() => setShowSelectionError(false)}
+      />
+
+      <ConfirmModal
         isOpen={!!saveError}
         title="Save Failed"
         message={saveError}
@@ -555,19 +567,20 @@ function PatientRecordPage() {
         onConfirm={() => setSaveError('')}
       />
 
-      <ConfirmModal
-        isOpen={showSuccess}
-        title="Record Saved!"
-        message={`Receipt No: ${receiptNo}\nThe record has been successfully saved.`}
-        iconType="success"
-        confirmText="Go to Customers"
-        confirmColor="green"
-        isAlert
-        onConfirm={() => {
-          setShowSuccess(false);
-          navigate('/admin/customers');
-        }}
-      />
+      {/* ✅ The Lab Modal - onClose stays on page */}
+      {showLabModal && savedRecordForLab && (
+        <LabOrderModal 
+          record={savedRecordForLab}
+          onClose={() => {
+            setShowLabModal(false);
+            // Stay on page if they cancel
+          }}
+          onSuccess={() => {
+            setShowLabModal(false);
+            navigate('/admin/lab-orders'); // Navigate only on success
+          }}
+        />
+      )}
     </div>
   );
 }

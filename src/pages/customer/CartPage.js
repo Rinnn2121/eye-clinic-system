@@ -1,8 +1,8 @@
 // src/pages/customer/CartPage.js
 
 import React, { useState, useEffect } from 'react';
-import { Link} from 'react-router-dom';
-import { doc, getDoc, updateDoc} from 'firebase/firestore';
+import { Link } from 'react-router-dom';
+import { doc, getDoc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import BookingWizardModal from '../../components/BookingWizardModal';
@@ -59,20 +59,20 @@ function CartPage() {
     fetchCart();
   }, [currentUser]);
 
+  // ✅ Enforce max 5 per item
   const handleUpdateQuantity = async (id, newQty) => {
-  // ✅ Prevent going below 1 or above 5
-  if (newQty < 1 || newQty > 5) return;
-  
-  const updatedCart = cartItems.map(item => 
-    item.id === id ? { ...item, quantity: newQty } : item
-  );
-  setCartItems(updatedCart);
+    if (newQty < 1 || newQty > 5) return;
+    
+    const updatedCart = cartItems.map(item => 
+      item.id === id ? { ...item, quantity: newQty } : item
+    );
+    setCartItems(updatedCart);
 
-  if (currentUser?.email) {
-    const cartRef = doc(db, 'carts', currentUser.email);
-    await updateDoc(cartRef, { items: updatedCart });
-  }
-};
+    if (currentUser?.email) {
+      const cartRef = doc(db, 'carts', currentUser.email);
+      await updateDoc(cartRef, { items: updatedCart });
+    }
+  };
 
   const handleRemove = async (itemToRemove) => {
     const updatedCart = cartItems.filter(item => item.id !== itemToRemove.id);
@@ -110,13 +110,6 @@ function CartPage() {
   return (
     <div className="min-h-screen bg-white">
       
-      <div className="max-w-6xl mx-auto px-4 py-6 flex items-center gap-2 text-sm text-gray-500">
-        <Link to="/" className="hover:text-[#4A90E2]">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1" /></svg>
-        </Link>
-        <span>&gt;</span>
-        <span className="text-gray-800">Shopping Cart</span>
-      </div>
 
       <div className="w-full max-w-[1200px] mx-auto px-4 pb-20">
         <h1 className="text-3xl font-medium text-gray-900 mb-8">Shopping Cart</h1>
@@ -170,17 +163,17 @@ function CartPage() {
 
                   <div className="col-span-3 flex justify-center">
                     <div className="flex items-center border border-gray-300 h-9 w-24">
-                    <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1} className="px-2 text-gray-600 hover:bg-gray-50 flex-1 h-full disabled:opacity-50">-</button>
-                    <span className="flex-1 text-center text-sm font-medium">{item.quantity}</span>
-                    {/* ✅ Disable + button when quantity reaches 5 */}
-                    <button 
-                      onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)} 
-                      disabled={item.quantity >= 5}
-                      className={`px-2 flex-1 h-full ${item.quantity >= 5 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-50'}`}
-                    >
-                      +
-                    </button>
-                  </div>
+                      <button onClick={() => handleUpdateQuantity(item.id, item.quantity - 1)} disabled={item.quantity <= 1} className="px-2 text-gray-600 hover:bg-gray-50 flex-1 h-full disabled:opacity-50">-</button>
+                      <span className="flex-1 text-center text-sm font-medium">{item.quantity}</span>
+                      {/* ✅ Disable + button when quantity reaches 5 */}
+                      <button 
+                        onClick={() => handleUpdateQuantity(item.id, item.quantity + 1)} 
+                        disabled={item.quantity >= 5}
+                        className={`px-2 flex-1 h-full ${item.quantity >= 5 ? 'text-gray-300 cursor-not-allowed' : 'text-gray-600 hover:bg-gray-50'}`}
+                      >
+                        +
+                      </button>
+                    </div>
                   </div>
 
                   <div className="col-span-2 text-center font-bold text-gray-900">

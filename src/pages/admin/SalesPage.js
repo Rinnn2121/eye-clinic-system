@@ -5,11 +5,13 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import SalesChart from '../../components/SalesChart';
 import { Link } from 'react-router-dom';
+import TransactionDetailsModal from '../../components/TransactionDetailsModal'; // ✅ Import Modal
 
 function SalesPage() {
   const [timeFilter, setTimeFilter] = useState('This Day');
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSale, setSelectedSale] = useState(null); // ✅ Modal State
 
   const [stats, setStats] = useState({
     totalRevenue: 0,
@@ -25,6 +27,7 @@ function SalesPage() {
   const [paymentFilter, setPaymentFilter] = useState('All Payment Methods');
   const [statusFilter, setStatusFilter] = useState('All Status');
 
+  // ✅ Fetch from Firestore
   useEffect(() => {
     const fetchSales = async () => {
       try {
@@ -107,24 +110,52 @@ function SalesPage() {
     });
   };
 
-  const computeCategories = (data) => {
-    const categoryMap = {};
+    const computeCategories = (data) => {
+    // ✅ Hardcode the Frame Categories we care about
+    const categoryMap = {
+      'Plastic': 0,
+      'Metal': 0,
+      'Branded': 0,
+      'Own Frame': 0,
+      'Custom': 0
+    };
+
     data.forEach((s) => {
-      s.items?.forEach((item) => {
-        const cat = item.category || 'Other';
-        if (!categoryMap[cat]) categoryMap[cat] = 0;
-        categoryMap[cat] += (item.price || 0) * (item.qty || 1);
-      });
+      // We look at the first item (the frame) of the order
+      const frameItem = s.items?.[0];
+      if (frameItem) {
+        const frameName = frameItem.name || frameItem.category;
+        
+        // Match the frame name to our categories
+        if (categoryMap[frameName] !== undefined) {
+          categoryMap[frameName] += (Number(s.totalAmount) || 0); // ✅ Use totalAmount instead of item price
+        } else {
+          // If it's something unexpected, add it to Custom
+          categoryMap['Custom'] += (Number(s.totalAmount) || 0);
+        }
+      }
     });
 
     const total = Object.values(categoryMap).reduce((a, b) => a + b, 0);
-    const palette = ['#818cf8', '#4A90E2', '#f87171', '#fbbf24', '#fb923c'];
-    const catArray = Object.entries(categoryMap).map(([name, value], idx) => ({
-      name,
-      value,
-      percent: total > 0 ? Math.round((value / total) * 100) : 0,
-      color: palette[idx % palette.length],
-    }));
+    
+    // ✅ Palette for the 5 Frame Categories
+    const palette = [
+      '#818cf8', // Plastic - Indigo
+      '#4A90E2', // Metal - Blue
+      '#f87171', // Branded - Red
+      '#fbbf24', // Own Frame - Yellow
+      '#fb923c'  // Custom - Orange
+    ];
+
+    // Filter out empty categories (so the chart stays clean) and map colors
+    const catArray = Object.entries(categoryMap)
+      .filter(([name, value]) => value > 0)
+      .map(([name, value], idx) => ({
+        name,
+        value,
+        percent: total > 0 ? Math.round((value / total) * 100) : 0,
+        color: palette[idx % palette.length],
+      }));
 
     setCategories(catArray);
   };
@@ -184,10 +215,8 @@ function SalesPage() {
     return matchesSearch && matchesPayment && matchesStatus;
   });
 
-  // ✅ Dynamic Text for Stat Cards
   const getTimeLabel = (isOutstanding = false) => {
     if (isOutstanding) return "Total unpaid balance across all sales";
-    
     switch (timeFilter) {
       case 'This Day': return "Revenue generated today";
       case 'This Week': return "Revenue generated this week";
@@ -266,7 +295,6 @@ function SalesPage() {
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">{peso(stats.totalRevenue)}</h2>
             </div>
-            {/* ✅ Dynamic Text */}
             <p className="text-sm text-gray-500 font-medium">{getTimeLabel()}</p>
           </div>
 
@@ -282,7 +310,6 @@ function SalesPage() {
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">{stats.completedTransactions}</h2>
             </div>
-            {/* ✅ Dynamic Text */}
             <p className="text-sm text-gray-500 font-medium">{getTransactionLabel()}</p>
           </div>
 
@@ -298,7 +325,6 @@ function SalesPage() {
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">{stats.productsSold}</h2>
             </div>
-            {/* ✅ Dynamic Text */}
             <p className="text-sm text-gray-500 font-medium">{getProductsLabel()}</p>
           </div>
 
@@ -314,7 +340,6 @@ function SalesPage() {
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">{peso(stats.outstandingPayments)}</h2>
             </div>
-            {/* ✅ This one stays static because it's all-time */}
             <p className="text-sm text-gray-500 font-medium">{getTimeLabel(true)}</p>
           </div>
         </div>
@@ -444,7 +469,12 @@ function SalesPage() {
                     const statusText = sale.paymentStatus === 'paid' || !isPartial ? 'Paid' : 'Partial';
 
                     return (
-                      <tr key={sale.id} className="hover:bg-gray-50 text-gray-700">
+                      // ✅ Clickable Row
+                      <tr 
+                        key={sale.id} 
+                        onClick={() => setSelectedSale(sale)}
+                        className="hover:bg-gray-50 text-gray-700 cursor-pointer transition-colors"
+                      >
                         <td className="px-6 py-4 font-medium">{sale.receiptNo || '—'}</td>
                         <td className="px-6 py-4 text-sm">
                           {sale.orderDate ? new Date(sale.orderDate).toLocaleString('en-US', {
@@ -480,6 +510,12 @@ function SalesPage() {
         </div>
 
       </div>
+
+      {/* ✅ Transaction Details Modal */}
+      <TransactionDetailsModal 
+        sale={selectedSale} 
+        onClose={() => setSelectedSale(null)} 
+      />
     </div>
   );
 }

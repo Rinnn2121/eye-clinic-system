@@ -42,7 +42,9 @@ function TransactionDetailsModal({ sale, onClose }) {
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6 pb-6 border-b border-gray-100">
             {/* Icon */}
             <div className="bg-blue-50 text-[#4A90E2] w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0">
-              🖨️
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+              </svg>
             </div>
             
             {/* Receipt No */}
@@ -101,7 +103,10 @@ function TransactionDetailsModal({ sale, onClose }) {
                     {sale.items && sale.items.length > 0 ? (
                       sale.items.map((item, idx) => (
                         <tr key={idx} className="text-gray-700">
-                          <td className="px-3 py-2">{item.name || 'Unknown Item'}</td>
+                          <td className="px-3 py-2">
+                            <span className="font-medium">{item.name || 'Unknown Item'}</span>
+                            {item.category && <p className="text-xs text-gray-400">{item.category}</p>}
+                          </td>
                           <td className="px-3 py-2 text-center">{item.qty || 1}</td>
                           <td className="px-3 py-2 text-right">
                             {peso((item.price || 0) * (item.qty || 1))}
@@ -134,7 +139,6 @@ function TransactionDetailsModal({ sale, onClose }) {
               </div>
             </div>
 
-
             {/* Right Column: Payment & Notes */}
             <div className="space-y-4">
               
@@ -152,32 +156,12 @@ function TransactionDetailsModal({ sale, onClose }) {
                   </div>
                   <div className="flex justify-between text-gray-900 font-bold border-t border-gray-100 pt-2">
                     <span>Balance</span>
-                    <span>{peso(sale.balance)}</span>
+                    <span className={sale.balance > 0 ? 'text-red-600' : 'text-gray-900'}>
+                      {peso(sale.balance)}
+                    </span>
                   </div>
                 </div>
               </div>
-
-              {/* ✅ NEW: Payment History Ledger */}
-              {sale.paymentHistory && sale.paymentHistory.length > 0 && (
-                <div className="border border-gray-200 rounded-lg p-4 bg-gray-50">
-                  <h3 className="font-bold text-gray-900 mb-3 text-sm">Payment History</h3>
-                  <div className="space-y-2">
-                    {sale.paymentHistory.map((payment, index) => (
-                      <div key={index} className="flex justify-between items-center text-xs text-gray-600 border-b border-gray-200 last:border-0 pb-2 last:pb-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-green-500">✓</span>
-                          <span>
-                            {new Date(payment.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                          </span>
-                          <span className="text-gray-400">|</span>
-                          <span>{payment.method}</span>
-                        </div>
-                        <span className="font-bold text-gray-900">₱ {Number(payment.amount).toLocaleString()}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
 
               {/* Notes */}
               <div className="border border-gray-200 rounded-lg p-4 h-32">

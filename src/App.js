@@ -39,6 +39,7 @@ import AllAppointmentsPage from './pages/admin/AllAppointmentsPage';
 import ReportsPage from './pages/admin/ReportsPage';
 import CustomerAccountsPage from './pages/admin/CustomerAccountsPage';
 import AdminProfilePage from './pages/admin/AdminProfilePage';
+import LabOrdersPage from './pages/admin/LabOrdersPage';
 
 // Wrapper that decides whether to show the top Navbar
 function AppShell({ children }) {
@@ -105,6 +106,11 @@ function App() {
               <Route path="patient-record/:customerId" element={<PatientRecordPage />} />
               <Route path="catalog" element={<CatalogPage />} />
               <Route path="transactions" element={<AllTransactionsPage />} />
+              <Route path="/admin/lab-orders" element={
+              <PrivateRoute allowedRoles={['admin', 'staff']}>
+                <LabOrdersPage />
+              </PrivateRoute>
+            } />
               <Route path="/admin/accounts" element={
               <PrivateRoute allowedRoles={['admin', 'staff']}>
                 <CustomerAccountsPage />
