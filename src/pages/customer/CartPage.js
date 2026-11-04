@@ -254,6 +254,7 @@ function CartPage() {
           onClose={() => setShowBookingModal(false)} 
           onSuccess={() => {
             setShowBookingModal(false);
+            setCartItems([]); // ✅ Immediately clear the UI
           }}
         />
       )}

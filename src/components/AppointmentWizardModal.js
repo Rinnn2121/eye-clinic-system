@@ -86,6 +86,11 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
     return formData.time < currentTimeStr;
   };
 
+  const isOutsideClinicHours = () => {
+    if (!formData.time) return false;
+    return formData.time < '09:00' || formData.time > '17:30';
+  };
+
   // ✅ Helper to check for 30-minute time slot overlap
   const isTimeSlotTaken = () => {
     if (!formData.time || existingAppts.length === 0) return false;
@@ -116,6 +121,13 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
       setErrorMsg("Please select at least one service.");
       return;
     }
+
+    // ✅ Time Restriction: 9:00 AM to 5:30 PM (17:30)
+    if (formData.time < '09:00' || formData.time > '17:30') {
+      setErrorMsg("The clinic only accepts appointments between 9:00 AM and 5:30 PM.");
+      return;
+    }
+
     if (isTimePast()) {
       setErrorMsg("The selected time has already passed today. Please choose a future time.");
       return;
@@ -132,7 +144,7 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
         customerId: selectedCustomer.id,
         customerName: `${selectedCustomer.firstName} ${selectedCustomer.lastName}`,
         reason: selectedServices.join(', '), 
-        status: 'Pending',
+        status: 'Scheduled', 
         createdAt: new Date().toISOString()
       });
 
@@ -291,14 +303,20 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
                     value={formData.time} 
                     onChange={(e) => setFormData({...formData, time: e.target.value})} 
                     className={`w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] ${
-                      isTimePast() || isTimeSlotTaken() ? 'border-red-500 bg-red-50' : ''
+                      isTimePast() || isTimeSlotTaken() || isOutsideClinicHours() ? 'border-red-500 bg-red-50' : ''
                     }`}
                   />
-                  {/* ✅ Show inline warnings */}
-                  {isTimePast() && (
+                  
+                  {/* ✅ INLINE WARNINGS */}
+                  {isOutsideClinicHours() && (
+                    <p className="text-xs text-red-500 mt-1 font-medium">
+                      The clinic only accepts appointments between 9:00 AM and 5:30 PM.
+                    </p>
+                  )}
+                  {isTimePast() && !isOutsideClinicHours() && (
                     <p className="text-xs text-red-500 mt-1 font-medium">This time has already passed today.</p>
                   )}
-                  {isTimeSlotTaken() && !isTimePast() && (
+                  {isTimeSlotTaken() && !isTimePast() && !isOutsideClinicHours() && (
                     <p className="text-xs text-red-500 mt-1 font-medium">This time is already booked. Please pick a time 30 mins away.</p>
                   )}
                 </div>
@@ -339,7 +357,7 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
                 <button onClick={() => setModalStep(2)} className="px-6 py-2 border border-gray-300 text-gray-700 rounded-lg font-medium hover:bg-gray-50">Back</button>
                 <button 
                   onClick={() => {
-                    if (isTimePast() || isTimeSlotTaken()) {
+                    if (isTimePast() || isTimeSlotTaken() || isOutsideClinicHours()) {
                       setErrorMsg("Please fix the time/date errors before proceeding.");
                       return;
                     }

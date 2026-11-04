@@ -4,14 +4,12 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from './ConfirmModal';
-import CreateStaffModal from './CreateStaffModal';
 
 export default function ProfileMenu({ align = 'right', direction = 'down' }) {
   const { currentUser, userRole, userData, logout } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const [showStaffModal, setShowStaffModal] = useState(false);
   const dropdownRef = useRef(null);
 
   useEffect(() => {
@@ -38,18 +36,16 @@ export default function ProfileMenu({ align = 'right', direction = 'down' }) {
   const displayEmail = currentUser?.email || '';
   const initial = displayName.charAt(0).toUpperCase();
 
-  // ✅ Determine the Profile Link based on role
-  const profileLink = userRole === 'admin' || userRole === 'staff' 
-    ? '/admin/profile' 
-    : '/customer/dashboard';
-
-  // ✅ Position logic
   let positionClasses = '';
   if (align === 'right-sidebar') {
     positionClasses = 'left-full bottom-0 ml-2';
   } else {
     positionClasses = `right-0 ${direction === 'down' ? 'top-full mt-2' : 'bottom-full mb-2'}`;
   }
+
+  const profileLink = userRole === 'admin' || userRole === 'staff' 
+    ? '/admin/profile' 
+    : '/customer/profile';
 
   return (
     <div className="relative" ref={dropdownRef}>
@@ -60,11 +56,7 @@ export default function ProfileMenu({ align = 'right', direction = 'down' }) {
         title="My Account"
       >
         {userData?.photoUrl ? (
-          <img 
-            src={userData.photoUrl} 
-            alt={displayName} 
-            className="w-full h-full object-cover" 
-          />
+          <img src={userData.photoUrl} alt={displayName} className="w-full h-full object-cover" />
         ) : (
           <span className="font-bold text-sm">{initial}</span>
         )}
@@ -72,10 +64,7 @@ export default function ProfileMenu({ align = 'right', direction = 'down' }) {
 
       {/* Dropdown */}
       {isOpen && (
-        <div 
-          className={`absolute z-[999] w-72 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden ${positionClasses}`}
-          style={{ right: align !== 'right-sidebar' ? 0 : 'auto' }}
-        >
+        <div className={`absolute z-[999] w-72 bg-white rounded-xl shadow-2xl border border-gray-200 overflow-hidden ${positionClasses}`} style={{ right: align !== 'right-sidebar' ? 0 : 'auto' }}>
 
           {/* Profile Header */}
           <div className="p-4 bg-gray-50 border-b border-gray-100 flex items-center gap-3">
@@ -96,7 +85,7 @@ export default function ProfileMenu({ align = 'right', direction = 'down' }) {
           </div>
 
           <div className="p-2">
-            {/* Admin-only menu items */}
+            {/* Admin-only: Manage Accounts */}
             {userRole === 'admin' && (
               <>
                 <Link
@@ -107,27 +96,14 @@ export default function ProfileMenu({ align = 'right', direction = 'down' }) {
                   <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  Manage Customer Accounts
+                  Manage Accounts
                 </Link>
-
-                <button
-                  onClick={() => {
-                    setIsOpen(false);
-                    setShowStaffModal(true);
-                  }}
-                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium text-gray-700"
-                >
-                  <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" />
-                  </svg>
-                  Add Staff Account
-                </button>
 
                 <div className="border-t border-gray-100 my-1"></div>
               </>
             )}
 
-            {/* ✅ Profile Link (Added above Logout) */}
+            {/* Profile Link */}
             <Link
               to={profileLink}
               onClick={() => setIsOpen(false)}
@@ -170,10 +146,6 @@ export default function ProfileMenu({ align = 'right', direction = 'down' }) {
         onConfirm={confirmLogout}
       />
 
-      {/* Add Staff Modal */}
-      {showStaffModal && (
-        <CreateStaffModal onClose={() => setShowStaffModal(false)} />
-      )}
     </div>
   );
 }

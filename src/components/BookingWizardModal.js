@@ -1,7 +1,7 @@
 // src/components/BookingWizardModal.js
 
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, doc, getDoc, query, where, getDocs } from 'firebase/firestore';
+import { collection, addDoc, doc, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore'; // ✅ Added updateDoc
 import { db } from '../firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -16,7 +16,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
-  // ✅ Store existing appointments for overlap check
+  // Store existing appointments for overlap check
   const [existingAppts, setExistingAppts] = useState([]);
 
   // Step 1 State
@@ -24,7 +24,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     initialService ? [initialService] : ['Eye Examination']
   );
   const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState('09:00'); // Default to 9 AM
+  const [selectedTime, setSelectedTime] = useState('09:00'); 
 
   // Step 2 State
   const [includedItems, setIncludedItems] = useState([]);
@@ -55,7 +55,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     fetchCart();
   }, [currentUser]);
 
-  // ✅ Fetch existing appointments for the selected date
+  // Fetch existing appointments for the selected date
   useEffect(() => {
     const fetchExistingAppts = async () => {
       if (!selectedDate) return;
@@ -76,7 +76,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
 
   // Handle Quantity Change
   const handleUpdateQty = (id, newQty) => {
-    if (newQty < 1) return;
+    if (newQty < 1 || newQty > 5) return; // Enforce max 5
     setCartItems(cartItems.map(item => 
       item.id === id ? { ...item, quantity: newQty } : item
     ));
@@ -91,28 +91,24 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     }
   };
 
-  // ✅ Helper: Check if time is in the past today
+  // Helper: Check if time is in the past today
   const isTimePast = () => {
     if (selectedDate !== getTodayStr()) return false;
-
     const now = new Date();
-    const currentTimeStr = now.toTimeString().slice(0, 5); // e.g. "14:30"
+    const currentTimeStr = now.toTimeString().slice(0, 5); 
     return selectedTime < currentTimeStr;
   };
 
-  // ✅ Helper: Check for 30-min overlap
+  // Helper: Check for 30-min overlap
   const isTimeSlotTaken = () => {
     if (!selectedTime || existingAppts.length === 0) return false;
-
     const [selHours, selMins] = selectedTime.split(':').map(Number);
     const selectedTimeInMins = selHours * 60 + selMins;
 
     for (const appt of existingAppts) {
       if (!appt.time) continue;
-      
       const [existHours, existMins] = appt.time.split(':').map(Number);
       const existTimeInMins = existHours * 60 + existMins;
-
       if (Math.abs(selectedTimeInMins - existTimeInMins) < 30) {
         return true;
       }
@@ -120,76 +116,91 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     return false;
   };
 
+  // ✅ Helper: Check if time is outside clinic hours
+  const isOutsideClinicHours = () => {
+    if (!selectedTime) return false;
+    return selectedTime < '09:00' || selectedTime > '17:30';
+  };
+
   const handleConfirm = async () => {
-  setErrorMsg('');
+    setErrorMsg('');
 
-  if (visitTypes.length === 0) {
-    setErrorMsg("Please select at least one service.");
-    return;
-  }
-  if (!selectedDate || selectedDate < getTodayStr()) {
-    setErrorMsg("Please select a valid future date.");
-    return;
-  }
-  if (isTimePast()) {
-    setErrorMsg("The selected time has already passed today. Please choose a future time.");
-    return;
-  }
-  if (isTimeSlotTaken()) {
-    setErrorMsg("This time slot is already booked. Please pick a time at least 30 minutes away from existing appointments.");
-    return;
-  }
+    if (visitTypes.length === 0) {
+      setErrorMsg("Please select at least one service.");
+      return;
+    }
+    if (!selectedDate || selectedDate < getTodayStr()) {
+      setErrorMsg("Please select a valid future date.");
+      return;
+    }
+    if (isOutsideClinicHours()) {
+      setErrorMsg("The clinic only accepts appointments between 9:00 AM and 5:30 PM.");
+      return;
+    }
+    if (isTimePast()) {
+      setErrorMsg("The selected time has already passed today. Please choose a future time.");
+      return;
+    }
+    if (isTimeSlotTaken()) {
+      setErrorMsg("This time slot is already booked. Please pick a time at least 30 minutes away.");
+      return;
+    }
 
-  setLoading(true);
-  try {
-    const selectedCartItems = cartItems.filter(item => includedItems.includes(item.id));
-    
-// 1. Save Appointment
-await addDoc(collection(db, 'appointments'), {
-  customerId: currentUser.email, // ✅ Email
-  customerName: currentUser.email.split('@')[0],
-  date: selectedDate,
-  time: selectedTime,
-  reason: visitTypes.join(', '), 
-  status: 'Pending',
-  createdAt: new Date().toISOString(),
-  interestedItems: selectedCartItems.map(item => ({
-    name: item.name,
-    price: item.price,
-    color: item.color,
-    qty: item.quantity
-  }))
-});
+    setLoading(true);
+    try {
+      const selectedCartItems = cartItems.filter(item => includedItems.includes(item.id));
+      
+      // 1. Save Appointment
+      await addDoc(collection(db, 'appointments'), {
+        customerId: currentUser.email,
+        customerName: currentUser.email.split('@')[0],
+        date: selectedDate,
+        time: selectedTime,
+        reason: visitTypes.join(', '), 
+        status: 'Pending',
+        createdAt: new Date().toISOString(),
+        interestedItems: selectedCartItems.map(item => ({
+          name: item.name,
+          price: item.price,
+          color: item.color,
+          qty: item.quantity
+        }))
+      });
 
-// 2. Notify Admin
-await addDoc(collection(db, 'notifications'), {
-  recipient: 'admin', 
-  type: 'booking',
-  title: 'New Appointment Booked',
-  message: `${currentUser.email.split('@')[0]} booked a ${visitTypes.join(', ')} on ${selectedDate} at ${selectedTime}.`,
-  link: '/admin/appointments',
-  isRead: false,
-  createdAt: new Date().toISOString()
-});
+      // 2. Notify Admin
+      await addDoc(collection(db, 'notifications'), {
+        recipient: 'admin', 
+        type: 'booking',
+        title: 'New Appointment Booked',
+        message: `${currentUser.email.split('@')[0]} booked a ${visitTypes.join(', ')} on ${selectedDate} at ${selectedTime}.`,
+        link: '/admin/appointments',
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
 
-// 3. Notify Customer
-await addDoc(collection(db, 'notifications'), {
-  recipient: currentUser.email, // ✅ MUST BE EMAIL
-  type: 'booking',
-  title: 'Appointment Booked — Awaiting Confirmation',
-  message: `Your appointment for ${visitTypes.join(', ')} on ${selectedDate} at ${selectedTime} has been received. The clinic will confirm it shortly.`,
-  link: '/customer/appointments',
-  isRead: false,
-  createdAt: new Date().toISOString()
-});
-    setShowSuccessModal(true);
+      // 3. Notify Customer
+      await addDoc(collection(db, 'notifications'), {
+        recipient: currentUser.email,
+        type: 'booking',
+        title: 'Appointment Booked — Awaiting Confirmation',
+        message: `Your appointment for ${visitTypes.join(', ')} on ${selectedDate} at ${selectedTime} has been received. The clinic will confirm it shortly.`,
+        link: '/customer/appointments',
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
 
-  } catch (err) {
-    console.error(err);
-    setErrorMsg("Failed to book appointment. Please try again.");
-  }
-  setLoading(false);
-};
+      // ✅ 4. Clear the Cart in Firestore
+      const cartRef = doc(db, 'carts', currentUser.email);
+      await updateDoc(cartRef, { items: [] });
+
+      setShowSuccessModal(true);
+
+    } catch (err) {
+      console.error(err);
+      setErrorMsg("Failed to book appointment. Please try again.");
+    }
+    setLoading(false);
+  };
 
   // --- CALENDAR LOGIC ---
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
@@ -330,7 +341,6 @@ await addDoc(collection(db, 'notifications'), {
                   })}
                 </div>
 
-                {/* ✅ Time Input Field instead of buttons */}
                 <h3 className="font-bold text-gray-800 mb-3">Select Time</h3>
                 <div>
                   <input 
@@ -338,16 +348,21 @@ await addDoc(collection(db, 'notifications'), {
                     value={selectedTime} 
                     onChange={(e) => setSelectedTime(e.target.value)}
                     className={`w-full border rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] ${
-                      (isTimePast() || isTimeSlotTaken()) && selectedDate
+                      (isTimePast() || isTimeSlotTaken() || isOutsideClinicHours()) && selectedDate
                         ? 'border-red-500 bg-red-50 text-red-700' 
                         : 'border-gray-300'
                     }`}
                   />
-                  {/* Inline warnings */}
-                  {isTimePast() && selectedDate && (
+                  {/* ✅ Inline Warnings */}
+                  {isOutsideClinicHours() && selectedDate && (
+                    <p className="text-xs text-red-500 mt-2 font-medium">
+                      The clinic only accepts appointments between 9:00 AM and 5:30 PM.
+                    </p>
+                  )}
+                  {isTimePast() && selectedDate && !isOutsideClinicHours() && (
                     <p className="text-xs text-red-500 mt-2 font-medium">This time has already passed today.</p>
                   )}
-                  {isTimeSlotTaken() && !isTimePast() && selectedDate && (
+                  {isTimeSlotTaken() && !isTimePast() && !isOutsideClinicHours() && selectedDate && (
                     <p className="text-xs text-red-500 mt-2 font-medium">This time is already booked. Please pick a time at least 30 mins away.</p>
                   )}
                 </div>
@@ -412,11 +427,10 @@ await addDoc(collection(db, 'notifications'), {
             </div>
           )}
 
-                    {/* STEP 3: Review */}
+          {/* STEP 3: Review */}
           {step === 3 && (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               
-              {/* ✅ Show Error Message */}
               {errorMsg && (
                 <div className="md:col-span-3 bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded text-sm">
                   {errorMsg}
@@ -485,7 +499,7 @@ await addDoc(collection(db, 'notifications'), {
 
                 <button 
                   onClick={handleConfirm}
-                  disabled={loading || isTimePast() || isTimeSlotTaken() || !selectedDate}
+                  disabled={loading || isTimePast() || isTimeSlotTaken() || !selectedDate || isOutsideClinicHours()}
                   className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Confirming...' : 'Confirm Appointment'}
@@ -508,7 +522,7 @@ await addDoc(collection(db, 'notifications'), {
           {step < 3 && (
             <button 
               onClick={() => setStep(step + 1)}
-              disabled={step === 1 && (visitTypes.length === 0 || !selectedDate || isTimePast() || isTimeSlotTaken() || !selectedTime)}
+              disabled={step === 1 && (visitTypes.length === 0 || !selectedDate || isTimePast() || isTimeSlotTaken() || !selectedTime || isOutsideClinicHours())}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               Continue

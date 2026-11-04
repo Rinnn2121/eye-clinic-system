@@ -19,7 +19,14 @@ function ItemStatusPage() {
       if (!customerId) return;
 
       try {
-        const q = query(collection(db, 'labOrders'), where('patientId', '==', customerId));
+        // ✅ Use 'in' to check BOTH the Reference ID and the Email
+        const idsToSearch = [userData?.linkedCustomerId, currentUser?.email].filter(Boolean);
+
+        const q = query(
+          collection(db, 'labOrders'), 
+          where('patientId', 'in', idsToSearch)
+        );
+        
         const snap = await getDocs(q);
         const items = [];
         snap.forEach(d => items.push({ id: d.id, ...d.data() }));
@@ -32,8 +39,7 @@ function ItemStatusPage() {
       setLoading(false);
     };
     fetchOrders();
-  }, [customerId]);
-
+  }, [customerId, userData, currentUser]);
   if (loading) {
     return <div className="text-center py-20 text-gray-500">Loading item status...</div>;
   }

@@ -4,7 +4,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs, doc, updateDoc, addDoc, query, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import ConfirmModal from '../../components/ConfirmModal';
-import LabTrackingModal from '../../components/LabTrackingModal'; // ✅ Updated Import
+import LabTrackingModal from '../../components/LabTrackingModal';
 
 function LabOrdersPage() {
   const [labOrders, setLabOrders] = useState([]);
@@ -17,6 +17,7 @@ function LabOrdersPage() {
   // Modals
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [alertConfig, setAlertConfig] = useState(null);
+  const [showMarkAllModal, setShowMarkAllModal] = useState(false); // ✅ New state for bulk action
 
   const loadOrders = async () => {
     try {
@@ -79,6 +80,56 @@ function LabOrdersPage() {
     }
   };
 
+  // ✅ Bulk Action: Mark All as Ready
+  const handleMarkAllReady = async () => {
+    try {
+      // Find all orders that are currently 'in_progress' and match the search term (so it doesn't mark hidden ones)
+      const ordersToUpdate = filteredOrders; 
+
+      if (ordersToUpdate.length === 0) {
+        setShowMarkAllModal(false);
+        return;
+      }
+
+      // Loop through and update each one
+      await Promise.all(ordersToUpdate.map(async (order) => {
+        await updateDoc(doc(db, 'labOrders', order.id), { status: 'ready' });
+        
+        // Send notification for each
+        if (order.patientId) {
+          const custQuery = query(collection(db, 'customers'), where('__name__', '==', order.patientId));
+          const custSnap = await getDocs(custQuery);
+          if (!custSnap.empty) {
+            const customerData = custSnap.docs[0].data();
+            const email = customerData.email || customerData.linkedEmail;
+            if (email) {
+              await addDoc(collection(db, 'notifications'), {
+                recipient: email.toLowerCase(),
+                type: 'order',
+                title: 'Item Ready for Pick-Up!',
+                message: `Your glasses (Ref: ${order.id.slice(-5)}) are ready for pick up at the clinic.`,
+                link: '/customer/item-status',
+                isRead: false,
+                createdAt: new Date().toISOString()
+              });
+            }
+          }
+        }
+      }));
+
+      loadOrders();
+      setShowMarkAllModal(false);
+      setAlertConfig({
+        type: 'success',
+        title: 'Bulk Update Successful',
+        message: `${ordersToUpdate.length} orders have been marked as Ready for Pickup.`
+      });
+    } catch (err) {
+      console.error(err);
+      setAlertConfig({ type: 'error', title: 'Error', message: 'Failed to update all orders.' });
+    }
+  };
+
   // Filter Logic
   const filteredOrders = useMemo(() => {
     return labOrders.filter(order => {
@@ -125,38 +176,53 @@ function LabOrdersPage() {
           </div>
         </div>
 
-        {/* Tabs */}
-        <div className="flex border-b border-gray-200">
-          <button
-            onClick={() => setActiveTab('in_progress')}
-            className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
-              activeTab === 'in_progress' 
-                ? 'border-[#eab308] text-yellow-600' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            In Laboratory ({counts.in_progress})
-          </button>
-          <button
-            onClick={() => setActiveTab('ready')}
-            className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
-              activeTab === 'ready' 
-                ? 'border-[#22c55e] text-green-600' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Ready for Pickup ({counts.ready})
-          </button>
-          <button
-            onClick={() => setActiveTab('picked_up')}
-            className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
-              activeTab === 'picked_up' 
-                ? 'border-[#4A90E2] text-blue-600' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Picked Up ({counts.picked_up})
-          </button>
+        {/* Tabs & Bulk Action */}
+        <div className="flex justify-between items-center border-b border-gray-200">
+          <div className="flex">
+            <button
+              onClick={() => setActiveTab('in_progress')}
+              className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
+                activeTab === 'in_progress' 
+                  ? 'border-[#eab308] text-yellow-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              In Laboratory ({counts.in_progress})
+            </button>
+            <button
+              onClick={() => setActiveTab('ready')}
+              className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
+                activeTab === 'ready' 
+                  ? 'border-[#22c55e] text-green-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Ready for Pickup ({counts.ready})
+            </button>
+            <button
+              onClick={() => setActiveTab('picked_up')}
+              className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
+                activeTab === 'picked_up' 
+                  ? 'border-[#4A90E2] text-blue-600' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              Picked Up ({counts.picked_up})
+            </button>
+          </div>
+
+          {/* ✅ Bulk Action Button (Only shows on In Laboratory tab) */}
+          {activeTab === 'in_progress' && filteredOrders.length > 0 && (
+            <button
+              onClick={() => setShowMarkAllModal(true)}
+              className="bg-[#22c55e] text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-600 transition-colors shadow-sm flex items-center gap-2 mb-2"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              Mark All as Ready ({filteredOrders.length})
+            </button>
+          )}
         </div>
 
         {/* Order List */}
@@ -204,6 +270,18 @@ function LabOrdersPage() {
         )}
 
       </div>
+
+      {/* ✅ Confirm Bulk Action Modal */}
+      <ConfirmModal
+        isOpen={showMarkAllModal}
+        title="Mark All as Ready?"
+        message={`Are you sure you want to mark all ${filteredOrders.length} visible orders as "Ready for Pickup"? This will also notify the customers.`}
+        iconType="success"
+        confirmText="Yes, Mark All"
+        confirmColor="green"
+        onCancel={() => setShowMarkAllModal(false)}
+        onConfirm={handleMarkAllReady}
+      />
 
       {/* ✅ The Separated Tracking Modal */}
       {selectedOrder && (

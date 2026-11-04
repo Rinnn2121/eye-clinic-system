@@ -36,7 +36,16 @@ function AdminDashboard() {
   const [allOrders, setAllOrders] = useState([]); 
 
   // Calendar state
-  const [selectedDate, setSelectedDate] = useState(new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0]);
+ const [selectedDate, setSelectedDate] = useState(new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0]);
+const [calendarDate, setCalendarDate] = useState(new Date()); 
+
+const handlePrevMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
+  };
+
+  const handleNextMonth = () => {
+    setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
+  };
 
   // Chart states
   const [chartRange, setChartRange] = useState('Week');
@@ -241,11 +250,11 @@ function AdminDashboard() {
     );
   }
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
+  // ✅ Use calendarDate instead of the current date
+  const currentYear = calendarDate.getFullYear();
+  const currentMonth = calendarDate.getMonth();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
-
   return (
     <div className="min-h-screen bg-gray-50 p-6 font-sans">
       <div className="w-full mx-auto space-y-6">
@@ -477,43 +486,92 @@ function AdminDashboard() {
           </div>
 
           {/* RIGHT COLUMN: Calendar & Pickups */}
-          <div className="lg:col-span-4 flex flex-col gap-6">
-            <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
-              <div className="flex items-center justify-between mb-4"><h3 className="font-bold text-xl text-gray-800">Calendar</h3></div>
-              <div className="flex justify-between items-center mb-4">
-                <button className="text-gray-400 hover:text-gray-600 px-2 text-lg">&lt;</button>
-                <div className="flex gap-2">
-                  <select className="border border-gray-200 rounded-md px-2 py-1 text-sm font-medium outline-none"><option>{new Date().toLocaleString('default', { month: 'long' })}</option></select>
-                  <select className="border border-gray-200 rounded-md px-2 py-1 text-sm font-medium outline-none"><option>{new Date().getFullYear()}</option></select>
-                </div>
-                <button className="text-gray-400 hover:text-gray-600 px-2 text-lg">&gt;</button>
-              </div>
-              <div className="grid grid-cols-7 gap-1 text-center text-sm text-gray-500 mb-2 font-semibold">{[ 'Su','Mo','Tu','We','Th','Fr','Sa' ].map((d) => <span key={d}>{d}</span>)}</div>
-              <div className="grid grid-cols-7 gap-1 text-center text-base">
-                {[...Array(firstDayOfMonth)].map((_, i) => (<div key={`empty-${i}`} className="p-1"></div>))}
-                {[...Array(daysInMonth)].map((_, i) => {
-                  const day = i + 1;
-                  const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                  const isToday = day === new Date().getDate();
-                  const isSelected = selectedDate === formattedDate;
-                  const hasAppointments = appointments.some(a => a.date === formattedDate);
-                  return (
-                    <div key={i} className="flex flex-col items-center justify-center p-0.5">
-                      <button onClick={() => setSelectedDate(formattedDate)} className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors font-medium ${isSelected ? 'bg-blue-600 text-white font-bold' : isToday ? 'bg-blue-100 text-blue-600 font-bold' : 'text-gray-700 hover:bg-gray-100'}`}>{day}</button>
-                      <div className={`w-1 h-1 rounded-full mt-0.5 ${hasAppointments ? (isSelected ? 'bg-blue-600' : 'bg-blue-500') : 'bg-transparent'}`}></div>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-4 bg-[#dbeafe] text-blue-900 text-sm p-3 rounded-xl">
-                <div className="flex justify-between items-center font-bold mb-2"><span>Incoming Schedule</span><span>{new Date(selectedDate).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span></div>
-                {selectedDateAppts.length === 0 ? (<p className="text-blue-700/70 italic">No appointments scheduled.</p>) : (
-                  <div className="space-y-1.5 max-h-[72px] overflow-y-auto pr-1">
-                    {selectedDateAppts.map((apt, idx) => (<div key={idx} className="flex gap-2 items-center"><span className="font-semibold whitespace-nowrap">{apt.displayTime}</span><span className="truncate">{apt.customerName}</span></div>))}
-                  </div>
-                )}
-              </div>
+        <div className="lg:col-span-4 flex flex-col gap-6">
+          <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-bold text-xl text-gray-800">Calendar</h3>
             </div>
+            
+            {/* ✅ Navigation Controls */}
+            <div className="flex justify-between items-center mb-4">
+              <button 
+                onClick={handlePrevMonth} 
+                className="text-gray-500 hover:text-gray-800 px-2 py-1 bg-gray-50 hover:bg-gray-200 rounded-md transition-colors font-bold"
+              >
+                &lt;
+              </button>
+              <div className="flex gap-2">
+                <span className="text-sm font-bold text-gray-800 bg-gray-50 px-3 py-1 rounded-md">
+                  {calendarDate.toLocaleString('default', { month: 'long' })} {calendarDate.getFullYear()}
+                </span>
+              </div>
+              <button 
+                onClick={handleNextMonth} 
+                className="text-gray-500 hover:text-gray-800 px-2 py-1 bg-gray-50 hover:bg-gray-200 rounded-md transition-colors font-bold"
+              >
+                &gt;
+              </button>
+            </div>
+
+            <div className="grid grid-cols-7 gap-1 text-center text-sm text-gray-500 mb-2 font-semibold">
+              {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => <span key={d}>{d}</span>)}
+            </div>
+            
+            <div className="grid grid-cols-7 gap-1 text-center text-base">
+              {[...Array(firstDayOfMonth)].map((_, i) => (
+                <div key={`empty-${i}`} className="p-1"></div>
+              ))}
+              
+              {[...Array(daysInMonth)].map((_, i) => {
+                const day = i + 1;
+                const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                const isToday = day === new Date().getDate() && currentMonth === new Date().getMonth() && currentYear === new Date().getFullYear();
+                const isSelected = selectedDate === formattedDate;
+                const hasAppointments = appointments.some(a => a.date === formattedDate);
+
+                return (
+                  <div key={i} className="flex flex-col items-center justify-center p-0.5 h-10">
+                    <button 
+                      onClick={() => setSelectedDate(formattedDate)}
+                      className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors font-medium ${
+                        isSelected ? 'bg-blue-600 text-white font-bold' : 
+                        isToday ? 'bg-blue-100 text-blue-600 font-bold' : 
+                        'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      {day}
+                    </button>
+                    <div className={`w-1 h-1 rounded-full mt-0.5 ${
+                      hasAppointments 
+                        ? (isSelected ? 'bg-blue-600' : 'bg-blue-500') 
+                        : 'bg-transparent'
+                    }`}></div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Selected Date Schedule Card */}
+            <div className="mt-4 bg-[#dbeafe] text-blue-900 text-sm p-3 rounded-xl flex flex-col gap-2">
+              <div className="flex justify-between items-center font-bold">
+                <span>Incoming Schedule</span>
+                <span>{new Date(selectedDate).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
+              </div>
+              {selectedDateAppts.length === 0 ? (
+                <p className="text-blue-700/70 italic">No appointments scheduled.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-[72px] overflow-y-auto pr-1">
+                  {selectedDateAppts.map((apt, idx) => (
+                    <div key={idx} className="flex gap-2 items-center">
+                      <span className="font-semibold whitespace-nowrap">{apt.displayTime}</span>
+                      <span className="truncate">{apt.customerName}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
 
             <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col">
               <h3 className="font-bold text-xl text-gray-900 mb-4">Items for Pick-up</h3>

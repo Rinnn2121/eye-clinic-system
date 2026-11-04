@@ -8,7 +8,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
 import AppointmentWizardModal from '../../components/AppointmentWizardModal';
 import AppointmentDetailsModal from '../../components/AppointmentDetailsModal';
-import PendingAppointmentsModal from '../../components/PendingAppointmentsModal'; // ✅ Import new modal
+import PendingAppointmentsModal from '../../components/PendingAppointmentsModal';
 
 function AppointmentPage() {
   const [appointments, setAppointments] = useState([]);
@@ -30,7 +30,7 @@ function AppointmentPage() {
   const [selectedAppointment, setSelectedAppointment] = useState(null); 
   const [apptToCancel, setApptToCancel] = useState(null); 
   const [alertConfig, setAlertConfig] = useState(null); 
-  const [showPendingModal, setShowPendingModal] = useState(false); // ✅ New state
+  const [showPendingModal, setShowPendingModal] = useState(false);
 
   const loadAppointments = async () => {
     try {
@@ -129,6 +129,24 @@ function AppointmentPage() {
     }
   };
 
+  const handleConfirmAll = async () => {
+    try {
+      await Promise.all(pendingAppointmentsList.map(apt => 
+        updateDoc(doc(db, 'appointments', apt.id), { 
+          status: 'Scheduled',
+          confirmedBy: loggedInName,
+          confirmedAt: new Date().toISOString()
+        })
+      ));
+      setShowPendingModal(false);
+      loadAppointments();
+      setAlertConfig({ type: 'success', title: 'All Confirmed', message: 'All pending appointments have been scheduled.' });
+    } catch (err) {
+      console.error(err);
+      setAlertConfig({ type: 'error', title: 'Error', message: 'Failed to confirm all appointments.' });
+    }
+  };
+
   const stats = useMemo(() => {
     const total = appointments.length;
     const completed = appointments.filter(a => a.status === 'Completed').length;
@@ -151,7 +169,6 @@ function AppointmentPage() {
     return { total, completed, cancelled, pending, scheduled, dateAppts };
   }, [appointments, selectedDate]);
 
-  // ✅ Filter out the pending list specifically for the modal
   const pendingAppointmentsList = useMemo(() => {
     return appointments
       .filter(a => a.status === 'Pending')
@@ -236,7 +253,7 @@ function AppointmentPage() {
           </div>
         </div>
 
-        {/* ✅ TOP STAT CARDS (Updated to match screenshot) */}
+        {/* TOP STAT CARDS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-[#fef3c7] rounded-2xl p-5 relative border border-yellow-200 shadow-sm flex items-center gap-4">
             <div className="bg-[#eab308] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-inner flex-shrink-0">
@@ -278,7 +295,7 @@ function AppointmentPage() {
           </div>
         </div>
 
-        {/* ✅ NEEDS CONFIRMATION ALERT BANNER */}
+        {/* NEEDS CONFIRMATION ALERT BANNER */}
         {stats.pending > 0 && (
           <div className="bg-[#fffbeb] rounded-2xl p-4 border border-yellow-200 shadow-sm flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
             <div className="flex items-start md:items-center gap-3">
@@ -393,8 +410,6 @@ function AppointmentPage() {
 
           {/* RIGHT COLUMN: Calendar & Schedule */}
           <div className="lg:col-span-4 flex flex-col gap-4">
-            
-            {/* Calendar */}
             <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex-shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2">
@@ -458,7 +473,6 @@ function AppointmentPage() {
               </div>
             </div>
 
-            {/* Selected Date Schedule Card */}
             <div className="bg-[#dbeafe] rounded-2xl p-5 border border-gray-200 shadow-sm flex-shrink-0">
               <h3 className="font-bold mb-4 rounded-lg text-gray-900 flex justify-between items-center text-xl">
                 <span>Schedule</span>
@@ -486,17 +500,17 @@ function AppointmentPage() {
                 )}
               </div>
             </div>
-
           </div>
         </div>
       </div>
 
-      {/* ✅ Pending Modal */}
+      {/* ✅ Pending Modal (With Confirm All logic passed in) */}
       {showPendingModal && (
         <PendingAppointmentsModal 
           pendingAppointments={pendingAppointmentsList}
           onClose={() => setShowPendingModal(false)}
           onSelectAppointment={(apt) => setSelectedAppointment(apt)}
+          onConfirmAll={handleConfirmAll}
         />
       )}
 

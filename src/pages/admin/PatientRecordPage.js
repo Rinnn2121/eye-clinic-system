@@ -40,6 +40,7 @@ function PatientRecordPage() {
   // Modal states
   const [showPrescriptionError, setShowPrescriptionError] = useState(false);
   const [showSelectionError, setShowSelectionError] = useState(false);
+  const [showDepositError, setShowDepositError] = useState(false);
   const [saveError, setSaveError] = useState('');
   
   // Lab Modal State
@@ -127,46 +128,48 @@ function PatientRecordPage() {
     load();
   }, [customerId, navigate]);
 
-  // ✅ Auto-calculate total based on Frame Type
+  // ✅ Auto-calculate total based on Frame Type (SAFE FROM INFINITE LOOPS)
   useEffect(() => {
     if (record.isManualTotal) return;
     if (record.frameText === 'Custom' || record.frameText === 'Own Frame') return; 
 
     const basePrice = FRAME_TYPES[record.frameText] || 0;
-    setRecord(p => ({ ...p, total: basePrice }));
-  }, [record.frameText, record.isManualTotal]);
+    
+    // Only update state if the price is actually different
+    if (record.total !== basePrice) {
+      setRecord(p => ({ ...p, total: basePrice }));
+    }
+  }, [record.frameText, record.isManualTotal, record.total]);
 
-  // Auto-calculate balance based on Deposit
+  // ✅ Auto-calculate balance based on Deposit (SAFE FROM INFINITE LOOPS)
   useEffect(() => {
     const deposited = Number(record.deposit) || 0;
-    const balance = record.total - deposited;
+    const total = Number(record.total) || 0;
+    const balance = total - deposited;
 
     let calculatedStatus = 'pending';
-    if (record.total > 0 && deposited >= record.total) {
+    if (total > 0 && deposited >= total) {
       calculatedStatus = 'paid';
     }
 
-    setRecord((p) => ({ 
-      ...p, 
-      balance: balance > 0 ? balance : 0,
-      paymentStatus: calculatedStatus
-    }));
-  }, [record.deposit, record.total]);
+    const newBalance = balance > 0 ? balance : 0;
 
-  
+    // Only update state if the balance/status is actually different
+    if (record.balance !== newBalance || record.paymentStatus !== calculatedStatus) {
+      setRecord((p) => ({ 
+        ...p, 
+        balance: newBalance,
+        paymentStatus: calculatedStatus
+      }));
+    }
+  }, [record.deposit, record.total, record.balance, record.paymentStatus]);
 
   const handleSave = async () => {
-
-    if (Number(record.total) < 0 || Number(record.deposit) < 0) {
-      setSaveError("Total and deposit cannot be negative.");
-      return;
-    }
     if (!record.newODsph && !record.newOSsph) {
       setShowPrescriptionError(true); 
       return;
     }
 
-    // Validation: Must select Lens and Coating
     if (!record.lensText || !record.coatingText) {
       setShowSelectionError(true);
       return;
@@ -182,6 +185,15 @@ function PatientRecordPage() {
     }
     if (record.coatingText === 'Custom' && !record.customCoating) {
       setShowSelectionError(true);
+      return;
+    }
+
+    // ✅ 50% Minimum Deposit Check
+    const total = Number(record.total) || 0;
+    const deposit = Number(record.deposit) || 0;
+    
+    if (total > 0 && deposit < (total * 0.5)) {
+      setShowDepositError(true);
       return;
     }
 
@@ -252,9 +264,8 @@ function PatientRecordPage() {
         ],
       });
 
-            // ✅ 4. Mark appointment as completed (Handles early walk-ins)
-      // Create a list of possible IDs (email and reference ID)
-      const possibleIds = [customerId, customer?.email].filter(Boolean); // ✅ filter(Boolean) removes undefined/null
+      // 4. Mark appointment as completed
+      const possibleIds = [customerId, customer?.email].filter(Boolean); 
 
       if (possibleIds.length > 0) {
         const apptQuery = query(
@@ -345,7 +356,7 @@ function PatientRecordPage() {
           </div>
         </div>
 
-                {/* OLD PRESCRIPTION TABLE */}
+        {/* OLD PRESCRIPTION TABLE */}
         <div className="border-2 border-gray-700 rounded-lg mb-4 overflow-hidden">
           <div className="grid grid-cols-[80px_1fr_90px] bg-gray-50 border-b-2 border-gray-700">
             <div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">PD</div>
@@ -354,13 +365,11 @@ function PatientRecordPage() {
           </div>
           <div className="grid grid-cols-[80px_1fr_90px]">
             <div className="border-r-2 border-gray-700 row-span-2 flex items-center justify-center p-2">
-              {/* ✅ Changed to tel */}
               <input type="tel" inputMode="decimal" value={record.oldPd} onChange={(e) => setRecord({ ...record, oldPd: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="PD" />
             </div>
             <div className="border-r-2 border-b-2 border-gray-700 p-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium w-8">OD:</span>
-                {/* ✅ Changed to tel */}
                 <input type="tel" inputMode="decimal" value={record.oldODsph} onChange={(e) => setRecord({ ...record, oldODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
                 <input type="tel" inputMode="decimal" value={record.oldODcyl} onChange={(e) => setRecord({ ...record, oldODcyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
                 <span className="text-xs">x</span>
@@ -510,13 +519,26 @@ function PatientRecordPage() {
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium w-20 text-gray-600">DEPOSIT:</span>
             <input 
-            type="number" 
-            min="0"
-            value={record.deposit} 
-            onChange={(e) => 
-            setRecord({ ...record, deposit: e.target.value })}
-              className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent" placeholder="0" />
+              type="number" 
+              min="0"
+              value={record.deposit} 
+              onChange={(e) => setRecord({ ...record, deposit: e.target.value })}
+              className={`flex-1 border-b pb-1 text-sm outline-none bg-transparent ${
+                record.deposit && Number(record.deposit) < (Number(record.total) * 0.5)
+                  ? 'border-red-500 text-red-600'
+                  : 'border-gray-400'
+              }`} 
+              placeholder="0" 
+            />
           </div>
+
+          {/* ✅ Inline Warning for 50% rule */}
+          {record.deposit && Number(record.deposit) < (Number(record.total) * 0.5) && (
+            <p className="text-xs text-red-500 font-medium ml-24">
+              Deposit must be at least 50% of the total (₱{(Number(record.total) * 0.5).toLocaleString()}).
+            </p>
+          )}
+
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium w-20 text-gray-600">BALANCE:</span>
             <span className="flex-1 text-sm font-semibold text-red-600">₱{(record.balance || 0).toLocaleString()}</span>
@@ -581,6 +603,17 @@ function PatientRecordPage() {
         confirmColor="red"
         isAlert
         onConfirm={() => setShowSelectionError(false)}
+      />
+
+      <ConfirmModal
+        isOpen={showDepositError}
+        title="Minimum Deposit Required"
+        message={`The clinic requires a minimum deposit of 50% of the total (₱${((Number(record.total) || 0) * 0.5).toLocaleString()}).`}
+        iconType="warning"
+        confirmText="OK"
+        confirmColor="red"
+        isAlert
+        onConfirm={() => setShowDepositError(false)}
       />
 
       <ConfirmModal

@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-export default function PendingAppointmentsModal({ pendingAppointments, onClose, onSelectAppointment }) {
+export default function PendingAppointmentsModal({ pendingAppointments, onClose, onSelectAppointment, onConfirmAll }) {
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
       <div className="bg-white rounded-xl w-full max-w-4xl shadow-2xl flex flex-col max-h-[85vh]">
@@ -13,9 +13,21 @@ export default function PendingAppointmentsModal({ pendingAppointments, onClose,
             <h2 className="text-2xl font-bold text-gray-900">Appointments Needing Confirmation</h2>
             <p className="text-gray-500 text-sm mt-1">Please review and confirm the following appointments.</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-3xl leading-none mt-1">
-            &times;
-          </button>
+          <div className="flex items-center gap-4">
+            {/* ✅ Bulk Confirm Button */}
+            {pendingAppointments.length > 0 && (
+              <button 
+                onClick={onConfirmAll}
+                className="bg-green-500 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-green-600 transition-colors shadow-sm flex items-center gap-2"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" /></svg>
+                Confirm All ({pendingAppointments.length})
+              </button>
+            )}
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-700 text-3xl leading-none mt-1">
+              &times;
+            </button>
+          </div>
         </div>
 
         {/* Table */}
@@ -38,7 +50,7 @@ export default function PendingAppointmentsModal({ pendingAppointments, onClose,
                     key={apt.id} 
                     onClick={() => {
                       onSelectAppointment(apt);
-                      onClose(); // Close this modal when opening the details
+                      onClose(); 
                     }}
                     className="hover:bg-gray-50 text-gray-700 cursor-pointer transition-colors"
                   >
@@ -75,7 +87,7 @@ export default function PendingAppointmentsModal({ pendingAppointments, onClose,
             </svg>
             These appointments will appear in the main list once confirmed.
           </div>
-          <button onClick={onClose} className="bg-white border border-gray-300 text-gray-700 px-6 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition-colors shadow-sm">
+          <button onClick={onClose} className="bg-white border border-gray-300 text-gray-700 px-6 py-2 rounded-lg font-bold text-sm hover:bg-gray-100 transition-shadow shadow-sm">
             Close
           </button>
         </div>
