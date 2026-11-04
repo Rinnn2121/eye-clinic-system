@@ -130,6 +130,7 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Total Amount (Editable)</label>
               {/* ✅ Editable Total Input */}
               <input 
+                min="0"
                 type="number" 
                 required
                 value={formData.customTotal} 
@@ -141,6 +142,7 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Amount Paid *</label>
               <input 
+                min="0"
                 type="number" 
                 required
                 value={formData.amountPaid} 

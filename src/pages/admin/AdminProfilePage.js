@@ -27,7 +27,7 @@ export default function AdminProfilePage() {
 
     setUploadingImage(true);
     try {
-      const cloudName = 'qqrflkm1'; 
+      const cloudName = 'vmdtvqty'; 
       const uploadPreset = 'profile_unsigned'; // ✅ Using the new preset
 
       const data = new FormData();

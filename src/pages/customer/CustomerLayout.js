@@ -5,7 +5,7 @@ import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-do
 import { useAuth } from '../../contexts/AuthContext';
 
 function CustomerLayout() {
-  const { currentUser, userData, logout } = useAuth(); 
+  const { currentUser, userData, logout, resendVerification } = useAuth(); 
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -95,6 +95,27 @@ function CustomerLayout() {
 
       {/* ✅ RIGHT CONTENT AREA */}
       <div className="flex-1 flex flex-col h-screen overflow-y-auto">
+        
+        {/* ✅ VERIFICATION BANNER (Now inside the content area) */}
+        {!currentUser?.emailVerified && (
+          <div className="bg-yellow-50 px-6 py-3 border-b border-yellow-200 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-2 text-yellow-800">
+              <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div>
+                <p className="text-sm font-bold">Your email is not verified.</p>
+                <p className="text-xs">Please check your inbox for a verification link.</p>
+              </div>
+            </div>
+            <button 
+              onClick={() => resendVerification()}
+              className="text-xs font-bold bg-white border border-yellow-300 text-yellow-800 px-3 py-1.5 rounded-lg hover:bg-yellow-100 transition-colors flex-shrink-0"
+            >
+              Resend Email
+            </button>
+          </div>
+        )}
         
         {/* Dynamic Top Breadcrumb Area */}
         <div className="bg-white px-8 py-4 border-b border-gray-200 flex items-center gap-2 text-sm text-gray-500">

@@ -8,7 +8,8 @@ import {
   signOut, 
   onAuthStateChanged,
   setPersistence,
-  browserSessionPersistence
+  browserSessionPersistence,
+  sendEmailVerification // ✅ Import this
 } from 'firebase/auth';
 import { doc, getDoc,updateDoc, setDoc } from 'firebase/firestore';
 
@@ -66,6 +67,12 @@ export function AuthProvider({ children }) {
     });
 
     return result;
+  };
+
+  const resendVerification = async () => {
+    if (auth.currentUser) {
+      await sendEmailVerification(auth.currentUser);
+    }
   };
 
   const logout = async () => {
@@ -132,6 +139,7 @@ export function AuthProvider({ children }) {
     signup,
     logout,
     loading,
+    resendVerification, // ✅ Expose this
     updateProfilePicture 
   };
 

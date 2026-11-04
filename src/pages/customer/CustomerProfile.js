@@ -5,6 +5,8 @@ import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'fireb
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
+import { sendEmailVerification } from 'firebase/auth';
+import { auth } from '../../firebase/config';
 
 function CustomerProfile() {
   const { currentUser, userData, updateProfilePicture } = useAuth(); 
@@ -215,7 +217,7 @@ function CustomerProfile() {
     setUploadingImage(true);
     try {
       // Your exact Cloudinary details from InventoryPage
-      const cloudName = 'qqrflkm1'; 
+      const cloudName = 'vmdtvqty'; 
       const uploadPreset = 'profile_unsigned';
 
       const data = new FormData();
@@ -242,6 +244,15 @@ data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
       setAlertConfig({ type: 'error', title: 'Upload Failed', message: 'Could not upload image. Please try again.' });
     }
     setUploadingImage(false);
+  };
+
+  const handleResend = async () => {
+    try {
+      await sendEmailVerification(auth.currentUser);
+      setAlertConfig({ type: 'success', title: 'Email Sent!', message: 'A new verification link has been sent to your email.' });
+    } catch (err) {
+      setAlertConfig({ type: 'error', title: 'Error', message: err.message });
+    }
   };
 
   if (loading) {
@@ -350,10 +361,23 @@ data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
       <p className="text-sm font-medium text-gray-500 mt-1">Profile Picture</p>
     </div>
 
-
-        {/* Form */}
+     {/* Form */}
         <div className="flex-1 space-y-4">
           <div className="grid grid-cols-2 gap-4">
+            {!currentUser?.emailVerified && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between mb-6">
+            <div>
+              <p className="font-bold text-yellow-800">Email not verified</p>
+              <p className="text-sm text-yellow-700">Please verify your email to secure your account.</p>
+            </div>
+            <button 
+              onClick={handleResend}
+              className="bg-white text-yellow-800 border border-yellow-300 px-4 py-2 rounded-lg text-sm font-bold hover:bg-yellow-100"
+            >
+              Resend Email
+            </button>
+          </div>
+        )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
               <input

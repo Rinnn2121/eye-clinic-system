@@ -6,12 +6,13 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage"; // ✅ 1. Import getStorage
 
 const firebaseConfig = {
-  apiKey: "AIzaSyCT_YUkeB-sq3sHxlKPax77ki0uHA0Nv28",
-  authDomain: "eye-clinic-system.firebaseapp.com",
-  projectId: "eye-clinic-system",
-  storageBucket: "eye-clinic-system.firebasestorage.app",
-  messagingSenderId: "436862565536",
-  appId: "1:436862565536:web:a40483f580ac24a8369dc5"
+  apiKey: "AIzaSyBS1vX2PSGrEVdQ5fqMFP1K3p6Yih7ttek",
+  authDomain: "eye-clinic-system-803ee.firebaseapp.com",
+  projectId: "eye-clinic-system-803ee",
+  storageBucket: "eye-clinic-system-803ee.firebasestorage.app",
+  messagingSenderId: "870281086396",
+  appId: "1:870281086396:web:63e17f2ca5e760fc6817b9",
+  measurementId: "G-WHQ85CCCX1"
 };
 
 const app = initializeApp(firebaseConfig);

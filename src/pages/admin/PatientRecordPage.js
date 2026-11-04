@@ -153,7 +153,14 @@ function PatientRecordPage() {
     }));
   }, [record.deposit, record.total]);
 
+  
+
   const handleSave = async () => {
+
+    if (Number(record.total) < 0 || Number(record.deposit) < 0) {
+      setSaveError("Total and deposit cannot be negative.");
+      return;
+    }
     if (!record.newODsph && !record.newOSsph) {
       setShowPrescriptionError(true); 
       return;
@@ -245,24 +252,27 @@ function PatientRecordPage() {
         ],
       });
 
-      // ✅ 4. Mark appointment as completed (Handles early walk-ins)
-      const apptQuery = query(
-        collection(db, 'appointments'),
-        where('customerId', '==', customerId),
-        where('status', 'in', ['Pending', 'Scheduled'])
-      );
-      
-      const apptSnap = await getDocs(apptQuery);
-      if (!apptSnap.empty) {
-        const pendingAppts = [];
-        apptSnap.forEach(doc => pendingAppts.push({ id: doc.id, ...doc.data() }));
-        // Sort to get the closest upcoming appointment
-        pendingAppts.sort((a, b) => a.date.localeCompare(b.date));
+            // ✅ 4. Mark appointment as completed (Handles early walk-ins)
+      // Create a list of possible IDs (email and reference ID)
+      const possibleIds = [customerId, customer?.email].filter(Boolean); // ✅ filter(Boolean) removes undefined/null
+
+      if (possibleIds.length > 0) {
+        const apptQuery = query(
+          collection(db, 'appointments'),
+          where('customerId', 'in', possibleIds),
+          where('status', 'in', ['Pending', 'Scheduled'])
+        );
         
-        // Mark it as Completed
-        await updateDoc(doc(db, 'appointments', pendingAppts[0].id), {
-          status: 'Completed'
-        });
+        const apptSnap = await getDocs(apptQuery);
+        if (!apptSnap.empty) {
+          const pendingAppts = [];
+          apptSnap.forEach(doc => pendingAppts.push({ id: doc.id, ...doc.data() }));
+          pendingAppts.sort((a, b) => a.date.localeCompare(b.date));
+          
+          await updateDoc(doc(db, 'appointments', pendingAppts[0].id), {
+            status: 'Completed'
+          });
+        }
       }
 
       // 5. Prepare for Lab Modal
@@ -274,7 +284,7 @@ function PatientRecordPage() {
         frameCategory: finalFrame, 
         lensType: finalLens, 
         coating: finalCoating, 
-        totalAmount: record.total, // ✅ Pass total to lab order
+        totalAmount: record.total, 
         newODsph: record.newODsph, newODcyl: record.newODcyl, newODaxis: record.newODaxis,
         newOSsph: record.newOSsph, newOScyl: record.newOScyl, newOSaxis: record.newOSaxis,
         newADD: record.newADD, newPd: record.newPd,
@@ -323,10 +333,19 @@ function PatientRecordPage() {
 
         <div className="grid grid-cols-2 gap-4 mb-6">
           <div className="flex items-end gap-2"><span className="text-sm font-medium">OCCUPATION:</span><input value={record.occupation} onChange={(e) => setRecord({ ...record, occupation: e.target.value })} className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none focus:border-[#4A90E2]" /></div>
-          <div className="flex items-end gap-2"><span className="text-sm font-medium">DATE:</span><input type="date" value={record.date} onChange={(e) => setRecord({ ...record, date: e.target.value })} className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none" /></div>
+          <div className="flex items-end gap-2">
+            <span className="text-sm font-medium">DATE:</span>
+            <input 
+              type="date" 
+              value={record.date} 
+              readOnly 
+              disabled 
+              className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-gray-50 text-gray-600 cursor-not-allowed" 
+            />
+          </div>
         </div>
 
-        {/* OLD PRESCRIPTION TABLE */}
+                {/* OLD PRESCRIPTION TABLE */}
         <div className="border-2 border-gray-700 rounded-lg mb-4 overflow-hidden">
           <div className="grid grid-cols-[80px_1fr_90px] bg-gray-50 border-b-2 border-gray-700">
             <div className="border-r-2 border-gray-700 p-2 text-center font-semibold text-xs">PD</div>
@@ -335,27 +354,29 @@ function PatientRecordPage() {
           </div>
           <div className="grid grid-cols-[80px_1fr_90px]">
             <div className="border-r-2 border-gray-700 row-span-2 flex items-center justify-center p-2">
-              <input type="text" value={record.oldPd} onChange={(e) => setRecord({ ...record, oldPd: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="PD" />
+              {/* ✅ Changed to tel */}
+              <input type="tel" inputMode="decimal" value={record.oldPd} onChange={(e) => setRecord({ ...record, oldPd: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="PD" />
             </div>
             <div className="border-r-2 border-b-2 border-gray-700 p-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium w-8">OD:</span>
-                <input value={record.oldODsph} onChange={(e) => setRecord({ ...record, oldODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
-                <input value={record.oldODcyl} onChange={(e) => setRecord({ ...record, oldODcyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
+                {/* ✅ Changed to tel */}
+                <input type="tel" inputMode="decimal" value={record.oldODsph} onChange={(e) => setRecord({ ...record, oldODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
+                <input type="tel" inputMode="decimal" value={record.oldODcyl} onChange={(e) => setRecord({ ...record, oldODcyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
                 <span className="text-xs">x</span>
-                <input value={record.oldODaxis} onChange={(e) => setRecord({ ...record, oldODaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
+                <input type="tel" inputMode="numeric" value={record.oldODaxis} onChange={(e) => setRecord({ ...record, oldODaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
               </div>
             </div>
             <div className="row-span-2 flex items-center justify-center p-2">
-              <input value={record.oldADD} onChange={(e) => setRecord({ ...record, oldADD: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="ADD" />
+              <input type="tel" inputMode="decimal" value={record.oldADD} onChange={(e) => setRecord({ ...record, oldADD: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="ADD" />
             </div>
             <div className="border-r-2 border-gray-700 p-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium w-8">OS:</span>
-                <input value={record.oldOSsph} onChange={(e) => setRecord({ ...record, oldOSsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
-                <input value={record.oldOScyl} onChange={(e) => setRecord({ ...record, oldOScyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
+                <input type="tel" inputMode="decimal" value={record.oldOSsph} onChange={(e) => setRecord({ ...record, oldOSsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
+                <input type="tel" inputMode="decimal" value={record.oldOScyl} onChange={(e) => setRecord({ ...record, oldOScyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
                 <span className="text-xs">x</span>
-                <input value={record.oldOSaxis} onChange={(e) => setRecord({ ...record, oldOSaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
+                <input type="tel" inputMode="numeric" value={record.oldOSaxis} onChange={(e) => setRecord({ ...record, oldOSaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
               </div>
             </div>
           </div>
@@ -370,27 +391,27 @@ function PatientRecordPage() {
           </div>
           <div className="grid grid-cols-[80px_1fr_90px]">
             <div className="border-r-2 border-gray-700 row-span-2 flex items-center justify-center p-2">
-              <input type="text" value={record.newPd} onChange={(e) => setRecord({ ...record, newPd: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="PD" />
+              <input type="tel" inputMode="decimal" value={record.newPd} onChange={(e) => setRecord({ ...record, newPd: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="PD" />
             </div>
             <div className="border-r-2 border-b-2 border-gray-700 p-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium w-8">OD:</span>
-                <input value={record.newODsph} onChange={(e) => setRecord({ ...record, newODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
-                <input value={record.newODcyl} onChange={(e) => setRecord({ ...record, newODcyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
+                <input type="tel" inputMode="decimal" value={record.newODsph} onChange={(e) => setRecord({ ...record, newODsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
+                <input type="tel" inputMode="decimal" value={record.newODcyl} onChange={(e) => setRecord({ ...record, newODcyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
                 <span className="text-xs">x</span>
-                <input value={record.newODaxis} onChange={(e) => setRecord({ ...record, newODaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
+                <input type="tel" inputMode="numeric" value={record.newODaxis} onChange={(e) => setRecord({ ...record, newODaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
               </div>
             </div>
             <div className="row-span-2 flex items-center justify-center p-2">
-              <input value={record.newADD} onChange={(e) => setRecord({ ...record, newADD: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="ADD" />
+              <input type="tel" inputMode="decimal" value={record.newADD} onChange={(e) => setRecord({ ...record, newADD: e.target.value })} className="w-full text-center text-sm outline-none bg-transparent" placeholder="ADD" />
             </div>
             <div className="border-r-2 border-gray-700 p-2">
               <div className="flex items-center gap-2">
                 <span className="text-xs font-medium w-8">OS:</span>
-                <input value={record.newOSsph} onChange={(e) => setRecord({ ...record, newOSsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
-                <input value={record.newOScyl} onChange={(e) => setRecord({ ...record, newOScyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
+                <input type="tel" inputMode="decimal" value={record.newOSsph} onChange={(e) => setRecord({ ...record, newOSsph: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="SPH" />
+                <input type="tel" inputMode="decimal" value={record.newOScyl} onChange={(e) => setRecord({ ...record, newOScyl: e.target.value })} className="flex-1 border-b border-gray-400 text-sm outline-none" placeholder="CYL" />
                 <span className="text-xs">x</span>
-                <input value={record.newOSaxis} onChange={(e) => setRecord({ ...record, newOSaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
+                <input type="tel" inputMode="numeric" value={record.newOSaxis} onChange={(e) => setRecord({ ...record, newOSaxis: e.target.value })} className="w-14 border-b border-gray-400 text-sm outline-none" placeholder="Axis" />
               </div>
             </div>
           </div>
@@ -477,6 +498,7 @@ function PatientRecordPage() {
               <span className="text-lg font-bold mr-1">₱</span>
               <input
               type="number"
+              min="0"
               value={record.total}
               onChange={(e) => {
                 setRecord({ ...record, total: Number(e.target.value), isManualTotal: true });
@@ -487,7 +509,12 @@ function PatientRecordPage() {
           </div>
           <div className="flex items-center gap-2">
             <span className="text-sm font-medium w-20 text-gray-600">DEPOSIT:</span>
-            <input type="number" value={record.deposit} onChange={(e) => setRecord({ ...record, deposit: e.target.value })}
+            <input 
+            type="number" 
+            min="0"
+            value={record.deposit} 
+            onChange={(e) => 
+            setRecord({ ...record, deposit: e.target.value })}
               className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none bg-transparent" placeholder="0" />
           </div>
           <div className="flex items-center gap-2">

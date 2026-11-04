@@ -88,9 +88,12 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
             <div className="w-1/3">
               <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Date</label>
               <input 
-                type="date" required value={formData.date}
-                onChange={(e) => setFormData({...formData, date: e.target.value})}
-                className="w-full border-b-2 border-gray-300 pb-1 text-sm outline-none bg-transparent"
+                type="date" 
+                required 
+                value={formData.date}
+                readOnly      // ✅ Lock it
+                disabled      // ✅ Lock it
+                className="w-full border-b-2 border-gray-300 pb-1 text-sm outline-none bg-gray-50 text-gray-600 cursor-not-allowed"
               />
             </div>
           </div>
@@ -104,13 +107,12 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
                 className="w-full border-b-2 border-gray-300 pb-1 text-sm font-bold text-gray-500 bg-gray-50 outline-none"
               />
             </div>
-            <div>
-              <label className="block text-xs font-bold text-[#4A90E2] uppercase mb-1">Specific Frame (Brand/Model) *</label>
+                        <div>
+              <label className="block text-xs font-bold text-[#4A90E2] uppercase mb-1">Frame Description (Brand or Type) *</label>
               <input 
                 type="text" required value={formData.specificFrame}
                 onChange={(e) => setFormData({...formData, specificFrame: e.target.value})}
                 className="w-full border-b-2 border-[#4A90E2] pb-1 text-sm font-bold text-gray-900 outline-none"
-                placeholder="e.g., Ray-Ban RB2140"
               />
             </div>
           </div>
@@ -141,7 +143,6 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
                 value={formData.notes}
                 onChange={(e) => setFormData({...formData, notes: e.target.value})}
                 className="w-full h-[100px] border-2 border-gray-300 rounded-xl p-3 text-sm outline-none focus:border-[#4A90E2] resize-none"
-                placeholder="Special instructions for the lab..."
               />
             </div>
           </div>

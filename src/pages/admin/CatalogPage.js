@@ -59,8 +59,17 @@ function CatalogPage() {
     }
 
     result.sort((a, b) => {
+      // 1. ✅ Push Disabled items to the bottom
       if (a.isActive === false && b.isActive !== false) return 1;
       if (a.isActive !== false && b.isActive === false) return -1;
+
+      // 2. ✅ Push Featured items to the top (if both are active)
+      if (a.isActive !== false && b.isActive !== false) {
+        if (a.isFeatured && !b.isFeatured) return -1;
+        if (!a.isFeatured && b.isFeatured) return 1;
+      }
+
+      // 3. Apply the selected sorting (Price, Name, etc.)
       if (sortBy === 'Price: Low to High') return a.price - b.price;
       if (sortBy === 'Price: High to Low') return b.price - a.price;
       if (sortBy === 'Name: A-Z') return a.name.localeCompare(b.name);

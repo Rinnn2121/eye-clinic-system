@@ -40,10 +40,21 @@ function LandingPage() {
           }
         });
 
-        const sorted = allProducts.sort((a, b) => new Date(b.createdAt || 0) - new Date(a.createdAt || 0));
+        // ✅ Sort logic updated to prioritize Featured items
+        const sorted = allProducts.sort((a, b) => {
+          // 1. Featured items first
+          if (a.isFeatured && !b.isFeatured) return -1;
+          if (!a.isFeatured && b.isFeatured) return 1;
+          
+          // 2. Then by newest
+          return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+        });
 
         const frames = sorted.filter(p => p.category === 'Metal Frame' || p.category === 'Plastic Frame');
+        
+        // Best sellers now = the first 4 frames (Featured first, then newest)
         setBestSellers(frames.slice(0, 4));
+        
         setMetalFrames(sorted.filter(p => p.category === 'Metal Frame').slice(0, 4));
         setPlasticFrames(sorted.filter(p => p.category === 'Plastic Frame').slice(0, 4));
         setPackages(sorted.filter(p => p.category === 'Package').slice(0, 4));
@@ -55,6 +66,8 @@ function LandingPage() {
     };
     loadProducts();
   }, []);
+
+  
 
   // ✅ Booking logic with Login Check
   const handleBookClick = () => {

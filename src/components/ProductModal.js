@@ -1,7 +1,7 @@
 // src/components/ProductModal.js
 
-import React, { useState } from 'react';
-import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
+import React, { useState, useEffect } from 'react';
+import { collection, addDoc, doc, updateDoc, getDocs } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -11,18 +11,35 @@ export default function ProductModal({ product, onClose, onSuccess }) {
   const { userData, currentUser } = useAuth();
   const loggedInName = userData?.name || currentUser?.email?.split('@')[0] || 'Admin Staff';
 
+  const [featuredCount, setFeaturedCount] = useState(0);
+  
+// ✅ Fetch how many are currently featured
+  useEffect(() => {
+    const checkFeaturedCount = async () => {
+      const snap = await getDocs(collection(db, 'inventory'));
+      let count = 0;
+      snap.forEach(doc => {
+        if (doc.data().isFeatured === true) count++;
+      });
+      setFeaturedCount(count);
+    };
+    checkFeaturedCount();
+  }, []);
   // Form State
-  const [formData, setFormData] = useState({
+    const [formData, setFormData] = useState({
     name: product?.name || '',
     category: product?.category || 'Metal Frame',
     price: product?.price || '',
     description: product?.description || '',
     isActive: product?.isActive !== false,
+    isFeatured: product?.isFeatured || false, // ✅ Added here
     imageUrl: product?.imageUrl || '',
     createdAt: product?.createdAt || new Date().toISOString(),
     updatedAt: product?.updatedAt || new Date().toISOString(),
     updatedBy: product?.updatedBy || loggedInName
   });
+
+  
 
   const [imageFile, setImageFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -35,7 +52,7 @@ export default function ProductModal({ product, onClose, onSuccess }) {
       let finalImageUrl = formData.imageUrl;
 
       if (imageFile) {
-        const cloudName = 'qqrflkm1'; 
+        const cloudName = 'vmdtvqty'; 
         const uploadPreset = 'inventory_unsigned';
 
         const data = new FormData();
@@ -58,9 +75,10 @@ export default function ProductModal({ product, onClose, onSuccess }) {
         price: parseFloat(formData.price),
         description: formData.description,
         isActive: formData.isActive,
+        isFeatured: formData.isFeatured, // ✅ Save it
         imageUrl: finalImageUrl,
         updatedAt: new Date().toISOString(),
-        updatedBy: loggedInName, // ✅ Save the current user's name
+        updatedBy: loggedInName, 
         createdAt: formData.createdAt
       };
 
@@ -166,6 +184,7 @@ export default function ProductModal({ product, onClose, onSuccess }) {
                       <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">₱</span>
                       <input
                         type="number" step="0.01" required
+                        min="0"
                         value={formData.price}
                         onChange={(e) => setFormData({ ...formData, price: e.target.value })}
                         className="w-full border border-gray-300 rounded-lg pl-8 pr-4 py-2.5 text-sm font-medium outline-none focus:ring-2 focus:ring-[#4A90E2]"
@@ -199,6 +218,42 @@ export default function ProductModal({ product, onClose, onSuccess }) {
                     <span className="w-2 h-2 rounded-full bg-red-500"></span> Disabled
                   </button>
                 </div>
+              </div>
+                            {/* ✅ Featured Toggle */}
+              <div className="mt-6">
+                <div className="flex justify-between items-center mb-3">
+                  <label className="block text-sm font-bold text-gray-800">Featured on Homepage</label>
+                  <span className={`text-xs font-bold ${featuredCount >= 4 && !formData.isFeatured ? 'text-red-500' : 'text-gray-500'}`}>
+                    {featuredCount} / 4 Selected
+                  </span>
+                </div>
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    // If it's already featured, let them turn it off
+                    if (formData.isFeatured) {
+                      setFormData({ ...formData, isFeatured: false });
+                      return;
+                    }
+                    // If not featured, check the limit
+                    if (featuredCount >= 4) {
+                      alert("You can only feature up to 4 items on the homepage. Please remove a featured item first.");
+                      return;
+                    }
+                    setFormData({ ...formData, isFeatured: true });
+                  }}
+                  className={`flex items-center gap-2 px-6 py-2 rounded-lg text-sm font-bold transition-colors ${
+                    formData.isFeatured 
+                      ? 'bg-yellow-100 text-yellow-800 border border-yellow-300' 
+                      : featuredCount >= 4 
+                        ? 'bg-gray-50 text-gray-400 cursor-not-allowed border border-gray-200'
+                        : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${formData.isFeatured ? 'bg-yellow-500' : 'bg-gray-400'}`}></span>
+                  {formData.isFeatured ? 'Yes, Feature this' : featuredCount >= 4 ? 'Limit Reached' : 'Not Featured'}
+                </button>
               </div>
             </div>
 

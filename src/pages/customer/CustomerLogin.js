@@ -1,10 +1,13 @@
 // src/pages/customer/CustomerLogin.js
 
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom'; // ✅ Added Link
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';        
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';                  
+import { signOut } from 'firebase/auth'; // ✅ Import for blocking unverified users
+import { auth } from '../../firebase/config'; 
+import emailjs from '@emailjs/browser'; // ✅ Import EmailJS
 
 function CustomerLogin() {
   const [email, setEmail] = useState('');
@@ -12,7 +15,8 @@ function CustomerLogin() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  
+  const { login } = useAuth(); 
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -21,17 +25,45 @@ function CustomerLogin() {
     setLoading(true);
 
     try {
-      await login(email, password);
-      
-      // Fetch role from Firestore
+      // 1. Attempt to log in
+      const userCredential = await login(email, password);
+      const user = userCredential.user;
+
+      // ✅ 2. Strict Check: Block if not verified
+      if (!user.emailVerified) {
+        await signOut(auth); // Log them out immediately
+        setError('Your email is not verified. Please check your inbox and click the verification link before logging in.');
+        setLoading(false);
+        return; // Stop execution here
+      }
+
+      // ✅ 3. Send Login Notification Email (Using EmailJS)
+      try {
+        await emailjs.send(
+          'service_qd6q6ox',      // 👈 REPLACE THIS
+          'template_agxoowy',     // 👈 REPLACE THIS
+          {
+            to_email: email,
+            login_time: new Date().toLocaleString('en-PH', { 
+              dateStyle: 'long', 
+              timeStyle: 'short' 
+            }),
+          },
+          'EnPJnnKQXm7ASqkp9'       // 👈 REPLACE THIS
+        );
+        console.log('Login notification email sent successfully.');
+      } catch (emailErr) {
+        // We log the error but don't block the login
+        console.error('Email notification failed:', emailErr);
+      }
+
+      // 4. Redirect based on role
       const userDoc = await getDoc(doc(db, 'users', email));
-      
       let role = 'customer';
       if (userDoc.exists()) {
         role = userDoc.data().role || 'customer';
       }
       
-      // ✅ Role-based redirection
       if (role === 'admin' || role === 'staff') {
         navigate('/admin/dashboard', { replace: true });
       } else {
