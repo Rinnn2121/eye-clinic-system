@@ -67,8 +67,6 @@ function LandingPage() {
     loadProducts();
   }, []);
 
-  
-
   // ✅ Booking logic with Login Check
   const handleBookClick = () => {
     if (!currentUser) {
@@ -336,16 +334,18 @@ function LandingPage() {
         />
       )}
 
-      {/* ✅ Login Required / Success Alerts */}
+      {/* ✅ Login Required Alert Modal (Now with a Close/Cancel option) */}
       {alertConfig && (
         <ConfirmModal
           isOpen={true}
           title={alertConfig.title}
           message={alertConfig.message}
           iconType={alertConfig.type === 'success' ? 'success' : 'warning'}
+          cancelText="Close"
           confirmText={alertConfig.type === 'success' ? 'OK' : 'Go to Login'}
           confirmColor={alertConfig.type === 'success' ? 'green' : 'blue'}
-          isAlert
+          isAlert={false} // ✅ Setting this to false forces the Cancel/Close button to appear
+          onCancel={() => setAlertConfig(null)} // ✅ Handles the Close button
           onConfirm={() => {
             setAlertConfig(null);
             if (alertConfig.type !== 'success') {

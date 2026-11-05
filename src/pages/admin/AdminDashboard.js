@@ -242,7 +242,10 @@ function AdminDashboard() {
               <div className="bg-[#e0e7ff] rounded-2xl p-5 border border-indigo-200 shadow-sm h-full">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="bg-[#6366f1] text-white p-2 rounded-full w-11 h-11 flex items-center justify-center">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+  <circle cx="12" cy="12" r="10" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 16V8h4a3 3 0 0 1 0 6H9m-1-3h6m-6 3h6" />
+</svg>
                   </div>
                   <span className="text-base font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">Sales</span>
                 </div>
@@ -390,6 +393,14 @@ function AdminDashboard() {
                   </div>
                 </div>
               </div>
+
+              {/* ✅ CENTERED COLUMN LABELS */}
+              <div className="flex items-center bg-gray-50/50 px-4 mb-2 shadow-md py-3 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
+                <div className="w-1/5 text-center">Time</div>
+                <div className="w-1/3 text-center">Name</div>
+                <div className="flex-1 text-center">Service</div>
+                <div className="w-[15%] text-center">Status</div>
+              </div>
               
               {/* ✅ Scrollable table container with fixed height */}
               <div className="bg-white max-h-[350px] overflow-y-auto">
@@ -401,14 +412,35 @@ function AdminDashboard() {
                     <div 
                       key={idx} 
                       onClick={() => setSelectedAppt(apt)}
-                      className="flex items-center justify-between py-4 px-6 my-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all mx-4"
+                      className="flex items-center justify-between py-4 px-2 my-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all mx-0"
                     >
-                      <div className="w-1/5 flex-shrink-0"><span className="font-semibold text-gray-800 text-base">{apt.time ? new Date(`2000-01-01T${apt.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</span></div>
-                      <div className="w-1/3 min-w-0 pr-3"><span className="text-base font-medium text-gray-700 truncate block">{apt.customerName || 'Walk-in'}</span></div>
-                      <div className="flex-1 min-w-0 pr-3"><span className="text-base text-gray-500 truncate block">{apt.reason || 'Eye Examination'}</span></div>
-                      <div className="w-[15%] flex-shrink-0 text-right flex items-center justify-end gap-2">
-                        <span className={`w-2 h-2 rounded-full ${apt.status === 'Completed' ? 'bg-green-500' : apt.status === 'Cancelled' ? 'bg-red-500' : 'bg-yellow-500'}`}></span>
-                        <span className={`text-sm font-bold ${apt.status === 'Completed' ? 'text-green-600' : apt.status === 'Cancelled' ? 'text-red-500' : 'text-yellow-600'}`}>{apt.status || 'Pending'}</span>
+                      {/* ✅ Time Centered */}
+                      <div className="w-1/5 flex justify-center flex-shrink-0">
+                        <span className="font-semibold text-gray-800 text-base">
+                          {apt.time ? new Date(`2000-01-01T${apt.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}
+                        </span>
+                      </div>
+
+                      {/* ✅ Name Centered */}
+                      <div className="w-1/3 flex justify-center min-w-0 pr-3">
+                        <span className="text-base font-medium text-gray-700 truncate block">{apt.customerName || 'Walk-in'}</span>
+                      </div>
+
+                      {/* ✅ Service Centered */}
+                      <div className="flex-1 flex justify-center min-w-0 pr-3">
+                        <span className="text-base text-gray-500 truncate block">{apt.reason || 'Eye Examination'}</span>
+                      </div>
+
+                       {/* ✅ Status Centered (Removed bullet, added colored background) */}
+                      <div className="w-[15%] flex-shrink-0 flex items-center justify-center">
+                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
+                          apt.status === 'Completed' ? 'bg-[#bbf7d0] text-green-800' :
+                          apt.status === 'Cancelled' ? 'bg-[#fecdd3] text-red-800' : 
+                          apt.status === 'Scheduled' ? 'bg-blue-100 text-blue-800' :
+                          'bg-[#fef3c7] text-yellow-800'
+                        }`}>
+                          {apt.status || 'Pending'}
+                        </span>
                       </div>
                     </div>
                   ))
@@ -636,15 +668,15 @@ function AdminDashboard() {
       )}
 
       {showInventoryModal && (
-        <QuickInventoryModal 
-          onClose={() => setShowInventoryModal(false)} 
-          inventoryList={inventoryList} 
-          onItemClick={(item) => {
-            setShowInventoryModal(false); // Close inventory
-            setSelectedProduct(item);    // Open Product Modal
-          }}
-        />
-      )}
+  <QuickInventoryModal 
+    onClose={() => setShowInventoryModal(false)} 
+    inventoryList={inventoryList} 
+    onItemClick={(item) => {
+      setShowInventoryModal(false); // Close Search
+      setPreviewProduct(item);      // Open Preview Modal
+    }}
+  />
+)}
 
       {/* ✅ Product Preview Modal */}
       {previewProduct && (

@@ -17,7 +17,7 @@ function LabOrdersPage() {
   // Modals
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [alertConfig, setAlertConfig] = useState(null);
-  const [showMarkAllModal, setShowMarkAllModal] = useState(false); // ✅ New state for bulk action
+  const [showMarkAllModal, setShowMarkAllModal] = useState(false);
 
   const loadOrders = async () => {
     try {
@@ -40,8 +40,14 @@ function LabOrdersPage() {
 
   const handleStatusChange = async (order, newStatus) => {
     try {
+      const updateData = { status: newStatus };
+      // ✅ Save the timestamp when it is picked up
+      if (newStatus === 'picked_up') {
+        updateData.pickedUpAt = new Date().toISOString();
+      }
+
       // 1. Update the Lab Order Status
-      await updateDoc(doc(db, 'labOrders', order.id), { status: newStatus });
+      await updateDoc(doc(db, 'labOrders', order.id), updateData);
       
       // 2. Send Notification to Customer if marked "Ready"
       if (newStatus === 'ready' && order.patientId) {
@@ -83,7 +89,6 @@ function LabOrdersPage() {
   // ✅ Bulk Action: Mark All as Ready
   const handleMarkAllReady = async () => {
     try {
-      // Find all orders that are currently 'in_progress' and match the search term (so it doesn't mark hidden ones)
       const ordersToUpdate = filteredOrders; 
 
       if (ordersToUpdate.length === 0) {
@@ -91,11 +96,9 @@ function LabOrdersPage() {
         return;
       }
 
-      // Loop through and update each one
       await Promise.all(ordersToUpdate.map(async (order) => {
         await updateDoc(doc(db, 'labOrders', order.id), { status: 'ready' });
         
-        // Send notification for each
         if (order.patientId) {
           const custQuery = query(collection(db, 'customers'), where('__name__', '==', order.patientId));
           const custSnap = await getDocs(custQuery);
@@ -158,9 +161,9 @@ function LabOrdersPage() {
           <p className="text-gray-500 text-base mt-1">Track orders sent to the lab and manage customer pickups.</p>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2">
-          <div className="relative w-full max-w-md">
+        {/* ✅ Shortened Search Bar Container */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 max-w-md">
+          <div className="relative w-full">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -171,7 +174,7 @@ function LabOrdersPage() {
               placeholder="Search by patient or frame..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
             />
           </div>
         </div>
@@ -211,7 +214,6 @@ function LabOrdersPage() {
             </button>
           </div>
 
-          {/* ✅ Bulk Action Button (Only shows on In Laboratory tab) */}
           {activeTab === 'in_progress' && filteredOrders.length > 0 && (
             <button
               onClick={() => setShowMarkAllModal(true)}
@@ -234,38 +236,54 @@ function LabOrdersPage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {filteredOrders.map(order => (
-              <div 
-                key={order.id} 
-                onClick={() => setSelectedOrder(order)}
-                className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
-              >
-                <div>
-                  <div className="flex items-center gap-3 mb-1">
-                    <h3 className="font-bold text-xl text-gray-900">{order.patientName}</h3>
-                    <span className="text-sm font-bold text-[#4A90E2] bg-blue-50 px-2 py-0.5 rounded-full">
-                      {order.date}
-                    </span>
+            {filteredOrders.map(order => {
+              const isPickedUp = order.status === 'picked_up';
+              
+              return (
+                <div 
+                  key={order.id} 
+                  onClick={() => setSelectedOrder(order)}
+                  className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm hover:shadow-md transition-shadow cursor-pointer flex flex-col md:flex-row justify-between items-start md:items-center gap-4"
+                >
+                  <div>
+                    <div className="flex items-center gap-3 mb-1">
+                      <h3 className="font-bold text-xl text-gray-900">{order.patientName}</h3>
+                      <span className="text-sm font-bold text-[#4A90E2] bg-blue-50 px-2 py-0.5 rounded-full">
+                        {order.date}
+                      </span>
+                    </div>
+                    <p className="text-base text-gray-600 font-medium">
+                      Frame: {order.frameCategory} • Lens: {order.lens}
+                    </p>
+                    <p className="text-sm text-gray-500 mt-1">
+                      OD: {order.od} | OS: {order.os}
+                    </p>
                   </div>
-                  <p className="text-base text-gray-600 font-medium">
-                    Frame: {order.frameCategory} • Lens: {order.lens}
-                  </p>
-                  <p className="text-sm text-gray-500 mt-1">
-                    OD: {order.od} | OS: {order.os}
-                  </p>
-                </div>
-                
-                <div className="flex items-center gap-6">
-                  <div className="text-right">
-                    <p className="text-xs font-bold uppercase text-gray-400">Balance</p>
-                    <p className="text-lg font-bold text-red-600">{order.balance}</p>
+                  
+                                    <div className="flex items-center gap-6">
+                    <div className="text-right">
+                      <p className="text-xs font-bold uppercase text-gray-400">Balance</p>
+                      
+                      <p className={`text-lg font-bold ${isPickedUp || !order.balance || Number(order.balance) <= 0 ? 'text-gray-400' : 'text-red-600'}`}>
+                        ₱ {isPickedUp ? '0' : Number(order.balance || 0).toLocaleString()}
+                      </p>
+                      
+                      {/* ✅ Show Picked Up Date/Time if applicable */}
+                      {isPickedUp && order.pickedUpAt && (
+                        <p className="text-[10px] text-gray-500 font-medium mt-1">
+                          Picked up: {new Date(order.pickedUpAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                          {' '}at{' '}
+                          {new Date(order.pickedUpAt).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}
+                        </p>
+                      )}
+                    </div>
+                    <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200">
+                      View Details
+                    </button>
                   </div>
-                  <button className="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-200">
-                    View Details
-                  </button>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

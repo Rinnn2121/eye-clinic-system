@@ -1,37 +1,9 @@
 // src/pages/customer/ServicesPage.js
 
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
 import Footer from '../../components/Footer';
-import BookingWizardModal from '../../components/BookingWizardModal';
-import ConfirmModal from '../../components/ConfirmModal';
-import { useAuth } from '../../contexts/AuthContext';
 
 function ServicesPage() {
-  const { currentUser } = useAuth();
-  const navigate = useNavigate();
-
-  // Modal states
-  const [showBookingModal, setShowBookingModal] = useState(false);
-  const [selectedService, setSelectedService] = useState('');
-  const [alertConfig, setAlertConfig] = useState(null);
-
-  // Handle clicking "Book a Visit"
-  const handleBookVisit = (serviceTitle) => {
-    if (!currentUser) {
-      // If not logged in, show the custom alert
-      setAlertConfig({ 
-        type: 'error', 
-        title: 'Login Required', 
-        message: 'Please login or create an account to book an appointment.' 
-      });
-      return;
-    }
-    // If logged in, open the wizard
-    setSelectedService(serviceTitle);
-    setShowBookingModal(true);
-  };
-
   // The 6 services from the design
   const services = [
     {
@@ -78,7 +50,6 @@ function ServicesPage() {
               {/* Header Row: Image + Title */}
               <div className="flex items-center gap-4 mb-4">
                 <div className="w-20 h-20 bg-gray-200 rounded-full flex-shrink-0 flex items-center justify-center">
-                  {/* ✅ SVG Eye/Service Placeholder */}
                   <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
@@ -90,17 +61,9 @@ function ServicesPage() {
               </div>
 
               {/* Description */}
-              <p className="text-xs text-gray-600 leading-relaxed flex-1 mb-6">
+              <p className="text-xs text-gray-600 leading-relaxed flex-1">
                 {service.description}
               </p>
-
-              {/* Book a Visit Button */}
-              <button 
-                onClick={() => handleBookVisit(service.title)}
-                className="text-[#4A90E2] text-sm font-medium hover:underline flex items-center gap-1 text-left w-fit"
-              >
-                Book a Visit <span>→</span>
-              </button>
             </div>
           ))}
         </div>
@@ -108,35 +71,6 @@ function ServicesPage() {
 
       <Footer />
 
-      {/* Booking Wizard Modal */}
-      {showBookingModal && (
-        <BookingWizardModal 
-          initialService={selectedService}
-          onClose={() => setShowBookingModal(false)} 
-          onSuccess={() => {
-            setShowBookingModal(false);
-          }}
-        />
-      )}
-
-      {/* Login Required Alert Modal */}
-      {alertConfig && (
-        <ConfirmModal
-          isOpen={true}
-          title={alertConfig.title}
-          message={alertConfig.message}
-          iconType={alertConfig.type === 'success' ? 'success' : 'warning'}
-          confirmText={alertConfig.type === 'success' ? 'OK' : 'Go to Login'}
-          confirmColor={alertConfig.type === 'success' ? 'green' : 'blue'}
-          isAlert
-          onConfirm={() => {
-            setAlertConfig(null);
-            if (alertConfig.type !== 'success') {
-              navigate('/login');
-            }
-          }}
-        />
-      )}
     </div>
   );
 }

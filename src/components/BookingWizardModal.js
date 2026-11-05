@@ -1,7 +1,7 @@
 // src/components/BookingWizardModal.js
 
 import React, { useState, useEffect } from 'react';
-import { collection, addDoc, doc, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore'; // ✅ Added updateDoc
+import { collection, addDoc, doc, getDoc, query, where, getDocs, updateDoc } from 'firebase/firestore';
 import { db } from '../firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -189,7 +189,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
         createdAt: new Date().toISOString()
       });
 
-      // ✅ 4. Clear the Cart in Firestore
+      // 4. Clear the Cart in Firestore
       const cartRef = doc(db, 'carts', currentUser.email);
       await updateDoc(cartRef, { items: [] });
 
@@ -221,9 +221,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     { id: 'Eye Examination', desc: 'Check your eye vision and health.' },
     { id: 'Fitting of Contact Lenses', desc: 'Ensure proper fit and comfort.' },
     { id: 'Dry Eye Test', desc: 'Evaluate dry eye symptoms.' },
-    { id: 'Color Vision Test', desc: 'Check color perception.' },
-    { id: 'Prescribing/Dispensing of Corrective Lenses and Eyeglasses', desc: 'Get your new prescription or glasses.' },
-    { id: 'Computerized Eye Examination', desc: 'Fast and accurate digital eye check.' }
+    { id: 'Color Vision Test', desc: 'Check color perception.' }
   ];
 
   return (
@@ -385,8 +383,15 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                 <div className="space-y-4">
                   {cartItems.map(item => (
                     <div key={item.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
-                      <div className="w-20 h-20 bg-gray-100 flex-shrink-0">
-                        {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300">🖼️</div>}
+                      <div className="w-20 h-20 bg-gray-100 flex-shrink-0 flex items-center justify-center overflow-hidden rounded">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          /* ✅ SVG Image Placeholder */
+                          <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                        )}
                       </div>
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-900 text-sm">{item.name}</h4>
@@ -417,9 +422,12 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                 </div>
               )}
 
-              <div className="mt-6 bg-[#d0e2fd] text-blue-900 p-4 rounded-md flex gap-3">
-                <span className="text-xl">ℹ️</span>
-                <p className="text-xs leading-relaxed">
+              {/* ✅ SVG Info Banner */}
+              <div className="mt-6 bg-[#d0e2fd] text-blue-900 p-4 rounded-md flex items-start gap-3">
+                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <p className="text-xs leading-relaxed font-medium">
                   Items in your cart will be shared with the clinic to help prepare for your visit. 
                   This does NOT represent an online purchase.
                 </p>
@@ -463,8 +471,15 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                     <div className="space-y-3">
                       {cartItems.filter(item => includedItems.includes(item.id)).map(item => (
                          <div key={item.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                            <div className="w-16 h-16 bg-gray-200 flex-shrink-0">
-                              {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300">🖼️</div>}
+                            <div className="w-16 h-16 bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden rounded">
+                              {item.imageUrl ? (
+                                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                              ) : (
+                                /* ✅ SVG Image Placeholder */
+                                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                </svg>
+                              )}
                             </div>
                             <div className="flex-1">
                               <h4 className="font-bold text-gray-900 text-sm">{item.name}</h4>
@@ -492,9 +507,12 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                   {includedItems.length > 0 ? `${includedItems.length} items selected` : 'None'}
                 </p>
 
-                <div className="bg-[#d0e2fd] text-blue-900 p-3 rounded-lg mb-6 text-xs flex gap-2">
-                  <span>ℹ️</span>
-                  <p>No payment or order delivery is placed online. Payment process is handled at the clinic.</p>
+                {/* ✅ SVG Info Banner */}
+                <div className="bg-[#d0e2fd] text-blue-900 p-3 rounded-lg mb-6 text-xs flex items-start gap-2">
+                  <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <p className="font-medium">No payment or order delivery is placed online. Payment process is handled at the clinic.</p>
                 </div>
 
                 <button 

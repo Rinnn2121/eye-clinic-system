@@ -15,19 +15,31 @@ export default function AdminLayout() {
     setIsMobileOpen(false);
   }, [location.pathname]);
 
+  // Close desktop sidebar when clicking outside (on the main content)
+  const handleMainContentClick = () => {
+    if (isExpanded) {
+      setIsExpanded(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50">
       
-      {/* Sidebar (Contains notification bell at bottom) */}
-      <AdminSidebar 
-        isExpanded={isExpanded} 
-        onToggleExpand={() => setIsExpanded(!isExpanded)}
-        isMobileOpen={isMobileOpen}
-        onMobileClose={() => setIsMobileOpen(false)}
-      />
+      {/* ✅ Wrapped the sidebar in a div that STOPS the click from bubbling to the main content */}
+      <div onClick={(e) => e.stopPropagation()}>
+        <AdminSidebar 
+          isExpanded={isExpanded} 
+          onToggleExpand={() => setIsExpanded(!isExpanded)}
+          isMobileOpen={isMobileOpen}
+          onMobileClose={() => setIsMobileOpen(false)}
+        />
+      </div>
 
-      {/* Main Content Area — No Top Bar */}
-      <div className="md:pl-20">
+      {/* Main Content Area — Overlaps with the sidebar when it opens */}
+      <div 
+        className="md:pl-20" 
+        onClick={handleMainContentClick}
+      >
         <main className="p-4 md:p-6 lg:p-8 min-h-screen">
           <Outlet />
         </main>

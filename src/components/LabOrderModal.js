@@ -31,21 +31,22 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
     setSaving(true);
 
     try {
-       const orderData = {
+             const orderData = {
         patientName: record.customerName,
         date: formData.date,
         frameCategory: record.frameCategory,
-        specificFrame: formData.specificFrame, // ✅ Save specific frame
+        specificFrame: formData.specificFrame,
         lens: formData.lens,
         tint: formData.tint,
         od: formData.od,
         os: formData.os,
         add: formData.add,
         pd: formData.pd,
-        notes: formData.notes, // ✅ Save instructions
+        notes: formData.notes,
         patientId: record.customerId,
         recordId: record.id,
         totalAmount: record.totalAmount,
+        balance: record.balance, // ✅ Add this line!
         status: 'in_progress',
         createdAt: new Date().toISOString(),
       };

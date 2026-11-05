@@ -36,7 +36,7 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
     'Computerized Eye Examination'
   ];
 
-  // ✅ Fetch customers function (extracted so we can re-use it)
+  // Fetch customers function (extracted so we can re-use it)
   const fetchCustomers = async () => {
     const snap = await getDocs(collection(db, 'customers'));
     const list = [];
@@ -209,7 +209,8 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
                   </div>
                   <h3 className="font-bold text-gray-900 text-lg mb-2">New Customer</h3>
                   <p className="text-sm text-gray-500 mb-6">Register a new customer and create an appointment.</p>
-                  <div className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium group-hover:bg-blue-700">Continue</div>
+                  {/* ✅ Changed to outlined style to match the right side */}
+                  <div className="w-full bg-white border border-blue-600 text-blue-600 py-2.5 rounded-lg font-medium group-hover:bg-blue-50">Continue</div>
                 </div>
                 <div onClick={() => setModalStep(2)} className="group border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 rounded-xl p-6 flex flex-col items-center text-center cursor-pointer transition-all">
                   <div className="text-gray-700 group-hover:text-blue-600 mb-4 transition-colors">
@@ -228,7 +229,12 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
             <div>
               <h3 className="font-bold text-lg text-gray-900 mb-4">Select customer</h3>
               <div className="relative mb-4">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                {/* ✅ Replaced emoji with SVG Search Icon */}
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
                 <input type="text" placeholder="Search by customer name, phone no..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] outline-none" />
               </div>
               <div className="border border-gray-200 rounded-xl overflow-hidden mb-6">
@@ -414,7 +420,6 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
       {/* ✅ UPDATED LOGIC HERE */}
       {isAddingNew && (
         <AddCustomerModal 
-        isWizard={true}
           onClose={async (startVisitId) => {
             setIsAddingNew(false);
             

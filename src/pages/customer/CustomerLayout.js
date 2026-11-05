@@ -1,18 +1,13 @@
 // src/pages/customer/CustomerLayout.js
 
 import React from 'react';
-import { NavLink, Outlet, useNavigate, Link, useLocation } from 'react-router-dom';
+import { NavLink, Outlet, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
 function CustomerLayout() {
-  const { currentUser, userData, logout, resendVerification } = useAuth(); 
-  const navigate = useNavigate();
+  // ✅ Removed 'logout' from here since the button is gone
+  const { currentUser, userData, resendVerification } = useAuth(); 
   const location = useLocation();
-
-  const handleLogout = async () => {
-    await logout();
-    navigate('/');
-  };
 
   const navLinkClass = ({ isActive }) => 
     `block px-6 py-3 font-bold text-[15px] transition-colors rounded-lg ${
@@ -86,11 +81,8 @@ function CustomerLayout() {
           <NavLink to="/customer/wishlist" className={navLinkClass}>Wishlist</NavLink>
         </nav>
 
-        <div className="p-4 border-t border-blue-200">
-          <button onClick={handleLogout} className="w-full py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 transition-colors text-sm">
-            Logout
-          </button>
-        </div>
+        {/* ✅ The Logout Button section has been completely removed from here */}
+
       </div>
 
       {/* ✅ RIGHT CONTENT AREA */}

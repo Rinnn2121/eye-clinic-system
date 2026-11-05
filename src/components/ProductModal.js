@@ -13,7 +13,7 @@ export default function ProductModal({ product, onClose, onSuccess }) {
 
   const [featuredCount, setFeaturedCount] = useState(0);
   
-// ✅ Fetch how many are currently featured
+  // ✅ Fetch how many are currently featured
   useEffect(() => {
     const checkFeaturedCount = async () => {
       const snap = await getDocs(collection(db, 'inventory'));
@@ -25,21 +25,20 @@ export default function ProductModal({ product, onClose, onSuccess }) {
     };
     checkFeaturedCount();
   }, []);
+
   // Form State
-    const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState({
     name: product?.name || '',
     category: product?.category || 'Metal Frame',
     price: product?.price || '',
     description: product?.description || '',
     isActive: product?.isActive !== false,
-    isFeatured: product?.isFeatured || false, // ✅ Added here
+    isFeatured: product?.isFeatured || false, 
     imageUrl: product?.imageUrl || '',
     createdAt: product?.createdAt || new Date().toISOString(),
     updatedAt: product?.updatedAt || new Date().toISOString(),
     updatedBy: product?.updatedBy || loggedInName
   });
-
-  
 
   const [imageFile, setImageFile] = useState(null);
   const [uploading, setUploading] = useState(false);
@@ -75,7 +74,7 @@ export default function ProductModal({ product, onClose, onSuccess }) {
         price: parseFloat(formData.price),
         description: formData.description,
         isActive: formData.isActive,
-        isFeatured: formData.isFeatured, // ✅ Save it
+        isFeatured: formData.isFeatured,
         imageUrl: finalImageUrl,
         updatedAt: new Date().toISOString(),
         updatedBy: loggedInName, 
@@ -219,7 +218,8 @@ export default function ProductModal({ product, onClose, onSuccess }) {
                   </button>
                 </div>
               </div>
-                            {/* ✅ Featured Toggle */}
+
+              {/* ✅ Featured Toggle */}
               <div className="mt-6">
                 <div className="flex justify-between items-center mb-3">
                   <label className="block text-sm font-bold text-gray-800">Featured on Homepage</label>
@@ -293,8 +293,9 @@ export default function ProductModal({ product, onClose, onSuccess }) {
               <button type="button" onClick={onClose} className="flex-1 md:flex-none px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
+              {/* ✅ Changed text to "Save" */}
               <button type="submit" disabled={uploading} className="flex-1 md:flex-none px-6 py-2 bg-[#4A90E2] text-white rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 transition-colors shadow-sm disabled:opacity-50">
-                {uploading ? 'Uploading...' : 'Save Changes'}
+                {uploading ? 'Saving...' : 'Save'}
               </button>
             </div>
 

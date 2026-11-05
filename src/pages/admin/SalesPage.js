@@ -5,13 +5,13 @@ import { collection, getDocs, query, orderBy } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import SalesChart from '../../components/SalesChart';
 import { Link } from 'react-router-dom';
-import TransactionDetailsModal from '../../components/TransactionDetailsModal'; // ✅ Import Modal
+import TransactionDetailsModal from '../../components/TransactionDetailsModal';
 
 function SalesPage() {
   const [timeFilter, setTimeFilter] = useState('This Day');
   const [sales, setSales] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [selectedSale, setSelectedSale] = useState(null); // ✅ Modal State
+  const [selectedSale, setSelectedSale] = useState(null);
 
   const [stats, setStats] = useState({
     totalRevenue: 0,
@@ -128,7 +128,7 @@ function SalesPage() {
         
         // Match the frame name to our categories
         if (categoryMap[frameName] !== undefined) {
-          categoryMap[frameName] += (Number(s.totalAmount) || 0); // ✅ Use totalAmount instead of item price
+          categoryMap[frameName] += (Number(s.totalAmount) || 0);
         } else {
           // If it's something unexpected, add it to Custom
           categoryMap['Custom'] += (Number(s.totalAmount) || 0);
@@ -191,12 +191,6 @@ function SalesPage() {
     if (timeFilter === 'This Week') return 'Week';
     if (timeFilter === 'This Month') return 'Month';
     return 'Year';
-  };
-
-  const clearFilters = () => {
-    setSearchTerm('');
-    setPaymentFilter('All Payment Methods');
-    setStatusFilter('All Status');
   };
 
   const filteredTransactions = sales.filter((sale) => {
@@ -280,7 +274,7 @@ function SalesPage() {
           </div>
         </div>
 
-        {/* Stat Cards */}
+        {/* ✅ Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           
           <div className="bg-[#dbeafe] rounded-2xl p-5 border border-blue-200 shadow-sm flex flex-col justify-between">
@@ -288,10 +282,12 @@ function SalesPage() {
               <div className="flex items-center gap-3 mb-3">
                 <div className="bg-[#818cf8] text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0 shadow-sm">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <circle cx="12" cy="12" r="10" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 16V8h4a3 3 0 0 1 0 6H9m-1-3h6m-6 3h6" />
                   </svg>
                 </div>
-                <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Total Revenue</span>
+                {/* ✅ Changed to text-sm and capitalize */}
+                <span className="text-md font-bold text-gray-700 capitalize tracking-wide">Total Revenue</span>
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">{peso(stats.totalRevenue)}</h2>
             </div>
@@ -306,7 +302,8 @@ function SalesPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
                 </div>
-                <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Completed Transactions</span>
+                {/* ✅ Changed to text-sm and capitalize */}
+                <span className="text-md font-bold text-gray-700 capitalize tracking-wide">Completed Transactions</span>
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">{stats.completedTransactions}</h2>
             </div>
@@ -321,7 +318,8 @@ function SalesPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
                   </svg>
                 </div>
-                <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Products Sold</span>
+                {/* ✅ Changed to text-sm and capitalize */}
+                <span className="text-md font-bold text-gray-700 capitalize tracking-wide">Products Sold</span>
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">{stats.productsSold}</h2>
             </div>
@@ -333,10 +331,12 @@ function SalesPage() {
               <div className="flex items-center gap-3 mb-3">
                 <div className="bg-[#eab308] text-white rounded-full w-12 h-12 flex items-center justify-center flex-shrink-0 shadow-sm">
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <circle cx="12" cy="12" r="10" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 16V8h4a3 3 0 0 1 0 6H9m-1-3h6m-6 3h6" />
                   </svg>
                 </div>
-                <span className="text-sm font-bold text-gray-700 uppercase tracking-wide">Outstanding Payments</span>
+                {/* ✅ Changed to text-sm and capitalize */}
+                <span className="text-md font-bold text-gray-700 capitalize tracking-wide">Outstanding Payments</span>
               </div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">{peso(stats.outstandingPayments)}</h2>
             </div>
@@ -429,14 +429,6 @@ function SalesPage() {
                 <option value="Partial">Partial</option>
               </select>
 
-              <button 
-                onClick={clearFilters}
-                className="text-base text-[#4A90E2] hover:underline font-bold flex items-center gap-1 px-2"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
-                Clear Filters
-              </button>
-
               <Link to="/admin/transactions" className="text-base text-[#4A90E2] hover:underline font-bold ml-auto px-2">
                 View All →
               </Link>
@@ -469,7 +461,6 @@ function SalesPage() {
                     const statusText = sale.paymentStatus === 'paid' || !isPartial ? 'Paid' : 'Partial';
 
                     return (
-                      // ✅ Clickable Row
                       <tr 
                         key={sale.id} 
                         onClick={() => setSelectedSale(sale)}
