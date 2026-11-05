@@ -22,11 +22,12 @@ export default function QuickInventoryModal({ onClose, inventoryList, onItemClic
         </div>
         <div className="p-4 bg-gray-50">
           <input 
-            type="text" 
-            value={search} 
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" 
-          />
+              type="text" 
+              placeholder="Search frames, lenses, packages..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" 
+            />
         </div>
         <div className="flex-1 overflow-y-auto p-2">
           {filtered.length === 0 ? (

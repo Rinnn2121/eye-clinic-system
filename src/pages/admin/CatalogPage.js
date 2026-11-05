@@ -1,10 +1,11 @@
-// src/pages/admin/InventoryPage.js
+// src/pages/admin/CatalogPage.js
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
-import ProductModal from '../../components/ProductModal'; // ✅ Import the new component
+import ProductModal from '../../components/ProductModal';
+import ProductPreviewModal from '../../components/ProductPreviewModal';
 
 function CatalogPage() {
   const { userRole } = useAuth(); 
@@ -13,14 +14,17 @@ function CatalogPage() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('All Products');
   const [sortBy, setSortBy] = useState('Price: Low to High');
 
+  // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12; 
 
-  // ✅ Modal State
+  // ✅ Modal States
+  const [previewProduct, setPreviewProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
 
@@ -59,17 +63,13 @@ function CatalogPage() {
     }
 
     result.sort((a, b) => {
-      // 1. ✅ Push Disabled items to the bottom
       if (a.isActive === false && b.isActive !== false) return 1;
       if (a.isActive !== false && b.isActive === false) return -1;
+      
+      // ✅ Keep featured items at the top
+      if (a.isFeatured && !b.isFeatured) return -1;
+      if (!a.isFeatured && b.isFeatured) return 1;
 
-      // 2. ✅ Push Featured items to the top (if both are active)
-      if (a.isActive !== false && b.isActive !== false) {
-        if (a.isFeatured && !b.isFeatured) return -1;
-        if (!a.isFeatured && b.isFeatured) return 1;
-      }
-
-      // 3. Apply the selected sorting (Price, Name, etc.)
       if (sortBy === 'Price: Low to High') return a.price - b.price;
       if (sortBy === 'Price: High to Low') return b.price - a.price;
       if (sortBy === 'Name: A-Z') return a.name.localeCompare(b.name);
@@ -79,18 +79,26 @@ function CatalogPage() {
     return result;
   }, [products, searchTerm, activeTab, sortBy]);
 
+  // ✅ Pagination Logic
   const totalPages = Math.ceil(processedProducts.length / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = processedProducts.slice(indexOfFirstItem, indexOfLastItem);
 
-  useEffect(() => { setCurrentPage(1); }, [searchTerm, activeTab, sortBy]);
+  // Reset to page 1 when filters change
+  useEffect(() => { 
+    setCurrentPage(1); 
+  }, [searchTerm, activeTab, sortBy]);
 
   const tabs = ['All Products', 'Metal Frame', 'Plastic Frame', 'Lens', 'Coating', 'Package', 'Service'];
 
-  const openEditModal = (item) => {
-    if (!isAdmin) return; 
-    setEditingProduct(item);
+  const handleProductClick = (item) => {
+    setPreviewProduct(item);
+  };
+
+  const handleEditClick = () => {
+    setEditingProduct(previewProduct);
+    setPreviewProduct(null);
     setIsModalOpen(true);
   };
 
@@ -107,7 +115,7 @@ function CatalogPage() {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Catalog</h1>
-            <p className="text-gray-500 text-sm mt-1">Browse and manage your clinic's product catalog.</p>
+            <p className="text-gray-500 text-sm mt-1">Browse and manage frames, lenses and optical accessories.</p>
           </div>
           
           {isAdmin && (
@@ -174,18 +182,24 @@ function CatalogPage() {
             {currentItems.map((item) => (
               <div 
                 key={item.id} 
-                onClick={() => openEditModal(item)}
-                className={`bg-white border border-gray-200 rounded-xl overflow-hidden transition-shadow ${
-                  isAdmin ? 'cursor-pointer hover:shadow-md' : 'cursor-default'
-                }`}
+                onClick={() => handleProductClick(item)}
+                className="bg-white border border-gray-200 rounded-xl overflow-hidden transition-shadow cursor-pointer hover:shadow-md"
               >
-                <div className="w-full h-44 bg-gray-100 flex items-center justify-center border-b border-gray-100 overflow-hidden">
+                <div className="w-full h-44 bg-gray-100 flex items-center justify-center border-b border-gray-100 overflow-hidden relative">
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.name} className="w-full h-full object-contain p-2" />
                   ) : (
                     <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
+                  )}
+                  
+                  {/* ✅ Featured Badge */}
+                  {item.isFeatured && (
+                    <div className="absolute top-2 right-2 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
+                      Featured
+                    </div>
                   )}
                 </div>
 
@@ -209,7 +223,7 @@ function CatalogPage() {
           </div>
         )}
 
-        {/* Pagination */}
+        {/* ✅ Pagination */}
         {processedProducts.length > 0 && (
           <div className="flex justify-center items-center gap-2 mt-6">
             <button
@@ -223,6 +237,7 @@ function CatalogPage() {
             <div className="flex gap-1">
               {[...Array(totalPages)].map((_, i) => {
                 const pageNum = i + 1;
+                // Show ellipsis for large page counts
                 if (totalPages > 7 && pageNum > 3 && pageNum < totalPages - 1 && pageNum !== currentPage) {
                   if (pageNum === 4) return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
                   return null;
@@ -255,7 +270,17 @@ function CatalogPage() {
 
       </div>
 
-      {/* ✅ The Reusable Modal */}
+      {/* ✅ Preview Modal */}
+      {previewProduct && (
+        <ProductPreviewModal 
+          product={previewProduct}
+          isAdmin={isAdmin}
+          onClose={() => setPreviewProduct(null)}
+          onEdit={handleEditClick}
+        />
+      )}
+
+      {/* ✅ Edit/Add Modal */}
       {isAdmin && isModalOpen && (
         <ProductModal 
           product={editingProduct} 

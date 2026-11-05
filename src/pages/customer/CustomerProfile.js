@@ -418,13 +418,18 @@ data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
+                    <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone No. (11 Digits) *</label>
             <input
               type="tel"
+              required
+              maxLength={11}
+              pattern="[0-9]{11}"
+              title="Please enter exactly 11 digits."
               value={profile.phone}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value.replace(/\D/g, '') })}
               className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
+              placeholder="09XXXXXXXXX"
             />
           </div>
 

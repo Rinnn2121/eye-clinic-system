@@ -1,7 +1,7 @@
 // src/pages/admin/CustomerAccountsPage.js
 
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, deleteDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, query, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -16,6 +16,7 @@ function CustomerAccountsPage() {
   // Data States
   const [customerAccounts, setCustomerAccounts] = useState([]);
   const [staffAccounts, setStaffAccounts] = useState([]);
+  const [archivedAccounts, setArchivedAccounts] = useState([]); // ✅ New State
   const [loading, setLoading] = useState(true);
 
   // Filter & Modals
@@ -25,7 +26,7 @@ function CustomerAccountsPage() {
   const [showStaffModal, setShowStaffModal] = useState(false); // ✅ Staff creation modal state
 
   // Load Data
-  const loadData = async () => {
+    const loadData = async () => {
     setLoading(true);
     try {
       // 1. Fetch Pending Customer Accounts
@@ -45,6 +46,17 @@ function CustomerAccountsPage() {
         }
       });
       setStaffAccounts(staffList);
+
+      // ✅ 3. Fetch ARCHIVED Customers
+      const archivedSnap = await getDocs(collection(db, 'customers'));
+      const archivedList = [];
+      archivedSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.isArchived === true) {
+          archivedList.push({ id: doc.id, ...data });
+        }
+      });
+      setArchivedAccounts(archivedList);
 
     } catch (err) {
       console.error('Error loading accounts:', err);
@@ -78,9 +90,31 @@ function CustomerAccountsPage() {
     }
   };
 
+  const handleRestore = async (customerId) => {
+    try {
+      await updateDoc(doc(db, 'customers', customerId), {
+        isArchived: false,
+        restoredAt: new Date().toISOString()
+      });
+      loadData();
+      setAlertConfig({
+        type: 'success',
+        title: 'Account Restored',
+        message: 'The customer has been moved back to the active list.'
+      });
+    } catch (err) {
+      console.error(err);
+      setAlertConfig({ type: 'error', title: 'Error', message: 'Failed to restore account.' });
+    }
+  };
+
   // Filter Logic
-  const getFilteredData = () => {
-    const dataToFilter = activeTab === 'customers' ? customerAccounts : staffAccounts;
+    const getFilteredData = () => {
+    let dataToFilter = [];
+    if (activeTab === 'customers') dataToFilter = customerAccounts;
+    if (activeTab === 'staff') dataToFilter = staffAccounts;
+    if (activeTab === 'archived') dataToFilter = archivedAccounts; // ✅ New Tab
+
     if (!searchTerm) return dataToFilter;
     
     const lower = searchTerm.toLowerCase();
@@ -88,7 +122,8 @@ function CustomerAccountsPage() {
       item.email?.toLowerCase().includes(lower) ||
       item.firstName?.toLowerCase().includes(lower) ||
       item.lastName?.toLowerCase().includes(lower) ||
-      item.name?.toLowerCase().includes(lower)
+      item.name?.toLowerCase().includes(lower) ||
+      item.referenceId?.toLowerCase().includes(lower)
     );
   };
 
@@ -117,10 +152,10 @@ function CustomerAccountsPage() {
         </div>
 
         {/* ✅ Tabs */}
-        <div className="flex border-b border-gray-200">
+        <div className="flex flex-wrap border-b border-gray-200">
           <button
             onClick={() => setActiveTab('customers')}
-            className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
+            className={`py-3 px-6 text-sm md:text-base font-bold border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'customers' 
                 ? 'border-[#4A90E2] text-[#4A90E2]' 
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -128,9 +163,10 @@ function CustomerAccountsPage() {
           >
             Customer Accounts ({customerAccounts.length})
           </button>
+          
           <button
             onClick={() => setActiveTab('staff')}
-            className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
+            className={`py-3 px-6 text-sm md:text-base font-bold border-b-2 transition-colors whitespace-nowrap ${
               activeTab === 'staff' 
                 ? 'border-[#4A90E2] text-[#4A90E2]' 
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -138,7 +174,29 @@ function CustomerAccountsPage() {
           >
             Staff & Admin Accounts ({staffAccounts.length})
           </button>
+          
+          <button
+            onClick={() => setActiveTab('archived')}
+            className={`py-3 px-6 text-sm md:text-base font-bold border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'archived' 
+                ? 'border-[#4A90E2] text-[#4A90E2]' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Archived Customers ({archivedAccounts.length})
+          </button>
         </div>
+
+        <button
+            onClick={() => setActiveTab('archived')}
+            className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
+              activeTab === 'archived' 
+                ? 'border-[#4A90E2] text-[#4A90E2]' 
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Archived Customers ({archivedAccounts.length})
+          </button>
 
         {/* Filter Bar */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2">
@@ -187,47 +245,61 @@ function CustomerAccountsPage() {
                     const isSelf = item.email === currentUser?.email;
                     
                     return (
-                      <tr key={item.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-gray-800 font-medium">
-                          {activeTab === 'customers' 
-                            ? `${item.lastName || ''}, ${item.firstName || ''}`
-                            : item.name || '—'
-                          }
-                          {isSelf && (
-                            <span className="ml-2 text-[10px] font-bold text-[#4A90E2] bg-blue-50 px-2 py-0.5 rounded-full uppercase">You</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 text-gray-600">{item.email || item.id}</td>
-                        
-                        {activeTab === 'customers' && (
-                          <td className="px-6 py-4 text-gray-600">{item.phone || '—'}</td>
-                        )}
-                        
-                        {activeTab === 'staff' && (
-                          <td className="px-6 py-4">
-                            <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${
-                              item.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                            }`}>
-                              {item.role}
-                            </span>
-                          </td>
-                        )}
-                        
-                        <td className="px-6 py-4 text-gray-500 text-sm">
-                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}
-                        </td>
-                        
-                        <td className="px-6 py-4 text-center">
-                          {!isSelf && (
-                            <button
-                              onClick={() => setAccountToDelete({ ...item, type: activeTab === 'customers' ? 'customer' : 'staff' })}
-                              className="bg-red-50 border border-red-200 text-red-600 px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-red-100 transition-colors"
-                            >
-                              Delete
-                            </button>
-                          )}
-                        </td>
-                      </tr>
+                                        <tr key={item.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 text-gray-800 font-medium">
+                      {activeTab === 'customers' || activeTab === 'archived'
+                        ? `${item.lastName || ''}, ${item.firstName || ''}`
+                        : item.name || '—'
+                      }
+                      {/* ✅ Show Ref ID for archived */}
+                      {activeTab === 'archived' && (
+                        <span className="block text-xs text-gray-500 font-mono mt-1">{item.referenceId}</span>
+                      )}
+                      {isSelf && (
+                        <span className="ml-2 text-[10px] font-bold text-[#4A90E2] bg-blue-50 px-2 py-0.5 rounded-full uppercase">You</span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 text-gray-600">{item.email || item.id}</td>
+                    
+                    {(activeTab === 'customers' || activeTab === 'archived') && (
+                      <td className="px-6 py-4 text-gray-600">{item.phone || '—'}</td>
+                    )}
+                    
+                    {activeTab === 'staff' && (
+                      <td className="px-6 py-4">
+                        <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${
+                          item.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                        }`}>
+                          {item.role}
+                        </span>
+                      </td>
+                    )}
+                    
+                    <td className="px-6 py-4 text-gray-500 text-sm">
+                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}
+                    </td>
+                    
+                    <td className="px-6 py-4 text-center">
+                      {/* ✅ Show Restore Button for Archived */}
+                      {activeTab === 'archived' ? (
+                        <button
+                          onClick={() => handleRestore(item.id)}
+                          className="bg-green-50 border border-green-200 text-green-600 px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-green-100 transition-colors"
+                        >
+                          Restore
+                        </button>
+                      ) : (
+                        !isSelf && (
+                          <button
+                            onClick={() => setAccountToDelete({ ...item, type: activeTab === 'customers' ? 'customer' : 'staff' })}
+                            className="bg-red-50 border border-red-200 text-red-600 px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-red-100 transition-colors"
+                          >
+                            Delete
+                          </button>
+                        )
+                      )}
+                    </td>
+                  </tr>
                     );
                   })}
                 </tbody>

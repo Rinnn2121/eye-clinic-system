@@ -79,7 +79,13 @@ function CustomersPage() {
       const q = query(collection(db, 'customers'));
       const snap = await getDocs(q);
       const list = [];
-      snap.forEach((doc) => list.push({ id: doc.id, ...doc.data() }));
+            snap.forEach((doc) => {
+        const data = doc.data();
+        // ✅ Only push to the list if they are NOT archived
+        if (data.isArchived !== true) {
+          list.push({ id: doc.id, ...data });
+        }
+      });
       
       setCustomers(list);
       setFiltered(list);
@@ -153,7 +159,7 @@ function CustomersPage() {
     setPaymentFilter('All Payments');
   };
 
-  const handleNewVisit = (customerId) => navigate(`/admin/patient-record/${customerId}`);
+  const handleStartVisit = (customerId) => navigate(`/admin/patient-record/${customerId}`);
   const handleViewHistory = (customerId) => navigate(`/admin/customer-history/${customerId}`);
 
   // Pagination Calc
@@ -368,13 +374,13 @@ function CustomersPage() {
                         <td className="px-4 py-4">
                           <div className="flex items-center justify-center gap-2">
                             <button
-                              onClick={() => handleNewVisit(c.id)}
-                              className="bg-[#4A90E2] text-white px-3 py-1.5 rounded text-sm font-medium hover:bg-[#4A90E2]/90 transition-colors flex items-center gap-1"
+                              onClick={() => handleStartVisit(c.id)} // ✅ Updated function name
+                              className="bg-[#4A90E2] text-white px-3 py-1 rounded text-xs font-medium hover:bg-[#4A90E2]/90 transition-colors flex items-center gap-1"
                             >
-                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                               </svg>
-                              New Visit
+                              Start Visit {/* ✅ Changed text */}
                             </button>
                             
                             <button

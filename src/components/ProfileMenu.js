@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from './ConfirmModal';
 
-export default function ProfileMenu({ align = 'right', direction = 'down' }) {
+export default function ProfileMenu({ align = 'right', direction = 'down', showManageAccounts = false }) {
   const { currentUser, userRole, userData, logout } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -85,8 +85,8 @@ export default function ProfileMenu({ align = 'right', direction = 'down' }) {
           </div>
 
           <div className="p-2">
-            {/* Admin-only: Manage Accounts */}
-            {userRole === 'admin' && (
+            {/* ✅ Admin-only: Manage Accounts (Now properly checks BOTH the prop and the role) */}
+            {showManageAccounts && userRole === 'admin' && (
               <>
                 <Link
                   to="/admin/accounts"

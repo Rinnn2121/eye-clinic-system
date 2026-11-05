@@ -2,12 +2,13 @@
 
 import React, { useState } from 'react';
 import { doc, setDoc } from 'firebase/firestore';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
+import { createUserWithEmailAndPassword, sendEmailVerification } from 'firebase/auth'; // ✅ Added sendEmailVerification
 import { db } from '../firebase/config';
 import { secondaryAuth } from '../firebase/secondary';
 import ConfirmModal from './ConfirmModal';
+import emailjs from '@emailjs/browser'; // ✅ Added EmailJS
 
-export default function CreateStaffModal({ onClose }) {
+export default function CreateStaffModal({ onClose, onSuccess }) {
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -18,38 +19,75 @@ export default function CreateStaffModal({ onClose }) {
   const [creating, setCreating] = useState(false);
   const [alertConfig, setAlertConfig] = useState(null);
 
+  // ✅ EMAILJS CONFIG - Replace these with your actual IDs
+  const EMAILJS_SERVICE_ID = 'service_qd6q6ox'; 
+  const EMAILJS_TEMPLATE_ID = 'template_agxoowy'; // (Change this to your "Welcome Staff" template ID)
+  const EMAILJS_PUBLIC_KEY = 'EnPJnnKQXm7ASqkp9';
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setCreating(true);
 
     try {
-      // 1. Create Firebase Auth user via secondary app (admin stays logged in)
+      // 1. Create Firebase Auth user via secondary app
       const userCredential = await createUserWithEmailAndPassword(
         secondaryAuth,
         formData.email.trim(),
         formData.password
       );
 
-      // 2. Save the user doc in Firestore
+      const newUser = userCredential.user;
+
+      // 2. ✅ Send Firebase Verification Email
+      // We do this immediately so they can verify their account.
+      try {
+        await sendEmailVerification(newUser);
+      } catch (verifyErr) {
+        console.error("Failed to send verification email:", verifyErr);
+      }
+
+      // 3. Save the user doc in Firestore
       await setDoc(doc(db, 'users', formData.email.trim()), {
         email: formData.email.trim(),
         role: formData.role,
         name: `${formData.firstName.trim()} ${formData.lastName.trim()}`.trim(),
-        uid: userCredential.user.uid,
+        uid: newUser.uid,
         createdAt: new Date().toISOString()
       });
 
-      // 3. Sign out from secondary app
+      // 4. ✅ Send EmailJS Welcome Email with Temporary Password
+      // (Wrapped in try/catch so if EmailJS fails, the account still gets created)
+      try {
+        await emailjs.send(
+          EMAILJS_SERVICE_ID,
+          EMAILJS_TEMPLATE_ID,
+          {
+            to_name: formData.firstName,
+            to_email: formData.email.trim(),
+            role: formData.role,
+            temp_password: formData.password,
+            login_link: window.location.origin + '/login' // Sends them to your login page
+          },
+          EMAILJS_PUBLIC_KEY
+        );
+        console.log('Welcome email sent successfully.');
+      } catch (emailError) {
+        console.error('EmailJS failed to send welcome email:', emailError);
+        // We don't block the account creation if the email fails
+      }
+
+      // 5. Sign out from secondary app
       await secondaryAuth.signOut();
 
       setAlertConfig({
         type: 'success',
         title: 'Account Created!',
-        message: `${formData.firstName} can now log in at /login with ${formData.email}.`
+        message: `A verification email has been sent to ${formData.email}. They can now log in using the temporary password provided.`
       });
 
       // Reset form
       setFormData({ firstName: '', lastName: '', email: '', password: '', role: 'staff' });
+      
     } catch (err) {
       console.error(err);
       let errorMessage = err.message;
@@ -114,7 +152,7 @@ export default function CreateStaffModal({ onClose }) {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">Password *</label>
+              <label className="block text-xs font-bold text-gray-700 mb-1">Temporary Password *</label>
               <input
                 required
                 type="text"
@@ -124,7 +162,7 @@ export default function CreateStaffModal({ onClose }) {
                 placeholder="Minimum 6 characters"
               />
               <p className="text-[10px] text-gray-500 mt-1">
-                Share this temporary password with the staff member.
+                This password will be included in the welcome email.
               </p>
             </div>
 
@@ -172,6 +210,9 @@ export default function CreateStaffModal({ onClose }) {
           isAlert
           onConfirm={() => {
             setAlertConfig(null);
+            if (alertConfig.type === 'success' && onSuccess) {
+              onSuccess(); // Tell the parent to refresh the list
+            }
             if (alertConfig.type === 'success') onClose();
           }}
         />

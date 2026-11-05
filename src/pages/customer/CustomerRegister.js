@@ -104,12 +104,19 @@ function CustomerRegister() {
                   value={formData.nickname} onChange={handleChange}
                 />
               </div>
-              <div>
-                <label className="block text-gray-700 font-medium mb-1 text-sm">Phone Number *</label>
+                            <div>
+                <label className="block text-gray-700 font-medium mb-1 text-sm">Phone No.</label>
                 <input
-                  type="tel" name="phone" required
+                  type="tel" 
+                  name="phone" 
+                  required 
+                  maxLength={11}
+                  pattern="[0-9]{11}"
+                  title="Please enter exactly 11 digits."
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-                  value={formData.phone} onChange={handleChange}
+                  value={formData.phone} 
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
+                  placeholder="09XXXXXXXXX"
                 />
               </div>
             </div>

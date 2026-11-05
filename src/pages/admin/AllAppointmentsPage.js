@@ -16,20 +16,20 @@ function AllAppointmentsPage() {
   const [serviceFilter, setServiceFilter] = useState('All Service');
   const [statusFilter, setStatusFilter] = useState('All Status');
   
-  // ✅ Date Range Filter States
+  // Date Range Filter States
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // ✅ Changed to 10 per page
+  const itemsPerPage = 10; 
 
   // Modal & Alert States
   const [selectedAppointment, setSelectedAppointment] = useState(null); 
   const [apptToCancel, setApptToCancel] = useState(null); 
   const [alertConfig, setAlertConfig] = useState(null); 
 
-  // ✅ Fetch Appointments
+  // Fetch Appointments
   const fetchAppointments = async () => {
     try {
       const snap = await getDocs(collection(db, 'appointments'));
@@ -92,7 +92,7 @@ function AllAppointmentsPage() {
     fetchAppointments();
   }, []);
 
-  // ✅ Handle Cancel Appointment
+  // Handle Cancel Appointment
   const handleCancelConfirm = async () => {
     if (!apptToCancel) return;
 
@@ -119,7 +119,7 @@ function AllAppointmentsPage() {
     }
   };
 
-  // ✅ Handle Confirm Appointment
+  // Handle Confirm Appointment
   const handleConfirmAppt = async (apt) => {
     try {
       await updateDoc(doc(db, 'appointments', apt.id), {
@@ -141,11 +141,10 @@ function AllAppointmentsPage() {
     }
   };
 
-  // ✅ Filter & Search Logic
+  // Filter & Search Logic
   const filteredAppointments = useMemo(() => {
     let result = [...appointments];
 
-    // Search
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(a => 
@@ -153,16 +152,13 @@ function AllAppointmentsPage() {
         a.phone?.includes(lower)
       );
     }
-    // Service
     if (serviceFilter !== 'All Service') {
       result = result.filter(a => a.reason === serviceFilter);
     }
-    // Status
     if (statusFilter !== 'All Status') {
       result = result.filter(a => a.status === statusFilter);
     }
 
-    // ✅ Date Range Filter
     if (startDate) {
       result = result.filter(a => a.date >= startDate);
     }
@@ -173,18 +169,15 @@ function AllAppointmentsPage() {
     return result;
   }, [appointments, searchTerm, serviceFilter, statusFilter, startDate, endDate]);
 
-  // Reset page when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, serviceFilter, statusFilter, startDate, endDate]);
 
-  // Pagination Calculation
   const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredAppointments.slice(indexOfFirstItem, indexOfLastItem);
 
-  // Clear Filters
   const clearFilters = () => {
     setSearchTerm('');
     setServiceFilter('All Service');
@@ -197,48 +190,62 @@ function AllAppointmentsPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="w-full mx-auto">
         
-        {/* Header */}
-        <div className="flex justify-between items-center mb-6">
-          <div>
+        {/* HEADER ROW */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+          <div className="flex flex-col gap-1">
+            <Link 
+              to="/admin/appointments" 
+              className="text-sm text-[#4A90E2] flex items-center gap-1 font-bold transition-colors mb-2 w-fit"
+            >
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
+              Back to Appointments
+            </Link>
             <h1 className="text-3xl font-bold text-gray-900">All Appointments</h1>
-            <p className="text-gray-500 text-base mt-1">View and manage the complete history of appointments.</p>
           </div>
-          <Link to="/admin/appointments" className="text-gray-400 hover:text-gray-700 text-3xl leading-none">
-            &times;
-          </Link>
-        </div>
 
-        {/* ✅ Date Range Filter */}
-        <div className="flex flex-wrap items-center gap-3 mb-4 bg-white p-3 rounded-xl border border-gray-200 shadow-sm w-fit">
-          <span className="text-sm font-bold text-gray-700 ml-1">From:</span>
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-[#4A90E2]"
-          />
-          <span className="text-sm font-bold text-gray-700">To:</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-[#4A90E2]"
-          />
+          <div className="flex flex-wrap items-center gap-3 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
+            <span className="text-sm font-bold text-gray-700 ml-1">From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-[#4A90E2]"
+            />
+            <span className="text-sm font-bold text-gray-700">To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-1.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-[#4A90E2]"
+            />
+          </div>
         </div>
 
         {/* Filter Bar */}
-        <div className="flex flex-wrap items-center gap-3 mb-6 bg-white p-2 rounded-xl border border-gray-200 shadow-sm">
-          <div className="relative flex-1 min-w-[200px]">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 flex flex-wrap items-center gap-3 mb-6">
+          
+          <div className="relative flex-1 min-w-[250px]">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </span>
             <input
               type="text"
               placeholder="Search by customer name, phone no..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-4 pr-4 py-2 border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
+              className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
             />
           </div>
           
-          <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-base bg-white text-gray-600 outline-none">
+          <select 
+            value={serviceFilter} 
+            onChange={(e) => setServiceFilter(e.target.value)} 
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
+          >
             <option value="All Service">All Service</option>
             <option value="Eye Examination">Eye Examination</option>
             <option value="Dry Eye Test">Dry Eye Test</option>
@@ -247,7 +254,11 @@ function AllAppointmentsPage() {
             <option value="Prescribing">Prescribing</option>
           </select>
 
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-base bg-white text-gray-600 outline-none">
+          <select 
+            value={statusFilter} 
+            onChange={(e) => setStatusFilter(e.target.value)} 
+            className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
+          >
             <option value="All Status">All Status</option>
             <option value="Pending">Pending</option>
             <option value="Scheduled">Scheduled</option>
@@ -255,8 +266,13 @@ function AllAppointmentsPage() {
             <option value="Cancelled">Cancelled</option>
           </select>
 
-          <button onClick={clearFilters} className="text-base text-[#4A90E2] hover:underline font-bold flex items-center gap-1 ml-auto px-4">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" /></svg>
+          <button 
+            onClick={clearFilters} 
+            className="text-sm text-[#4A90E2] hover:underline font-bold flex items-center gap-1 ml-auto px-4"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
+            </svg>
             Clear All Filters
           </button>
         </div>
@@ -297,7 +313,8 @@ function AllAppointmentsPage() {
                         <div className="font-semibold text-gray-800 text-base">{apt.customerName || 'Walk-in'}</div>
                         <div className="text-sm text-gray-500">{apt.phone || 'N/A'}</div>
                       </td>
-                      <td className="px-6 py-4 text-gray-600">
+                      {/* ✅ Added max-w and truncate here */}
+                      <td className="px-6 py-4 text-gray-600 truncate max-w-[250px]">
                         {apt.reason}
                       </td>
                       <td className="px-6 py-4">

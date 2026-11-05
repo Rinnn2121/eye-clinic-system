@@ -10,7 +10,7 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [customerSearch, setCustomerSearch] = useState('');
   const [allCustomers, setAllCustomers] = useState([]);
-  const [existingAppts, setExistingAppts] = useState([]); // ✅ Store appointments for overlap check
+  const [existingAppts, setExistingAppts] = useState([]); 
   const [isAddingNew, setIsAddingNew] = useState(false);
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -36,20 +36,22 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
     'Computerized Eye Examination'
   ];
 
+  // ✅ Fetch customers function (extracted so we can re-use it)
+  const fetchCustomers = async () => {
+    const snap = await getDocs(collection(db, 'customers'));
+    const list = [];
+    snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
+    setAllCustomers(list);
+  };
+
   // Fetch customers when reaching Step 2
   useEffect(() => {
-    const fetchCustomers = async () => {
-      if (modalStep === 2) {
-        const snap = await getDocs(collection(db, 'customers'));
-        const list = [];
-        snap.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
-        setAllCustomers(list);
-      }
-    };
-    fetchCustomers();
+    if (modalStep === 2) {
+      fetchCustomers();
+    }
   }, [modalStep]);
 
-  // ✅ Fetch existing appointments for the selected date to check overlap
+  // Fetch existing appointments for the selected date to check overlap
   useEffect(() => {
     const fetchExistingAppts = async () => {
       if (!formData.date) return;
@@ -59,7 +61,6 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
       const list = [];
       snap.forEach(doc => {
         const data = doc.data();
-        // Only care about pending/confirmed/scheduled appointments
         if (data.status !== 'Cancelled' && data.status !== 'Completed') {
           list.push(data);
         }
@@ -77,10 +78,8 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
     }
   };
 
-  // ✅ Helper to check if time is in the past (Only applies if date is today)
   const isTimePast = () => {
     if (formData.date !== todayStr) return false;
-
     const now = new Date();
     const currentTimeStr = now.toTimeString().slice(0, 5);
     return formData.time < currentTimeStr;
@@ -91,21 +90,15 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
     return formData.time < '09:00' || formData.time > '17:30';
   };
 
-  // ✅ Helper to check for 30-minute time slot overlap
   const isTimeSlotTaken = () => {
     if (!formData.time || existingAppts.length === 0) return false;
-
-    // Convert selected time to minutes
     const [selHours, selMins] = formData.time.split(':').map(Number);
     const selectedTimeInMins = selHours * 60 + selMins;
 
     for (const appt of existingAppts) {
       if (!appt.time) continue;
-      
       const [existHours, existMins] = appt.time.split(':').map(Number);
       const existTimeInMins = existHours * 60 + existMins;
-
-      // Check if the times are within 30 minutes of each other
       if (Math.abs(selectedTimeInMins - existTimeInMins) < 30) {
         return true;
       }
@@ -114,7 +107,6 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
   };
 
   const handleSubmit = async () => {
-    // Reset error
     setErrorMsg('');
 
     if (selectedServices.length === 0) {
@@ -122,7 +114,6 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
       return;
     }
 
-    // ✅ Time Restriction: 9:00 AM to 5:30 PM (17:30)
     if (formData.time < '09:00' || formData.time > '17:30') {
       setErrorMsg("The clinic only accepts appointments between 9:00 AM and 5:30 PM.");
       return;
@@ -148,7 +139,6 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
         createdAt: new Date().toISOString()
       });
 
-            // ✅ Notify Admin (NEW)
       await addDoc(collection(db, 'notifications'), {
         recipient: 'admin',
         type: 'booking',
@@ -276,7 +266,6 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
               <h3 className="font-bold text-lg text-gray-900 mb-1">Appointment Details</h3>
               <p className="text-sm text-gray-500 mb-6">Set the date, time and service for the appointment.</p>
               
-              {/* ✅ Show Error Message */}
               {errorMsg && (
                 <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4 text-sm">
                   {errorMsg}
@@ -307,7 +296,6 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
                     }`}
                   />
                   
-                  {/* ✅ INLINE WARNINGS */}
                   {isOutsideClinicHours() && (
                     <p className="text-xs text-red-500 mt-1 font-medium">
                       The clinic only accepts appointments between 9:00 AM and 5:30 PM.
@@ -423,13 +411,29 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
         </div>
       </div>
 
+      {/* ✅ UPDATED LOGIC HERE */}
       {isAddingNew && (
         <AddCustomerModal 
-          onClose={(startVisitId) => {
+        isWizard={true}
+          onClose={async (startVisitId) => {
             setIsAddingNew(false);
+            
             if (startVisitId) {
-              setModalStep(2);
+              // If a new customer was created, fetch the latest list
+              await fetchCustomers();
+              
+              // Find the newly created customer
+              const snap = await getDocs(collection(db, 'customers'));
+              const newCust = snap.docs.find(d => d.id === startVisitId);
+              
+              if (newCust) {
+                // Set them as the selected customer
+                setSelectedCustomer({ id: newCust.id, ...newCust.data() });
+                // Jump straight to Step 3 (Appointment Details)
+                setModalStep(3); 
+              }
             } else {
+              // If they cancelled, just go back to step 1
               setModalStep(1);
             }
           }}

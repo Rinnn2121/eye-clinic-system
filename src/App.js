@@ -112,7 +112,7 @@ function App() {
               </PrivateRoute>
             } />
               <Route path="/admin/accounts" element={
-              <PrivateRoute allowedRoles={['admin', 'staff']}>
+              <PrivateRoute allowedRoles={['admin']}>
                 <CustomerAccountsPage />
               </PrivateRoute>
             } />

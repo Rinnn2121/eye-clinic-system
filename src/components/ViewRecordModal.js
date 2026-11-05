@@ -262,24 +262,24 @@ function ViewRecordModal({ record, customer, onClose, onUpdatePayment }) {
             </div>
           </div>
 
-          {/* Notes */}
-          <div className="space-y-3">
+          {/* ✅ UPDATED NOTES SECTION */}
+          <div className="space-y-4">
             <div>
-              <label className="block text-[11px] text-gray-700 mb-1">Prescription Notes / Remarks</label>
-              <div className="w-full border border-gray-300 rounded-lg p-2 text-sm min-h-[60px] bg-gray-50">
-                {record.prescriptionNotes || ''}
+              <label className="block text-[11px] text-gray-700 font-bold mb-1">Prescription Notes / Remarks</label>
+              <div className="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 h-auto min-h-[50px] whitespace-pre-wrap">
+                {record.prescriptionNotes || <span className="text-gray-400 italic">No remarks</span>}
               </div>
             </div>
             <div>
-              <label className="block text-[11px] text-gray-700 mb-1">Additional Notes</label>
-              <div className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-gray-50">
-                {record.additionalNotes || ''}
+              <label className="block text-[11px] text-gray-700 font-bold mb-1">Additional Notes</label>
+              <div className="w-full border border-gray-300 rounded-lg p-3 text-sm bg-gray-50 h-auto min-h-[50px] whitespace-pre-wrap">
+                {record.additionalNotes || <span className="text-gray-400 italic">No additional notes</span>}
               </div>
             </div>
           </div>
 
           {/* Package Details (Read Only) */}
-          <div className="space-y-3">
+          <div className="space-y-3 pt-2">
             <div className="flex items-center gap-2">
               <span className="text-[11px] font-bold w-20 text-gray-700">FRAME:</span>
               <div className="flex-1 border border-gray-300 rounded-md px-3 py-1.5 text-sm bg-gray-50">

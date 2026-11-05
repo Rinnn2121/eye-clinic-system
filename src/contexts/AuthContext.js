@@ -92,6 +92,19 @@ export function AuthProvider({ children }) {
     setUserData(prev => ({ ...prev, photoUrl: newPhotoUrl }));
   };
 
+    // ✅ Add this to force context to fetch the latest user data
+  const refreshUserData = async () => {
+    if (!currentUser?.email) return;
+    try {
+      const userDoc = await getDoc(doc(db, 'users', currentUser.email));
+      if (userDoc.exists()) {
+        setUserData(userDoc.data());
+      }
+    } catch (err) {
+      console.error("Error refreshing user data:", err);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setLoading(true); 
@@ -139,8 +152,9 @@ export function AuthProvider({ children }) {
     signup,
     logout,
     loading,
-    resendVerification, // ✅ Expose this
-    updateProfilePicture 
+    resendVerification,
+    updateProfilePicture,
+    refreshUserData // ✅ Expose it
   };
 
   return (

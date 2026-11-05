@@ -152,7 +152,6 @@ function AppointmentPage() {
     const completed = appointments.filter(a => a.status === 'Completed').length;
     const cancelled = appointments.filter(a => a.status === 'Cancelled').length;
     
-    // ✅ Calculate Pending and Scheduled/Upcoming
     const pending = appointments.filter(a => a.status === 'Pending').length;
     const scheduled = appointments.filter(a => a.status === 'Scheduled').length;
     
@@ -254,20 +253,7 @@ function AppointmentPage() {
         </div>
 
         {/* TOP STAT CARDS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-[#fef3c7] rounded-2xl p-5 relative border border-yellow-200 shadow-sm flex items-center gap-4">
-            <div className="bg-[#eab308] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-inner flex-shrink-0">
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <div>
-              <p className="text-base font-bold text-gray-800">Pending Confirmation</p>
-              <h2 className="text-3xl font-bold text-gray-900">{stats.pending}</h2>
-              <p className="text-xs text-gray-500 mt-1">Appointments need confirmation</p>
-            </div>
-          </div>
-
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="bg-[#dbeafe] rounded-2xl p-5 relative border border-blue-200 shadow-sm flex items-center gap-4">
             <div className="bg-[#4A90E2] text-white w-12 h-12 rounded-full flex items-center justify-center shadow-inner flex-shrink-0">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -275,7 +261,7 @@ function AppointmentPage() {
               </svg>
             </div>
             <div>
-              <p className="text-base font-bold text-gray-800">Confirmed/Upcoming</p>
+              <p className="text-base font-bold text-gray-800">Confirmed / Upcoming</p>
               <h2 className="text-3xl font-bold text-gray-900">{stats.scheduled}</h2>
               <p className="text-xs text-gray-500 mt-1">Appointments scheduled this week</p>
             </div>
@@ -324,15 +310,22 @@ function AppointmentPage() {
           
           <div className="lg:col-span-8 flex flex-col gap-4">
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2 flex flex-wrap items-center gap-3">
+              
               <div className="relative flex-1 min-w-[200px]">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
                 <input
                   type="text"
                   placeholder="Search by customer name, phone no..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-4 pr-4 py-2 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
+                  className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
                 />
               </div>
+
               <select value={serviceFilter} onChange={(e) => setServiceFilter(e.target.value)} className="border border-gray-300 rounded-lg px-3 py-2 text-base bg-white text-gray-600 outline-none">
                 <option value="All Service">All Service</option>
                 <option value="Eye Examination">Eye Examination</option>
@@ -353,10 +346,11 @@ function AppointmentPage() {
               </Link>
             </div>
 
+            {/* ✅ SCROLLABLE TABLE CONTAINER */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
-              <div className="overflow-x-auto flex-1">
-                <table className="w-full text-base">
-                  <thead>
+              <div className="overflow-y-auto max-h-[500px]">
+                <table className="w-full text-base relative">
+                  <thead className="sticky top-0 z-10">
                     <tr className="bg-[#dbeafe] text-gray-700 text-left border-b border-gray-200">
                       <th className="px-5 py-3 font-bold">Date & Time</th>
                       <th className="px-5 py-3 font-bold">Customer</th>
@@ -368,7 +362,8 @@ function AppointmentPage() {
                     {filteredAppointments.length === 0 ? (
                       <tr><td colSpan="4" className="text-center py-8 text-gray-500 text-base">No appointments found.</td></tr>
                     ) : (
-                      filteredAppointments.slice(0, 5).map((apt) => (
+                      // ✅ Removed .slice(0, 5) so it shows ALL filtered appointments
+                      filteredAppointments.map((apt) => (
                         <tr 
                           key={apt.id} 
                           onClick={() => setSelectedAppointment(apt)}
@@ -410,6 +405,7 @@ function AppointmentPage() {
 
           {/* RIGHT COLUMN: Calendar & Schedule */}
           <div className="lg:col-span-4 flex flex-col gap-4">
+            
             <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex-shrink-0">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-xl text-gray-800 flex items-center gap-2">
@@ -500,11 +496,12 @@ function AppointmentPage() {
                 )}
               </div>
             </div>
+
           </div>
         </div>
       </div>
 
-      {/* ✅ Pending Modal (With Confirm All logic passed in) */}
+      {/* ✅ Pending Modal */}
       {showPendingModal && (
         <PendingAppointmentsModal 
           pendingAppointments={pendingAppointmentsList}

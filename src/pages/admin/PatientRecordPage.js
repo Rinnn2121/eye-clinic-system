@@ -47,6 +47,10 @@ function PatientRecordPage() {
   const [showLabModal, setShowLabModal] = useState(false);
   const [savedRecordForLab, setSavedRecordForLab] = useState(null);
 
+  // ✅ State for Additional Charges
+  const [additionalCharges, setAdditionalCharges] = useState([]);
+  const [newCharge, setNewCharge] = useState({ description: '', amount: '' });
+
   const [record, setRecord] = useState({
     date: new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0],
     firstName: '', lastName: '', nickname: '', address: '', age: '', phone: '', occupation: '',
@@ -66,8 +70,12 @@ function PatientRecordPage() {
     customLens: '',
     customCoating: '',
     
-    total: 0, deposit: '', balance: 0,
-    paymentStatus: 'pending', paymentMethod: 'Cash',
+    frameSubtotal: 0, // ✅ New field
+    total: 0, 
+    deposit: '', 
+    balance: 0,
+    paymentStatus: 'pending', 
+    paymentMethod: 'Cash',
     optometrist: '',
     
     isManualTotal: false,
@@ -128,20 +136,25 @@ function PatientRecordPage() {
     load();
   }, [customerId, navigate]);
 
-  // ✅ Auto-calculate total based on Frame Type (SAFE FROM INFINITE LOOPS)
+  // ✅ Auto-calculate subtotal and total based on Frame Type + Additional Charges
   useEffect(() => {
-    if (record.isManualTotal) return;
-    if (record.frameText === 'Custom' || record.frameText === 'Own Frame') return; 
+    const basePrice = record.isManualTotal 
+      ? Number(record.frameSubtotal) || 0 
+      : (FRAME_TYPES[record.frameText] || 0);
 
-    const basePrice = FRAME_TYPES[record.frameText] || 0;
-    
-    // Only update state if the price is actually different
-    if (record.total !== basePrice) {
-      setRecord(p => ({ ...p, total: basePrice }));
+    const chargesTotal = additionalCharges.reduce((sum, charge) => sum + Number(charge.amount || 0), 0);
+    const newTotal = basePrice + chargesTotal;
+
+    if (record.total !== newTotal || record.frameSubtotal !== basePrice) {
+      setRecord(p => ({ 
+        ...p, 
+        frameSubtotal: basePrice,
+        total: newTotal 
+      }));
     }
-  }, [record.frameText, record.isManualTotal, record.total]);
+  }, [record.frameText, record.isManualTotal, record.frameSubtotal, additionalCharges, record.total]);
 
-  // ✅ Auto-calculate balance based on Deposit (SAFE FROM INFINITE LOOPS)
+  // ✅ Auto-calculate balance based on Deposit
   useEffect(() => {
     const deposited = Number(record.deposit) || 0;
     const total = Number(record.total) || 0;
@@ -154,7 +167,6 @@ function PatientRecordPage() {
 
     const newBalance = balance > 0 ? balance : 0;
 
-    // Only update state if the balance/status is actually different
     if (record.balance !== newBalance || record.paymentStatus !== calculatedStatus) {
       setRecord((p) => ({ 
         ...p, 
@@ -163,6 +175,17 @@ function PatientRecordPage() {
       }));
     }
   }, [record.deposit, record.total, record.balance, record.paymentStatus]);
+
+  // ✅ Handle Adding/Removing Custom Charges
+  const handleAddCharge = () => {
+    if (!newCharge.description || !newCharge.amount) return;
+    setAdditionalCharges([...additionalCharges, { ...newCharge, amount: Number(newCharge.amount) }]);
+    setNewCharge({ description: '', amount: '' });
+  };
+
+  const handleRemoveCharge = (index) => {
+    setAdditionalCharges(additionalCharges.filter((_, i) => i !== index));
+  };
 
   const handleSave = async () => {
     if (!record.newODsph && !record.newOSsph) {
@@ -223,6 +246,11 @@ function PatientRecordPage() {
         frame: { name: finalFrame },
         lensType: { name: finalLens },
         coating: { name: finalCoating },
+        
+        // ✅ New Price Breakdown Saved Here
+        frameSubtotal: record.frameSubtotal,
+        additionalCharges: additionalCharges,
+        
         total: record.total,
         amountPaid: Number(record.deposit) || 0, 
         balance: record.balance,
@@ -245,6 +273,16 @@ function PatientRecordPage() {
       });
 
       // 3. Save the order for sales tracking
+      // ✅ We map the additional charges into the items array so they show up in Sales Reports
+      const orderItems = [
+        { name: finalFrame || 'Frame', category: 'Frame', qty: 1, price: record.frameSubtotal },
+        { name: finalLens || 'Lens', category: 'Lens', qty: 1, price: 0 },
+        { name: finalCoating || 'Coating', category: 'Coating', qty: 1, price: 0 },
+        ...additionalCharges.map(charge => ({
+           name: charge.description, category: 'Additional Charge', qty: 1, price: Number(charge.amount)
+        }))
+      ];
+
       await addDoc(collection(db, 'orders'), {
         receiptNo: generatedReceipt || '', 
         customerId: customerId || '', 
@@ -257,11 +295,7 @@ function PatientRecordPage() {
         paymentStatus: record.paymentStatus || 'pending', 
         paymentMethod: record.paymentMethod || 'Cash', 
         orderDate: new Date().toISOString(),
-        items: [
-          { name: finalFrame || 'Frame', category: record.frameText || 'Frame', qty: 1, price: FRAME_TYPES[record.frameText] || 0 },
-          { name: finalLens || 'Lens', category: 'Lens', qty: 1, price: 0 },
-          { name: finalCoating || 'Coating', category: 'Coating', qty: 1, price: 0 },
-        ],
+        items: orderItems,
       });
 
       // 4. Mark appointment as completed
@@ -427,9 +461,27 @@ function PatientRecordPage() {
         </div>
 
         {/* NOTES */}
-        <div className="mb-6 space-y-3">
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Prescription Notes / Remarks</label><textarea value={record.prescriptionNotes} onChange={(e) => setRecord({ ...record, prescriptionNotes: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" rows="2" /></div>
-          <div><label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label><input type="text" value={record.additionalNotes} onChange={(e) => setRecord({ ...record, additionalNotes: e.target.value })} className="w-full border border-gray-300 rounded-lg p-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]" /></div>
+                {/* NOTES */}
+        <div className="mb-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Prescription Notes / Remarks</label>
+            <textarea 
+              value={record.prescriptionNotes} 
+              onChange={(e) => setRecord({ ...record, prescriptionNotes: e.target.value })} 
+              className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] resize-y min-h-[80px] whitespace-pre-wrap" 
+              placeholder="Type any prescription remarks here..."
+            />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Additional Notes</label>
+            <textarea 
+              value={record.additionalNotes} 
+              onChange={(e) => setRecord({ ...record, additionalNotes: e.target.value })} 
+              className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] resize-y min-h-[80px] whitespace-pre-wrap" 
+              placeholder="Type any additional notes here..."
+            />
+          </div>
         </div>
 
         {/* ✅ FRAME, LENS, COATING SECTION */}
@@ -499,25 +551,88 @@ function PatientRecordPage() {
           
         </div>
 
-        {/* PAYMENT SECTION */}
-        <div className="space-y-3 mb-6 bg-gray-50 p-4 rounded-xl border border-gray-200">
-          <div className="flex items-center gap-2 border-t pt-2">
-            <span className="text-sm font-bold w-20">TOTAL:</span>
+        {/* ✅ NEW PAYMENT SECTION WITH SUBTOTAL & CHARGES */}
+        <div className="space-y-4 mb-6 bg-gray-50 p-5 rounded-xl border border-gray-200 shadow-sm">
+          
+          {/* Frame Subtotal */}
+          <div className="flex items-center gap-4 border-b border-gray-200 pb-3">
+            <span className="text-sm font-medium w-28 text-gray-600">FRAME SUBTOTAL:</span>
             <div className="flex-1 flex items-center">
-              <span className="text-lg font-bold mr-1">₱</span>
+              <span className="text-sm font-bold mr-1">₱</span>
               <input
-              type="number"
-              min="0"
-              value={record.total}
-              onChange={(e) => {
-                setRecord({ ...record, total: Number(e.target.value), isManualTotal: true });
-              }}
-              className="w-full text-lg font-bold outline-none bg-transparent border-b border-gray-300 focus:border-[#4A90E2]"
+                type="number"
+                min="0"
+                value={record.frameSubtotal || 0}
+                onChange={(e) => {
+                  setRecord({ ...record, frameSubtotal: Number(e.target.value), isManualTotal: true });
+                }}
+                className="w-full text-sm font-bold outline-none bg-transparent border-b border-gray-300 focus:border-[#4A90E2]"
               />
-               </div>
+            </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium w-20 text-gray-600">DEPOSIT:</span>
+
+          {/* Additional Charges */}
+          <div className="border-b border-gray-200 pb-3">
+            <span className="block text-sm font-medium text-gray-600 mb-2">ADDITIONAL CHARGES:</span>
+            
+            {additionalCharges.length > 0 && (
+              <div className="space-y-2 mb-3">
+                {additionalCharges.map((charge, index) => (
+                  <div key={index} className="flex justify-between items-center text-sm bg-white p-2 border border-gray-200 rounded shadow-sm">
+                    <span className="font-medium">{charge.description}</span>
+                    <div className="flex items-center gap-4">
+                      <span className="font-bold">₱{Number(charge.amount).toLocaleString()}</span>
+                      <button type="button" onClick={() => handleRemoveCharge(index)} className="text-red-400 hover:text-red-600 font-bold px-2 text-lg leading-none">
+                        &times;
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Add Charge Inputs */}
+            <div className="flex gap-2">
+              <input 
+                type="text" 
+                placeholder="e.g. Rush Fee, Special Lens" 
+                value={newCharge.description}
+                onChange={(e) => setNewCharge({...newCharge, description: e.target.value})}
+                className="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
+              />
+              <div className="relative w-28">
+                <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-500 text-sm">₱</span>
+                <input 
+                  type="number" 
+                  placeholder="0"
+                  value={newCharge.amount}
+                  onChange={(e) => setNewCharge({...newCharge, amount: e.target.value})}
+                  className="w-full border border-gray-300 rounded-lg pl-6 pr-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
+                />
+              </div>
+              <button 
+                type="button" 
+                onClick={handleAddCharge}
+                disabled={!newCharge.description || !newCharge.amount}
+                className="bg-gray-200 text-gray-800 px-4 rounded-lg font-bold text-sm hover:bg-gray-300 disabled:opacity-50 transition-colors"
+              >
+                Add
+              </button>
+            </div>
+          </div>
+
+          {/* Grand Total */}
+          <div className="flex items-center gap-4 pt-1">
+            <span className="text-sm font-bold w-28 text-gray-900">GRAND TOTAL:</span>
+            <div className="flex-1 flex items-center">
+              <span className="text-xl font-bold mr-1 text-gray-900">₱</span>
+              <span className="text-xl font-bold text-gray-900">{Number(record.total).toLocaleString()}</span>
+            </div>
+          </div>
+
+          {/* Deposit */}
+          <div className="flex items-center gap-4 pt-3 border-t border-gray-200">
+            <span className="text-sm font-medium w-28 text-gray-600">DEPOSIT:</span>
             <input 
               type="number" 
               min="0"
@@ -532,18 +647,19 @@ function PatientRecordPage() {
             />
           </div>
 
-          {/* ✅ Inline Warning for 50% rule */}
+          {/* Inline Warning for 50% rule */}
           {record.deposit && Number(record.deposit) < (Number(record.total) * 0.5) && (
-            <p className="text-xs text-red-500 font-medium ml-24">
+            <p className="text-xs text-red-500 font-medium ml-32">
               Deposit must be at least 50% of the total (₱{(Number(record.total) * 0.5).toLocaleString()}).
             </p>
           )}
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium w-20 text-gray-600">BALANCE:</span>
-            <span className="flex-1 text-sm font-semibold text-red-600">₱{(record.balance || 0).toLocaleString()}</span>
+          <div className="flex items-center gap-4">
+            <span className="text-sm font-medium w-28 text-gray-600">BALANCE:</span>
+            <span className="flex-1 text-lg font-bold text-red-600">₱{(record.balance || 0).toLocaleString()}</span>
           </div>
-          <div className="grid grid-cols-2 gap-4 pt-2">
+          
+          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200">
             <div className="flex items-center gap-2">
               <span className="text-sm font-medium text-gray-600">PAYMENT METHOD:</span>
               <select value={record.paymentMethod} onChange={(e) => setRecord({ ...record, paymentMethod: e.target.value })}
@@ -597,7 +713,7 @@ function PatientRecordPage() {
       <ConfirmModal
         isOpen={showSelectionError}
         title="Incomplete Selection"
-        message="Please make sure you have selected a Lens and a Coating (and filled in the custom text if 'Custom' is selected)."
+        message="Please make sure you have selected a Frame, Lens, and Coating (and filled in the custom text if 'Custom' is selected)."
         iconType="warning"
         confirmText="OK"
         confirmColor="red"

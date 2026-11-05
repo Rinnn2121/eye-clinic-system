@@ -228,6 +228,10 @@ function CustomerAppointments() {
       <AppointmentDetailsModal 
         appointment={selectedAppt} 
         onClose={() => setSelectedAppt(null)} 
+        onCancel={(apt) => {
+          setSelectedAppt(null);
+          setApptToCancel(apt);
+        }}
       />
 
       <ConfirmModal

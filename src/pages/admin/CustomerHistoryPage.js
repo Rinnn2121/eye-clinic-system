@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { collection, query, where, getDocs, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, query, where, getDocs, doc, getDoc, updateDoc} from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import ConfirmModal from '../../components/ConfirmModal';
 import ViewRecordModal from '../../components/ViewRecordModal';
@@ -116,24 +116,19 @@ function CustomerHistoryPage() {
     setUpdating(false);
   };
 
-  const handleDeleteCustomer = async () => {
+  const handleArchiveCustomer = async () => {
     setDeleting(true);
     try {
-      const recordsQuery = query(collection(db, 'records'), where('customerId', '==', customerId));
-      const recordsSnap = await getDocs(recordsQuery);
-      const deleteRecords = recordsSnap.docs.map(d => deleteDoc(doc(db, 'records', d.id)));
-      await Promise.all(deleteRecords);
+      // ✅ Instead of deleting records, we just flag the customer as archived
+      await updateDoc(doc(db, 'customers', customerId), {
+        isArchived: true,
+        archivedAt: new Date().toISOString()
+      });
 
-      const ordersQuery = query(collection(db, 'orders'), where('customerId', '==', customerId));
-      const ordersSnap = await getDocs(ordersQuery);
-      const deleteOrders = ordersSnap.docs.map(d => deleteDoc(doc(db, 'orders', d.id)));
-      await Promise.all(deleteOrders);
-
-      await deleteDoc(doc(db, 'customers', customerId));
       navigate('/admin/customers');
     } catch (err) {
-      console.error('Error deleting customer:', err);
-      alert('Failed to delete customer. Please try again.');
+      console.error('Error archiving customer:', err);
+      alert('Failed to archive customer. Please try again.');
       setDeleting(false);
       setShowDeleteModal(false);
     }
@@ -352,8 +347,8 @@ function CustomerHistoryPage() {
             onClick={() => setShowDeleteModal(true)}
             className="bg-red-50 text-red-600 border border-red-200 px-4 py-2 rounded-lg text-sm font-bold hover:bg-red-100 transition-colors flex items-center gap-2"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-            Delete Customer Account
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" /></svg>
+            Archive Customer Account
           </button>
         </div>
       </div>
@@ -387,16 +382,16 @@ function CustomerHistoryPage() {
         </div>
       )}
 
-      {/* Delete Confirm Modal */}
+            {/* Archive Confirm Modal */}
       <ConfirmModal
         isOpen={showDeleteModal}
-        title="Delete Customer Account?"
-        message={`Are you sure you want to permanently delete ${customer?.firstName} ${customer?.lastName}? This will also delete all their visit records and sales history. This action CANNOT be undone.`}
+        title="Archive Customer Account?"
+        message={`Are you sure you want to archive ${customer?.firstName} ${customer?.lastName}? Their visit records and sales history will be safely saved, but they will be removed from your active customers list. You can restore them later in Manage Accounts.`}
         iconType="warning"
-        confirmText={deleting ? 'Deleting...' : 'Yes, Delete Everything'}
+        confirmText={deleting ? 'Archiving...' : 'Yes, Archive'}
         confirmColor="red"
         onCancel={() => setShowDeleteModal(false)}
-        onConfirm={handleDeleteCustomer}
+        onConfirm={handleArchiveCustomer}
       />
 
       {/* Alerts */}
