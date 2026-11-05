@@ -9,7 +9,7 @@ import {
   onAuthStateChanged,
   setPersistence,
   browserSessionPersistence,
-  sendEmailVerification // ✅ Import this
+  sendEmailVerification
 } from 'firebase/auth';
 import { doc, getDoc,updateDoc, setDoc } from 'firebase/firestore';
 
@@ -41,11 +41,10 @@ export function AuthProvider({ children }) {
     return result;
   };
 
-  // ✅ Updated signup function to save initial customer data
+
   const signup = async (email, password, customerData) => {
     const result = await createUserWithEmailAndPassword(auth, email, password);
-    
-    // 1. Create the User Role document
+
     await setDoc(doc(db, 'users', email), {
       email: email,
       role: 'customer',
@@ -53,9 +52,7 @@ export function AuthProvider({ children }) {
       createdAt: new Date().toISOString()
     });
 
-    // 2. Create a "Pending" Customer document
-    // We use the email as the temporary ID. When they link a Reference ID,
-    // the system will merge this data into the official clinic record.
+  
     await setDoc(doc(db, 'onlineAccounts', email), {
       firstName: customerData.firstName,
       lastName: customerData.lastName,
@@ -79,20 +76,20 @@ export function AuthProvider({ children }) {
     await signOut(auth);
   };
 
-  // ✅ Add this function to update the profile picture
+
   const updateProfilePicture = async (newPhotoUrl) => {
     if (!currentUser?.email) return;
     
-    // Update Firestore
+
     await updateDoc(doc(db, 'users', currentUser.email), {
       photoUrl: newPhotoUrl
     });
     
-    // Update local state so the UI changes immediately
+
     setUserData(prev => ({ ...prev, photoUrl: newPhotoUrl }));
   };
 
-    // ✅ Add this to force context to fetch the latest user data
+
   const refreshUserData = async () => {
     if (!currentUser?.email) return;
     try {
@@ -154,7 +151,7 @@ export function AuthProvider({ children }) {
     loading,
     resendVerification,
     updateProfilePicture,
-    refreshUserData // ✅ Expose it
+    refreshUserData 
   };
 
   return (

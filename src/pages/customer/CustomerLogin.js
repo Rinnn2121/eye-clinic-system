@@ -5,9 +5,9 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';        
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';                  
-import { signOut } from 'firebase/auth'; // ✅ Import for blocking unverified users
+import { signOut } from 'firebase/auth'; 
 import { auth } from '../../firebase/config'; 
-import emailjs from '@emailjs/browser'; // ✅ Import EmailJS
+import emailjs from '@emailjs/browser';
 
 function CustomerLogin() {
   const [email, setEmail] = useState('');
@@ -25,23 +25,22 @@ function CustomerLogin() {
     setLoading(true);
 
     try {
-      // 1. Attempt to log in
       const userCredential = await login(email, password);
       const user = userCredential.user;
 
-      // ✅ 2. Strict Check: Block if not verified
+      // Strict Check: Block if not verified
       if (!user.emailVerified) {
-        await signOut(auth); // Log them out immediately
+        await signOut(auth);
         setError('Your email is not verified. Please check your inbox and click the verification link before logging in.');
         setLoading(false);
-        return; // Stop execution here
+        return; 
       }
 
-      // ✅ 3. Send Login Notification Email (Using EmailJS)
+      // Send Login Notification Email (Using EmailJS)
       try {
         await emailjs.send(
-          'service_qd6q6ox',      // 👈 REPLACE THIS
-          'template_agxoowy',     // 👈 REPLACE THIS
+          'service_qd6q6ox',      
+          'template_agxoowy',     
           {
             to_email: email,
             login_time: new Date().toLocaleString('en-PH', { 
@@ -49,15 +48,14 @@ function CustomerLogin() {
               timeStyle: 'short' 
             }),
           },
-          'EnPJnnKQXm7ASqkp9'       // 👈 REPLACE THIS
+          'EnPJnnKQXm7ASqkp9'       
         );
         console.log('Login notification email sent successfully.');
       } catch (emailErr) {
-        // We log the error but don't block the login
         console.error('Email notification failed:', emailErr);
       }
 
-      // 4. Redirect based on role
+      // Redirect based on role
       const userDoc = await getDoc(doc(db, 'users', email));
       let role = 'customer';
       if (userDoc.exists()) {
@@ -80,13 +78,17 @@ function CustomerLogin() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#4A90E2]">VITUG-SUMAYA</h1>
-          <p className="text-sm text-gray-500 tracking-wider">OPTICAL CLINIC</p>
+        
+        {/* ✅ Logo Section */}
+        <div className="text-center mb-8 flex justify-center">
+          <img 
+            src="/images/vslogo.png" 
+            alt="Vitug-Sumaya Optical Clinic" 
+            className="h-24 w-auto object-contain" 
+          />
         </div>
 
         <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
-          <h2 className="text-2xl font-semibold text-gray-800 text-center mb-6">Portal Login</h2>
 
           {error && (
             <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4 text-sm">

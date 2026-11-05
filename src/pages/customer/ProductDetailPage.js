@@ -1,7 +1,7 @@
 // src/pages/customer/ProductDetailPage.js
 
 import React, { useState, useEffect } from 'react';
-import { useParams, Link} from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { doc, getDoc, collection, getDocs, setDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,8 +18,12 @@ function ProductDetailPage() {
   const [selectedColor, setSelectedColor] = useState('');
   const [alertConfig, setAlertConfig] = useState(null);
   
+  // ✅ Image Gallery State
+  const [activeImage, setActiveImage] = useState('');
+
   const [isWishlisted, setIsWishlisted] = useState(false);
   const [savingWishlist, setSavingWishlist] = useState(false);
+  const [showDetails, setShowDetails] = useState(true);
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -30,6 +34,10 @@ function ProductDetailPage() {
         if (docSnap.exists()) {
           const data = { id: docSnap.id, ...docSnap.data() };
           setProduct(data);
+          
+          // ✅ Set the main image (fallback to old imageUrl if imageUrls is missing)
+          const mainImage = data.imageUrls?.[0] || data.imageUrl || '';
+          setActiveImage(mainImage);
 
           const q = collection(db, 'inventory');
           const snap = await getDocs(q);
@@ -76,7 +84,7 @@ function ProductDetailPage() {
         id: product.id,
         name: product.name,
         price: product.price,
-        imageUrl: product.imageUrl || '',
+        imageUrl: product.imageUrl || '', // Keep single image for wishlist thumbnail
         category: product.category
       };
 
@@ -97,7 +105,8 @@ function ProductDetailPage() {
     }
     setSavingWishlist(false);
   };
-    const handleAddToCart = async () => {
+
+  const handleAddToCart = async () => {
     if (!currentUser) {
       setAlertConfig({ type: 'error', title: 'Login Required', message: 'Please login to add items to your cart.' });
       return;
@@ -111,7 +120,7 @@ function ProductDetailPage() {
         id: product.id,
         name: product.name,
         price: Number(product.price),
-        imageUrl: product.imageUrl || '',
+        imageUrl: product.imageUrl || '', // Keep single image for cart thumbnail
         quantity: quantity,
         color: selectedColor || 'Default',
         isActive: true
@@ -121,40 +130,26 @@ function ProductDetailPage() {
         await setDoc(cartRef, { items: [cartItem] });
       } else {
         const existingItems = cartSnap.data().items || [];
-                const existingIndex = existingItems.findIndex(i => i.id === product.id && i.color === cartItem.color);
+        const existingIndex = existingItems.findIndex(i => i.id === product.id && i.color === cartItem.color);
         
         if (existingIndex > -1) {
-          // ✅ 1. Check current quantity in cart
           const currentQty = existingItems[existingIndex].quantity;
           const maxAddable = 5 - currentQty;
           
-          // ✅ 2. If cart already has 5, block the add
           if (maxAddable <= 0) {
-            setAlertConfig({ 
-              type: 'error', 
-              title: 'Limit Reached', 
-              message: 'You can only order up to 5 of this item.' 
-            });
+            setAlertConfig({ type: 'error', title: 'Limit Reached', message: 'You can only order up to 5 of this item.' });
             return;
           }
           
-          // ✅ 3. Add only up to the limit
           const qtyToAdd = Math.min(quantity, maxAddable);
           existingItems[existingIndex].quantity += qtyToAdd;
           await updateDoc(cartRef, { items: existingItems });
           
-          // ✅ 4. Warn the user if they didn't get exactly what they asked for
           if (qtyToAdd < quantity) {
-            setAlertConfig({ 
-              type: 'success', 
-              title: 'Added with Limit', 
-              message: `Only ${qtyToAdd} could be added because you already have ${currentQty} in your cart (Max 5).` 
-            });
+            setAlertConfig({ type: 'success', title: 'Added with Limit', message: `Only ${qtyToAdd} could be added because you already have ${currentQty} in your cart (Max 5).` });
             return;
           }
-
         } else {
-          // ✅ 5. If it's a new item, make sure the first add doesn't exceed 5
           const qtyToAdd = Math.min(quantity, 5);
           cartItem.quantity = qtyToAdd;
           await updateDoc(cartRef, { items: arrayUnion(cartItem) });
@@ -165,12 +160,29 @@ function ProductDetailPage() {
       console.error(err);
     }
   };
-  
 
   if (loading) return <div className="min-h-screen flex justify-center items-center"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#4A90E2]"></div></div>;
   if (!product) return <div className="min-h-screen text-center py-20">Product not found.</div>;
 
-  const colors = ['CPNK CRYSTAL PINK', 'BLK BLACK', 'CRED CRYSTAL RED'];
+    // ✅ Check if it's already an array, otherwise split it (for backwards compatibility)
+  const colors = Array.isArray(product.colors)
+    ? product.colors
+    : (product.colors 
+        ? product.colors.split(',').map(c => c.trim()).filter(c => c !== '') 
+        : ['CPNK CRYSTAL PINK', 'BLK BLACK', 'CRED CRYSTAL RED']
+      );
+  const AVAILABLE_LENS = ['Single Vision', 'Kryptok', 'Progressive'];
+  const AVAILABLE_COATING = [
+    'Ordinary', 
+    'Multicoated', 
+    'Blue Blocker', 
+    'Photochromic', 
+    'Photochromic Blue Blocker', 
+    'Photochromic Multicoated'
+  ];
+
+  // ✅ Combine images into a single array for the gallery
+  const allImages = product.imageUrls || (product.imageUrl ? [product.imageUrl] : []);
 
   return (
     <div className="min-h-screen bg-white">
@@ -188,26 +200,26 @@ function ProductDetailPage() {
         <div className="flex flex-col lg:flex-row gap-8 items-start">
           
           <div className="w-full lg:w-8/12 space-y-4">
+            {/* ✅ Image Gallery with Dynamic Thumbnails */}
             <div className="flex gap-4 h-[400px]">
-              <div className="flex flex-col items-center gap-2">
-                <button className="text-gray-400 hover:text-gray-700 text-xs">▲</button>
-                <div className="w-20 h-20 bg-[#f3f4f6] flex items-center justify-center">
-                  {/* ✅ SVG Image Placeholder */}
-                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <div className="w-20 h-20 bg-[#f3f4f6] flex items-center justify-center">
-                  {/* ✅ SVG Image Placeholder */}
-                  <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
-                <button className="text-gray-400 hover:text-gray-700 text-xs">▼</button>
+              
+              {/* Thumbnails Column */}
+              <div className="flex flex-col items-center gap-2 overflow-y-auto">
+                {allImages.map((url, idx) => (
+                  <button 
+                    key={idx} 
+                    onClick={() => setActiveImage(url)}
+                    className={`w-20 h-20 bg-[#f3f4f6] flex-shrink-0 border-2 transition-colors ${activeImage === url ? 'border-[#4A90E2]' : 'border-transparent'}`}
+                  >
+                    <img src={url} alt={`Thumbnail ${idx}`} className="w-full h-full object-cover" />
+                  </button>
+                ))}
               </div>
+
+              {/* Main Image */}
               <div className="flex-1 bg-[#f3f4f6] flex items-center justify-center relative">
-                {product.imageUrl ? (
-                  <img src={product.imageUrl} alt={product.name} className="w-full h-full object-contain p-6" />
+                {activeImage ? (
+                  <img src={activeImage} alt={product.name} className="w-full h-full object-contain p-6" />
                 ) : (
                   <svg className="w-20 h-20 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
@@ -216,17 +228,39 @@ function ProductDetailPage() {
               </div>
             </div>
 
-            <div className="w-full">
-              <button className="w-full bg-[#4A90E2] text-white px-4 py-2 text-sm font-medium flex justify-center items-center gap-2">
-                PRODUCT INFORMATION <span className="text-[10px]">▼</span>
+                        <div className="w-full">
+              {/* ✅ Clickable Dropdown Header */}
+              <button 
+                onClick={() => setShowDetails(!showDetails)}
+                className="w-full bg-[#4A90E2] text-white px-4 py-2 text-sm font-medium flex justify-center items-center gap-2 hover:bg-[#4A90E2]/90 transition-colors"
+              >
+                PRODUCT INFORMATION 
+                <span className={`text-[10px] transition-transform duration-200 ${showDetails ? 'rotate-180' : ''}`}>
+                  ▼
+                </span>
               </button>
-              <div className="bg-[#f3f4f6] p-5 space-y-4 text-xs font-medium text-gray-800">
-                <p className="flex gap-2"><span className="w-28">Available Lens:</span> <span className="font-normal">Standard, Progressive</span></p>
-                <p className="flex gap-2"><span className="w-28">Available Coating:</span> <span className="font-normal">Anti-Reflective, Blue Light</span></p>
-                <p className="flex gap-2"><span className="w-28">Material:</span> <span className="font-normal">Premium Acetate</span></p>
-                <p className="flex gap-2"><span className="w-28">Frame Type:</span> <span className="font-normal">{product.category}</span></p>
-                <p className="flex gap-2"><span className="w-28">Size:</span> <span className="font-normal">Medium (52-18-145)</span></p>
-              </div>
+
+              {/* ✅ Collapsible Content */}
+              {showDetails && (
+                <div className="bg-[#f3f4f6] p-5 space-y-4 text-xs font-medium text-gray-800 border-t border-gray-200 animate-in fade-in slide-in-from-top-2 duration-200">
+                  <p className="flex gap-2">
+                    <span className="w-28">Available Lens:</span> 
+                    <span className="font-normal">{AVAILABLE_LENS.join(', ')}</span>
+                  </p>
+                  <p className="flex gap-2">
+                    <span className="w-28">Available Coating:</span> 
+                    <span className="font-normal">{AVAILABLE_COATING.join(', ')}</span>
+                  </p>
+                  <p className="flex gap-2">
+                    <span className="w-28">Material:</span> 
+                    <span className="font-normal">{product.material || '—'}</span>
+                  </p>
+                  <p className="flex gap-2">
+                    <span className="w-28">Frame Type:</span> 
+                    <span className="font-normal">{product.category}</span>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -250,7 +284,6 @@ function ProductDetailPage() {
               <div className="flex items-center border border-gray-400 h-10 w-24">
                 <button onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-2 text-gray-600 hover:bg-gray-50 flex-1">-</button>
                 <span className="flex-1 text-center text-sm font-medium">{quantity}</span>
-                {/* ✅ Limit to 5 */}
                 <button 
                   onClick={() => setQuantity(Math.min(5, quantity + 1))} 
                   disabled={quantity >= 5}
@@ -288,7 +321,6 @@ function ProductDetailPage() {
           </div>
         </div>
 
-        {/* ✅ Info Banner with SVG */}
         <div className="mt-8 bg-[#d0e2fd] text-blue-900 px-6 py-4 rounded-md flex items-center gap-3 w-full lg:w-8/12">
           <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           <p className="text-sm font-medium">Our clinic team will help recommend suitable lenses and coating during your visit.</p>
@@ -297,11 +329,6 @@ function ProductDetailPage() {
         <div className="mt-16">
           <div className="flex justify-between items-center mb-6 border-b border-gray-300 pb-3">
             <h2 className="text-sm font-bold text-gray-900">Related Products</h2>
-            <div className="flex gap-1.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#4A90E2]"></span>
-              <span className="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
-              <span className="w-2.5 h-2.5 rounded-full bg-gray-300"></span>
-            </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {relatedProducts.map((rp) => (
@@ -310,7 +337,6 @@ function ProductDetailPage() {
                   {rp.imageUrl ? (
                     <img src={rp.imageUrl} alt={rp.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
                   ) : (
-                    /* ✅ SVG Image Placeholder */
                     <svg className="w-12 h-12 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>

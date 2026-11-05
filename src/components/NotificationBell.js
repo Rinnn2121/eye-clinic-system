@@ -6,7 +6,7 @@ import { db } from '../firebase/config';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
-export default function NotificationBell({ align = 'sidebar', isExpanded }) {
+export default function NotificationBell({ align = 'right', isExpanded = true }) {
   const { currentUser, userRole, loading: authLoading } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -99,42 +99,56 @@ export default function NotificationBell({ align = 'sidebar', isExpanded }) {
     );
   };
 
-  const dropdownPosition = align === 'sidebar' ? 'absolute left-full bottom-0 ml-4' : 'absolute right-0 top-full mt-2';
+  // Dropdown position based on where the bell is used
+  const dropdownPosition = align === 'sidebar' 
+    ? 'absolute left-full bottom-0 ml-4' 
+    : 'absolute right-0 top-full mt-2';
+
+  // ✅ Check if we are in the sidebar
+  const isSidebar = align === 'sidebar';
 
   return (
     <div className="relative w-full" ref={dropdownRef}>
       
-      {/* ✅ The Clickable Area */}
-      <div 
-        onClick={handleToggle} 
-        className={`flex items-center gap-3 w-full rounded-xl transition-all duration-200 ${
-          isExpanded ? 'px-4 py-3 justify-start' : 'p-3 justify-center'
-        } text-gray-700 hover:bg-white/50 cursor-pointer`}
+      <div
+        onClick={handleToggle}
+        className={`relative flex items-center cursor-pointer text-gray-700 transition-all duration-200 ${
+          isSidebar 
+            ? `rounded-xl hover:bg-white/50 ${isExpanded ? 'px-4 py-3 justify-start w-full' : 'p-3 justify-center w-full'}` 
+            : 'p-2 rounded-full hover:bg-gray-100 w-10 h-10 justify-center'
+        }`}
+        title="Notifications"
       >
-        {/* ✅ The Bell Icon */}
-        <div className="relative flex-shrink-0">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="flex items-center justify-center flex-shrink-0 relative pointer-events-none">
+          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
           </svg>
-          {/* Red Badge */}
-          {unreadCount > 0 && (
-            <span className="absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full border-2 border-[#b8cff2]">
+          
+          {/* ✅ Red dot shows up on the icon for BOTH Navbar and Collapsed Sidebar */}
+          {(!isExpanded || !isSidebar) && unreadCount > 0 && (
+            <span className={`absolute -top-1.5 -right-1.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold flex items-center justify-center rounded-full border-2 ${isSidebar ? 'border-[#b8cff2]' : 'border-[#b8cff2]'}`}>
               {unreadCount > 9 ? '9+' : unreadCount}
             </span>
           )}
         </div>
-        
-        {/* ✅ The Text (Shows when expanded) */}
-        <span className={`whitespace-nowrap transition-opacity duration-200 ${isExpanded ? 'opacity-100 block font-medium' : 'opacity-0 hidden'}`}>
-          Notifications
-        </span>
+
+        {/* ✅ Text only shows if we are in the sidebar AND it is expanded */}
+        {isSidebar && isExpanded && (
+          <div className="flex flex-1 items-center justify-between ml-3 pointer-events-none">
+            <span className="font-medium">Notifications</span>
+            {unreadCount > 0 && (
+              <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                {unreadCount}
+              </span>
+            )}
+          </div>
+        )}
       </div>
 
-      {/* Dropdown Menu */}
       {isOpen && (
         <div 
           onClick={(e) => e.stopPropagation()} 
-          className={`${dropdownPosition} w-80 bg-white rounded-xl shadow-2xl border border-gray-200 z-[999] overflow-hidden flex flex-col max-h-[70vh]`}
+          className={`${dropdownPosition} w-80 max-w-[90vw] bg-white rounded-xl shadow-2xl border border-gray-200 z-[9999] overflow-hidden flex flex-col max-h-[70vh]`}
         >
           <div className="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
             <h3 className="font-bold text-gray-800">Notifications</h3>
@@ -144,6 +158,7 @@ export default function NotificationBell({ align = 'sidebar', isExpanded }) {
               </button>
             )}
           </div>
+
           <div className="overflow-y-auto flex-1 min-h-[150px]">
             {authLoading ? (
               <div className="p-6 text-center text-gray-400 text-sm animate-pulse">Checking...</div>
@@ -162,9 +177,15 @@ export default function NotificationBell({ align = 'sidebar', isExpanded }) {
                       {getNotificationIcon(n.type)}
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className={`text-sm ${!n.isRead ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>{n.title}</p>
-                      <p className={`text-xs mt-1 ${!n.isRead ? 'text-gray-700' : 'text-gray-500'}`}>{n.message}</p>
-                      <p className="text-[10px] text-gray-400 mt-1">{formatDate(n.createdAt)}</p>
+                      <p className={`text-sm ${!n.isRead ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>
+                        {n.title}
+                      </p>
+                      <p className={`text-xs mt-1 ${!n.isRead ? 'text-gray-700' : 'text-gray-500'}`}>
+                        {n.message}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-1">
+                        {formatDate(n.createdAt)}
+                      </p>
                     </div>
                   </div>
                 </Link>

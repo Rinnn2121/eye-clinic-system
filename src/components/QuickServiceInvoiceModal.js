@@ -9,13 +9,13 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // ✅ 1. State for Multiple Services
+  // ✅ State for Multiple Services
   const [selectedServices, setSelectedServices] = useState([]);
   const [currentServiceId, setCurrentServiceId] = useState('');
 
   const [formData, setFormData] = useState({
     customerName: '',
-    amountPaid: '',
+    finalTotal: '', 
     paymentMethod: 'Cash'
   });
 
@@ -36,26 +36,30 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
     fetchServices();
   }, []);
 
-  // ✅ 2. Handler to add a service to the list
-  const handleAddService = () => {
-    if (!currentServiceId) return;
-    const serviceToAdd = services.find(s => s.id === currentServiceId);
-    
-    // Check if it's already in the list
-    if (selectedServices.some(s => s.id === currentServiceId)) {
-      alert("This service is already added.");
-      return;
-    }
+  // ✅ Automatically add service when selected from the dropdown
+  useEffect(() => {
+    if (currentServiceId) {
+      const serviceToAdd = services.find(s => s.id === currentServiceId);
+      
+      if (serviceToAdd && !selectedServices.some(s => s.id === currentServiceId)) {
+        setSelectedServices(prev => [
+          ...prev, 
+          { ...serviceToAdd, customTotal: serviceToAdd.price }
+        ]);
+        
+        // Auto-fill the Final Total if it's currently empty or matches the previous total
+        setFormData(prev => {
+          // If the input is empty, just use the new service price
+          if (!prev.finalTotal) {
+            return { ...prev, finalTotal: serviceToAdd.price };
+          }
+          return prev;
+        });
 
-    setSelectedServices([
-      ...selectedServices, 
-      { 
-        ...serviceToAdd, 
-        customTotal: serviceToAdd.price // Allow editing price per service if needed
+        setCurrentServiceId(''); // Reset dropdown
       }
-    ]);
-    setCurrentServiceId(''); // Reset dropdown
-  };
+    }
+  }, [currentServiceId, services, selectedServices]);
 
   const handleRemoveService = (index) => {
     setSelectedServices(selectedServices.filter((_, i) => i !== index));
@@ -67,11 +71,8 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
     setSelectedServices(updated);
   };
 
-  // Calculate Totals
-  const finalTotal = selectedServices.reduce((sum, service) => sum + (Number(service.customTotal) || 0), 0);
-  const amountPaidNum = Number(formData.amountPaid) || 0;
-  const isPartial = amountPaidNum < finalTotal && amountPaidNum > 0;
-  const balance = finalTotal - amountPaidNum;
+  // Helper to calculate the suggested total 
+  const suggestedTotal = selectedServices.reduce((sum, service) => sum + (Number(service.customTotal) || 0), 0);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -80,8 +81,8 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
     setSaving(true);
     try {
       const generatedReceipt = `SRV-${Date.now().toString().slice(-5)}`; 
+      const finalAmount = Number(formData.finalTotal) || 0;
       
-      // Map the selected services to the order items format
       const orderItems = selectedServices.map(srv => ({
         name: srv.name,
         category: 'Service',
@@ -95,10 +96,10 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
         customerId: 'walk-in',
         customerPhone: '',
         notes: `Service Only: ${selectedServices.map(s => s.name).join(', ')}`,
-        totalAmount: finalTotal, 
-        amountPaid: amountPaidNum,
-        balance: balance > 0 ? balance : 0,
-        paymentStatus: balance <= 0 ? 'paid' : 'pending',
+        totalAmount: finalAmount,
+        amountPaid: finalAmount,
+        balance: 0,
+        paymentStatus: 'paid',
         paymentMethod: formData.paymentMethod,
         orderDate: new Date().toISOString(),
         items: orderItems,
@@ -112,7 +113,6 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
     setSaving(false);
   };
 
-  // Helper to prevent negative typing
   const preventNegative = (e) => {
     if (e.key === '-' || e.key === 'e') e.preventDefault();
   };
@@ -138,11 +138,10 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
             />
           </div>
 
-          {/* ✅ Multiple Services Section */}
+          {/* Multiple Services Section */}
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
             <label className="block text-sm font-bold text-gray-800 mb-2">Availed Services *</label>
             
-            {/* Selected Services List */}
             {selectedServices.length > 0 && (
               <div className="space-y-2 mb-4">
                 {selectedServices.map((srv, index) => (
@@ -176,7 +175,7 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
               </div>
             )}
 
-            {/* Add Service Dropdown */}
+            {/* ✅ Dropdown that automatically calculates on selection */}
             <div className="flex gap-2">
               <select 
                 value={currentServiceId} 
@@ -192,65 +191,49 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
                   ))
                 )}
               </select>
-              <button 
-                type="button" 
-                onClick={handleAddService}
-                disabled={!currentServiceId}
-                className="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-900 disabled:opacity-50 transition-colors"
-              >
-                Add
-              </button>
             </div>
           </div>
 
-          {/* Totals & Payment */}
+          {/* Final Total Input */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Total</label>
-              <div className="w-full border border-gray-200 bg-gray-50 rounded-lg px-4 py-2 text-lg font-bold text-gray-900">
-                ₱ {finalTotal.toLocaleString()}
+              <label className="block text-sm font-medium text-gray-700 mb-1">Total Amount Paid *</label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold">₱</span>
+                <input 
+                  min="0"
+                  onKeyDown={preventNegative}
+                  type="number" 
+                  required
+                  value={formData.finalTotal} 
+                  onChange={(e) => setFormData({...formData, finalTotal: e.target.value})} 
+                  className="w-full border border-gray-300 rounded-lg pl-8 pr-4 py-2 text-lg font-bold outline-none focus:ring-2 focus:ring-[#4A90E2]" 
+                  placeholder="0"
+                />
               </div>
+              {suggestedTotal > 0 && !formData.finalTotal && (
+                <p className="text-xs text-gray-400 mt-1">Suggested: ₱{suggestedTotal}</p>
+              )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Amount Paid *</label>
-              <input 
-                min="0"
-                onKeyDown={preventNegative}
-                type="number" 
-                required
-                value={formData.amountPaid} 
-                onChange={(e) => setFormData({...formData, amountPaid: e.target.value})} 
-                className="w-full border border-gray-300 rounded-lg px-4 py-2 text-lg font-bold outline-none focus:ring-2 focus:ring-[#4A90E2]" 
-                placeholder="0"
-              />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+              <select 
+                value={formData.paymentMethod} 
+                onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})} 
+                className="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm outline-none bg-white focus:ring-2 focus:ring-[#4A90E2]"
+              >
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+                <option value="Card">Card</option>
+              </select>
             </div>
-          </div>
-
-          {/* Optional: Show a subtle text if partial */}
-          {isPartial && (
-            <p className="text-xs text-orange-600 font-medium text-right mt-1">
-              Remaining balance to be collected: ₱{balance.toLocaleString()}
-            </p>
-          )}
-
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
-            <select 
-              value={formData.paymentMethod} 
-              onChange={(e) => setFormData({...formData, paymentMethod: e.target.value})} 
-              className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none bg-white focus:ring-2 focus:ring-[#4A90E2]"
-            >
-              <option value="Cash">Cash</option>
-              <option value="GCash">GCash</option>
-              <option value="Card">Card</option>
-            </select>
           </div>
 
           <div className="flex gap-3 pt-4 border-t border-gray-100">
             <button type="button" onClick={onClose} className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
             <button 
               type="submit" 
-              disabled={saving || selectedServices.length === 0} 
+              disabled={saving || selectedServices.length === 0 || !formData.finalTotal} 
               className="flex-1 bg-[#4A90E2] text-white py-2 rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 disabled:opacity-50"
             >
               {saving ? 'Saving...' : 'Save & Issue Receipt'}
@@ -260,4 +243,4 @@ export default function QuickServiceInvoiceModal({ onClose, onSuccess }) {
       </div>
     </div>
   );
-} 
+}

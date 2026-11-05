@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import * as XLSX from 'xlsx'; // ✅ Import xlsx
 
 function ReportsPage() {
   const [activeTab, setActiveTab] = useState('sales');
@@ -14,6 +15,10 @@ function ReportsPage() {
 
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+
+  // ✅ Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   useEffect(() => {
     const fetchData = async () => {
@@ -44,6 +49,7 @@ function ReportsPage() {
     fetchData();
   }, []);
 
+  // ✅ Filter & Sort Sales (Newest First)
   const filteredSales = useMemo(() => {
     return orders.filter(o => {
       if (!o.orderDate) return false;
@@ -51,9 +57,10 @@ function ReportsPage() {
       if (startDate && itemDate < startDate) return false;
       if (endDate && itemDate > endDate) return false;
       return true;
-    });
+    }).sort((a, b) => new Date(b.orderDate) - new Date(a.orderDate));
   }, [orders, startDate, endDate]);
 
+  // ✅ Filter & Sort Appointments (Newest First)
   const filteredAppointments = useMemo(() => {
     return appointments.filter(a => {
       if (!a.date) return false;
@@ -61,9 +68,10 @@ function ReportsPage() {
       if (startDate && itemDate < startDate) return false;
       if (endDate && itemDate > endDate) return false;
       return true;
-    });
+    }).sort((a, b) => new Date(`${b.date}T${b.time || '00:00'}`) - new Date(`${a.date}T${a.time || '00:00'}`));
   }, [appointments, startDate, endDate]);
 
+  // ✅ Filter & Sort Customers (Newest First)
   const filteredCustomers = useMemo(() => {
     return customers.filter(c => {
       if (!c.createdAt) return false;
@@ -71,117 +79,90 @@ function ReportsPage() {
       if (startDate && itemDate < startDate) return false;
       if (endDate && itemDate > endDate) return false;
       return true;
-    });
+    }).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
   }, [customers, startDate, endDate]);
 
-  // ✅ The Magic Export Function (HTML Table format for Excel)
-  const handleExportCSV = () => {
-    let headers = [];
-    let rows = [];
-    let filename = `Report_${activeTab}_${startDate || 'All'}_to_${endDate || 'All'}.xls`;
+  // ✅ Reset Page when Tab or Dates change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, startDate, endDate]);
+
+  // ✅ Pagination Logic for all tabs
+  const getCurrentItems = () => {
+    let dataToPaginate = [];
+    if (activeTab === 'sales') dataToPaginate = filteredSales;
+    if (activeTab === 'appointments') dataToPaginate = filteredAppointments;
+    if (activeTab === 'customers') dataToPaginate = filteredCustomers;
+
+    const indexOfLastItem = currentPage * itemsPerPage;
+    const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+    return {
+      items: dataToPaginate.slice(indexOfFirstItem, indexOfLastItem),
+      totalPages: Math.ceil(dataToPaginate.length / itemsPerPage) || 1,
+      totalRecords: dataToPaginate.length
+    };
+  };
+
+  const { items: currentItems, totalPages, totalRecords } = getCurrentItems();
+
+  // ✅ NEW: Clean Excel Export using xlsx
+  const handleExportExcel = () => {
+    let dataToExport = [];
+    let filename = `Report_${activeTab}_${startDate || 'All'}_to_${endDate || 'All'}.xlsx`;
 
     if (activeTab === 'sales') {
-      headers = ['Receipt No', 'Date', 'Customer', 'Payment', 'Total', 'Paid', 'Balance', 'Status'];
-      rows = filteredSales.map(s => {
+      dataToExport = filteredSales.map(s => {
         const isPaid = s.paymentStatus === 'paid' || s.balance <= 0;
-        return [
-          s.receiptNo || '—',
-          s.orderDate ? new Date(s.orderDate).toLocaleDateString() : '—',
-          s.customerName || '—',
-          s.paymentMethod || 'Cash',
-          `₱ ${Number(s.totalAmount || 0).toLocaleString()}`,
-          `₱ ${Number(s.amountPaid || 0).toLocaleString()}`,
-          `₱ ${Number(s.balance || 0).toLocaleString()}`,
-          isPaid ? 'Paid' : 'Partial' // ✅ Fixes the 0 issue
-        ];
+        return {
+          'Receipt No': s.receiptNo || '—',
+          'Date': s.orderDate ? new Date(s.orderDate).toLocaleDateString() : '—',
+          'Customer': s.customerName || '—',
+          'Payment Method': s.paymentMethod || 'Cash',
+          'Total Amount': `₱ ${Number(s.totalAmount || 0).toLocaleString()}`,
+          'Amount Paid': `₱ ${Number(s.amountPaid || 0).toLocaleString()}`,
+          'Balance': `₱ ${Number(s.balance || 0).toLocaleString()}`,
+          'Status': isPaid ? 'Paid' : 'Partial'
+        };
       });
     } else if (activeTab === 'appointments') {
-      headers = ['Date', 'Time', 'Customer', 'Phone', 'Service', 'Status'];
-      rows = filteredAppointments.map(a => [
-        a.date,
-        a.time,
-        a.customerName || 'Walk-in',
-        a.phone || '—',
-        a.reason || '—',
-        a.status || 'Pending'
-      ]);
+      dataToExport = filteredAppointments.map(a => ({
+        'Date': a.date,
+        'Time': a.time,
+        'Customer': a.customerName || 'Walk-in',
+        'Phone': a.phone || '—',
+        'Service': a.reason || '—',
+        'Status': a.status || 'Pending'
+      }));
     } else if (activeTab === 'customers') {
-      headers = ['Reference ID', 'First Name', 'Last Name', 'Phone', 'Total Visits', 'Balance', 'Date Registered'];
-      rows = filteredCustomers.map(c => [
-        c.referenceId || '—',
-        c.firstName || '—',
-        c.lastName || '—',
-        c.phone || '—',
-        c.totalVisits || 0,
-        `₱ ${Number(c.latestBalance || 0).toLocaleString()}`,
-        c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'
-      ]);
+      dataToExport = filteredCustomers.map(c => ({
+        'Reference ID': c.referenceId || '—',
+        'First Name': c.firstName || '—',
+        'Last Name': c.lastName || '—',
+        'Phone': c.phone || '—',
+        'Total Visits': c.totalVisits || 0,
+        'Balance': `₱ ${Number(c.latestBalance || 0).toLocaleString()}`,
+        'Date Registered': c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'
+      }));
     }
 
-    // ✅ Build HTML Table for perfect formatting in Excel
-    let tableHTML = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head>
-        <meta charset="utf-8" />
-        <style>
-          table { border-collapse: collapse; font-family: Arial, sans-serif; width: 100%; }
-          th { background-color: #dbeafe; color: #1e40af; font-weight: bold; padding: 10px; border: 1px solid #93c5fd; text-align: left; }
-          td { padding: 8px 10px; border: 1px solid #e5e7eb; vertical-align: middle; }
-          .text-right { text-align: right; }
-          .text-center { text-align: center; }
-          .status-paid { background-color: #dcfce7; color: #166534; font-weight: bold; text-align: center; }
-          .status-partial { background-color: #fef3c7; color: #92400e; font-weight: bold; text-align: center; }
-          .status-cancelled { background-color: #fee2e2; color: #991b1b; font-weight: bold; text-align: center; }
-        </style>
-      </head>
-      <body>
-        <h2>${activeTab.toUpperCase()} REPORT</h2>
-        <p>Date Range: ${startDate || 'All Time'} to ${endDate || 'All Time'}</p>
-        <table>
-          <thead>
-            <tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr>
-          </thead>
-          <tbody>
-    `;
+    // ✅ Create the workbook
+    const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, activeTab.toUpperCase());
 
-    rows.forEach(row => {
-      tableHTML += '<tr>';
-      row.forEach((cell, index) => {
-        let cellClass = '';
-        // Align numbers to the right (columns 4, 5, 6 in Sales)
-        if (activeTab === 'sales' && [4, 5, 6].includes(index)) cellClass = 'text-right';
-        if (activeTab === 'customers' && index === 5) cellClass = 'text-right';
-        if (activeTab === 'customers' && index === 4) cellClass = 'text-center';
-        
-        // Color code the Status column
-        if ((activeTab === 'sales' && index === 7) || (activeTab === 'appointments' && index === 5)) {
-          if (cell === 'Paid' || cell === 'Completed') cellClass = 'status-paid';
-          else if (cell === 'Partial' || cell === 'Pending' || cell === 'Scheduled') cellClass = 'status-partial';
-          else if (cell === 'Cancelled') cellClass = 'status-cancelled';
-        }
-
-        tableHTML += `<td class="${cellClass}">${cell}</td>`;
+    // ✅ Auto-fit column widths
+    const maxWidths = {};
+    dataToExport.forEach(row => {
+      Object.keys(row).forEach(key => {
+        const value = row[key] ? row[key].toString() : '';
+        const width = value.length > key.length ? value.length : key.length;
+        maxWidths[key] = Math.max(maxWidths[key] || 10, width);
       });
-      tableHTML += '</tr>';
     });
+    worksheet['!cols'] = Object.keys(maxWidths).map(key => ({ wch: maxWidths[key] + 2 }));
 
-    tableHTML += `
-          </tbody>
-        </table>
-      </body>
-      </html>
-    `;
-
-    // Create Blob and Download
-    const blob = new Blob([tableHTML], { type: 'application/vnd.ms-excel' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    // ✅ Download file
+    XLSX.writeFile(workbook, filename);
   };
 
   if (loading) {
@@ -204,26 +185,26 @@ function ReportsPage() {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-1.5 shadow-sm">
-              <span className="text-sm font-bold text-gray-600">From:</span>
+            <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-xl px-4 py-2 shadow-sm">
+              <span className="text-sm font-bold text-gray-800">From:</span>
               <input
                 type="date"
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
-                className="bg-transparent text-sm text-gray-800 outline-none"
+                className="bg-white border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-[#4A90E2]"
               />
-              <span className="text-sm font-bold text-gray-600 ml-2">To:</span>
+              <span className="text-sm font-bold text-gray-800 ml-2">To:</span>
               <input
                 type="date"
                 value={endDate}
                 onChange={(e) => setEndDate(e.target.value)}
-                className="bg-transparent text-sm text-gray-800 outline-none"
+                className="bg-white border border-gray-200 rounded-lg px-3 py-1 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-[#4A90E2]"
               />
             </div>
             
             <button
-              onClick={handleExportCSV}
-              className="bg-[#22c55e] text-white px-5 py-2 rounded-lg text-sm font-bold hover:bg-green-600 transition-colors shadow-sm flex items-center gap-2"
+              onClick={handleExportExcel}
+              className="bg-[#22c55e] text-white px-5 py-2.5 rounded-lg text-sm font-bold hover:bg-green-600 transition-colors shadow-sm flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -286,10 +267,10 @@ function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredSales.length === 0 ? (
+                  {currentItems.length === 0 ? (
                     <tr><td colSpan="7" className="text-center py-8 text-gray-500">No sales found in this date range.</td></tr>
                   ) : (
-                    filteredSales.map((s) => {
+                    currentItems.map((s) => {
                       const isPaid = s.paymentStatus === 'paid' || s.balance <= 0;
                       return (
                         <tr key={s.id} className="hover:bg-gray-50">
@@ -330,10 +311,10 @@ function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredAppointments.length === 0 ? (
+                  {currentItems.length === 0 ? (
                     <tr><td colSpan="6" className="text-center py-8 text-gray-500">No appointments found in this date range.</td></tr>
                   ) : (
-                    filteredAppointments.map((a) => (
+                    currentItems.map((a) => (
                       <tr key={a.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 font-medium text-gray-900">{a.date}</td>
                         <td className="px-6 py-4 text-gray-600">{a.time}</td>
@@ -373,10 +354,10 @@ function ReportsPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredCustomers.length === 0 ? (
+                  {currentItems.length === 0 ? (
                     <tr><td colSpan="6" className="text-center py-8 text-gray-500">No customers registered in this date range.</td></tr>
                   ) : (
-                    filteredCustomers.map((c) => {
+                    currentItems.map((c) => {
                       const hasBalance = (c.latestBalance || 0) > 0;
                       return (
                         <tr key={c.id} className="hover:bg-gray-50">
@@ -401,9 +382,53 @@ function ReportsPage() {
 
         </div>
 
+        {/* ✅ Pagination Controls */}
+        {totalRecords > 0 && (
+          <div className="flex justify-center items-center gap-2 pt-2">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
+            >
+              Prev
+            </button>
+            
+            <div className="flex gap-1">
+              {[...Array(totalPages)].map((_, i) => {
+                const pageNum = i + 1;
+                if (totalPages > 5 && pageNum > 2 && pageNum < totalPages - 1 && pageNum !== currentPage) {
+                  if (pageNum === 3) return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
+                  return null;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1.5 rounded-md text-sm border shadow-sm font-medium ${
+                      currentPage === pageNum 
+                        ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
+                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
+            >
+              Next
+            </button>
+          </div>
+        )}
+
         {/* Footer Summary */}
         <div className="text-right text-sm font-medium text-gray-500">
-          Showing {activeTab === 'sales' ? filteredSales.length : activeTab === 'appointments' ? filteredAppointments.length : filteredCustomers.length} records
+          Showing {totalRecords} records • Page {currentPage} of {totalPages}
         </div>
 
       </div>

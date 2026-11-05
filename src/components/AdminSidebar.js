@@ -1,14 +1,14 @@
 // src/components/AdminSidebar.js
 
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import NotificationBell from './NotificationBell';
 import ProfileMenu from './ProfileMenu'; 
 
 export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen, onMobileClose }) {
-  const { userRole } = useAuth();
-  const [isNotifOpen, setIsNotifOpen] = useState(false); // For Notification Highlight
+  // ✅ Grab user data to display the name
+  const { userRole, userData, currentUser } = useAuth();
   const isAdmin = userRole === 'admin';
 
   const handleNavClick = () => {
@@ -26,6 +26,10 @@ export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen,
 
   const SidebarContent = ({ isMobile = false }) => {
     const expanded = isMobile ? true : isExpanded;
+
+    // ✅ Format user's display name
+    const displayName = userData?.name || userData?.firstName || currentUser?.email?.split('@')[0] || 'Admin Staff';
+    const displayRole = userRole === 'admin' ? 'Administrator' : 'Staff';
 
     return (
       <div className="flex flex-col h-full bg-[#b8cff2] text-gray-800 border-r border-blue-200">
@@ -118,24 +122,31 @@ export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen,
           )}
         </nav>
 
-        {/* ✅ Notification Bell Row - Matches NavLink */}
+        {/* ✅ Notification Bell Row */}
         <div className="px-2 py-2">
-          <div className={`w-full rounded-xl transition-all duration-200 ${
-            isNotifOpen 
-              ? 'bg-white text-[#1e40af] font-bold shadow-sm' 
-              : 'text-gray-800 hover:bg-white/50'
-          }`}>
-            <NotificationBell 
-              align="sidebar" 
-              isExpanded={expanded} 
-              onOpenChange={(open) => setIsNotifOpen(open)} 
-            />
-          </div>
+          <NotificationBell align="sidebar" isExpanded={expanded} />
         </div>
 
-        {/* ✅ Bottom Section: Profile Menu - Restored to centered layout */}
-        <div className="border-t border-blue-200 flex-shrink-0 p-3 flex flex-col items-center">
-          <ProfileMenu showManageAccounts align="right-sidebar" />
+        {/* ✅ Bottom Section: Profile Info & Menu */}
+        <div className="border-t border-blue-200 flex-shrink-0 p-3">
+          <div className={`flex items-center gap-3 ${expanded ? 'justify-start' : 'justify-center'}`}>
+            
+            {/* Profile Picture (Trigger for Dropdown) */}
+            <ProfileMenu showManageAccounts align="right-sidebar" />
+            
+            {/* Profile Name & Role (Only shows when expanded) */}
+            {expanded && (
+              <div className="flex flex-col min-w-0">
+                <span className="text-sm font-bold text-gray-900 truncate">
+                  {displayName}
+                </span>
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider truncate">
+                  {displayRole}
+                </span>
+              </div>
+            )}
+
+          </div>
         </div>
 
       </div>

@@ -585,7 +585,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                 }}
                 className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors"
               >
-                Continue Browsing
+                Continue
               </button>
             </div>
             

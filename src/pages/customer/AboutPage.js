@@ -51,7 +51,7 @@ function AboutPage() {
             </div>
             <h3 className="font-bold text-gray-900 mb-3 text-sm">Visit Our Branches</h3>
             <div className="text-xs text-gray-600 leading-relaxed space-y-2">
-              <p>51 Poblacion-Bayan, Magsaysay, Bulacan (Beside Ganda and Infront of Blessed Hope Maternity and Lying-In Clinic)</p>
+              <p>71 Provincial Rd. Banga Meycauayan Bulacan</p>
             </div>
           </div>
 

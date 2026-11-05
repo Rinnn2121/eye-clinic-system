@@ -13,7 +13,6 @@ export default function ProductModal({ product, onClose, onSuccess }) {
 
   const [featuredCount, setFeaturedCount] = useState(0);
   
-  // ✅ Fetch how many are currently featured
   useEffect(() => {
     const checkFeaturedCount = async () => {
       const snap = await getDocs(collection(db, 'inventory'));
@@ -32,40 +31,79 @@ export default function ProductModal({ product, onClose, onSuccess }) {
     category: product?.category || 'Metal Frame',
     price: product?.price || '',
     description: product?.description || '',
+    
+    // ✅ Changed colors to an array (supports legacy string data)
+    colors: Array.isArray(product?.colors) 
+      ? product.colors 
+      : (product?.colors ? product.colors.split(',').map(c => c.trim()) : []),
+      
+    material: product?.material || '',
     isActive: product?.isActive !== false,
     isFeatured: product?.isFeatured || false, 
-    imageUrl: product?.imageUrl || '',
+    imageUrls: product?.imageUrls || (product?.imageUrl ? [product.imageUrl] : []),
     createdAt: product?.createdAt || new Date().toISOString(),
     updatedAt: product?.updatedAt || new Date().toISOString(),
     updatedBy: product?.updatedBy || loggedInName
   });
 
-  const [imageFile, setImageFile] = useState(null);
+  const [imageFiles, setImageFiles] = useState([]);
   const [uploading, setUploading] = useState(false);
+
+  // ✅ Color state
+  const [newColor, setNewColor] = useState('');
+  const handleAddColor = () => {
+    if (newColor.trim() && !formData.colors.includes(newColor.trim())) {
+      setFormData({ ...formData, colors: [...formData.colors, newColor.trim()] });
+      setNewColor('');
+    }
+  };
+  const handleRemoveColor = (colorToRemove) => {
+    setFormData({ ...formData, colors: formData.colors.filter(c => c !== colorToRemove) });
+  };
+
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    setImageFiles([...imageFiles, ...files]);
+  };
+
+  const removeImage = (index, isNew) => {
+    if (isNew) {
+      setImageFiles(imageFiles.filter((_, i) => i !== index));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        imageUrls: prev.imageUrls.filter((_, i) => i !== index)
+      }));
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setUploading(true);
 
     try {
-      let finalImageUrl = formData.imageUrl;
+      let finalImageUrls = [...formData.imageUrls];
 
-      if (imageFile) {
+      if (imageFiles.length > 0) {
         const cloudName = 'vmdtvqty'; 
         const uploadPreset = 'inventory_unsigned';
 
-        const data = new FormData();
-        data.append('file', imageFile);
-        data.append('upload_preset', uploadPreset);
-        data.append('folder', 'eyeclinic_inventory');
+        for (const file of imageFiles) {
+          const data = new FormData();
+          data.append('file', file);
+          data.append('upload_preset', uploadPreset);
+          data.append('folder', 'eyeclinic_inventory');
 
-        const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
-          method: 'POST',
-          body: data,
-        });
+          const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
+            method: 'POST',
+            body: data,
+          });
 
-        const result = await response.json();
-        if (result.secure_url) finalImageUrl = result.secure_url;
+          const result = await response.json();
+          if (result.secure_url) {
+            finalImageUrls.push(result.secure_url);
+          }
+        }
       }
 
       const dataToSave = {
@@ -73,9 +111,12 @@ export default function ProductModal({ product, onClose, onSuccess }) {
         category: formData.category,
         price: parseFloat(formData.price),
         description: formData.description,
+        colors: formData.colors, // ✅ Saves as an array now
+        material: formData.material,
         isActive: formData.isActive,
         isFeatured: formData.isFeatured,
-        imageUrl: finalImageUrl,
+        imageUrls: finalImageUrls,
+        imageUrl: finalImageUrls[0] || '',
         updatedAt: new Date().toISOString(),
         updatedBy: loggedInName, 
         createdAt: formData.createdAt
@@ -98,7 +139,7 @@ export default function ProductModal({ product, onClose, onSuccess }) {
 
   return (
     <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[70] overflow-y-auto">
-      <div className="bg-white rounded-xl w-full max-w-4xl shadow-2xl my-8">
+      <div className="bg-white rounded-xl w-full max-w-5xl shadow-2xl my-8">
         
         <div className="flex justify-between items-center px-6 py-4 border-b border-gray-200">
           <h2 className="text-xl font-bold text-gray-900">
@@ -112,29 +153,31 @@ export default function ProductModal({ product, onClose, onSuccess }) {
         <form onSubmit={handleSubmit} className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             
+            {/* LEFT COLUMN */}
             <div className="space-y-5">
-              {/* Image Upload */}
-              <div className="relative w-full h-64 bg-gray-100 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300 overflow-hidden hover:bg-gray-50 transition-colors">
-                {(imageFile || formData.imageUrl) ? (
-                  <img 
-                    src={imageFile ? URL.createObjectURL(imageFile) : formData.imageUrl} 
-                    alt="Preview" 
-                    className="w-full h-full object-contain p-4 bg-white" 
-                  />
-                ) : (
-                  <div className="text-center">
-                    <svg className="w-12 h-12 text-gray-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p className="text-xs text-gray-500 font-medium">Click to upload image</p>
+              
+              <div>
+                <label className="block text-sm font-bold text-gray-800 mb-2">Product Images</label>
+                <div className="grid grid-cols-2 gap-3 mb-3">
+                  {formData.imageUrls.map((url, idx) => (
+                    <div key={`existing-${idx}`} className="relative w-full h-32 bg-gray-100 rounded-xl border border-gray-200 overflow-hidden group">
+                      <img src={url} alt="Preview" className="w-full h-full object-contain p-2 bg-white" />
+                      <button type="button" onClick={() => removeImage(idx, false)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
+                    </div>
+                  ))}
+                  {imageFiles.map((file, idx) => (
+                    <div key={`new-${idx}`} className="relative w-full h-32 bg-gray-100 rounded-xl border border-gray-200 overflow-hidden group">
+                      <img src={URL.createObjectURL(file)} alt="Preview" className="w-full h-full object-contain p-2 bg-white" />
+                      <button type="button" onClick={() => removeImage(idx, true)} className="absolute top-2 right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs opacity-0 group-hover:opacity-100 transition-opacity">&times;</button>
+                    </div>
+                  ))}
+                  <div className="relative w-full h-32 bg-gray-50 rounded-xl flex flex-col items-center justify-center border-2 border-dashed border-gray-300 overflow-hidden hover:bg-gray-100 transition-colors cursor-pointer">
+                    <svg className="w-8 h-8 text-gray-400 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" /></svg>
+                    <p className="text-[10px] text-gray-500 font-medium">Add Images</p>
+                    <input type="file" multiple accept="image/*" onChange={handleImageChange} className="absolute inset-0 opacity-0 cursor-pointer" />
                   </div>
-                )}
-                <input 
-                  type="file" 
-                  accept="image/*"
-                  onChange={(e) => setImageFile(e.target.files[0])}
-                  className="absolute inset-0 opacity-0 cursor-pointer"
-                />
+                </div>
+                <p className="text-[10px] text-gray-500">The first image will be used as the main thumbnail.</p>
               </div>
 
               <div>
@@ -142,12 +185,49 @@ export default function ProductModal({ product, onClose, onSuccess }) {
                 <textarea
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  placeholder="product description..."
-                  className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] resize-none h-32"
+                  className="w-full border border-gray-300 rounded-lg p-3 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2] resize-none h-24"
                 />
+              </div>
+
+              {/* ✅ INDIVIDUAL COLOR BUTTONS */}
+              <div>
+                <label className="block text-sm font-bold text-gray-800 mb-2">Frame Colors</label>
+                
+                {/* List of added colors */}
+                {formData.colors.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {formData.colors.map((color, idx) => (
+                      <span key={idx} className="flex items-center gap-1 bg-blue-50 text-[#4A90E2] border border-blue-200 px-3 py-1 rounded-full text-xs font-bold">
+                        {color}
+                        <button type="button" onClick={() => handleRemoveColor(color)} className="hover:text-red-500 text-sm leading-none ml-1">&times;</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {/* Add color input */}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={newColor}
+                    onChange={(e) => setNewColor(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddColor(); } }}
+                    placeholder="e.g. Black"
+                    className="flex-1 border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
+                  />
+                  <button
+                    type="button"
+                    onClick={handleAddColor}
+                    disabled={!newColor.trim()}
+                    className="bg-gray-800 text-white px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-900 disabled:opacity-50 transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
               </div>
             </div>
 
+            {/* RIGHT COLUMN */}
             <div className="flex flex-col">
               <div className="space-y-5 flex-1">
                 <div>
@@ -191,10 +271,26 @@ export default function ProductModal({ product, onClose, onSuccess }) {
                     </div>
                   </div>
                 </div>
+
+                <div className="bg-blue-50/50 p-4 rounded-xl border border-blue-100 space-y-4 mt-2">
+                  <h3 className="text-xs font-bold text-[#4A90E2] uppercase tracking-wide flex items-center gap-2">
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    Website Specifications
+                  </h3>
+                  
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">Material</label>
+                    <input
+                      type="text"
+                      value={formData.material}
+                      onChange={(e) => setFormData({ ...formData, material: e.target.value })}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
+                    />
+                  </div>
+                </div>
               </div>
 
-              {/* Status Toggle */}
-              <div className="mt-8">
+              <div className="mt-6 pt-6 border-t border-gray-200">
                 <label className="block text-sm font-bold text-gray-800 mb-3">Status</label>
                 <div className="flex gap-3">
                   <button
@@ -219,7 +315,6 @@ export default function ProductModal({ product, onClose, onSuccess }) {
                 </div>
               </div>
 
-              {/* ✅ Featured Toggle */}
               <div className="mt-6">
                 <div className="flex justify-between items-center mb-3">
                   <label className="block text-sm font-bold text-gray-800">Featured on Homepage</label>
@@ -231,12 +326,10 @@ export default function ProductModal({ product, onClose, onSuccess }) {
                 <button
                   type="button"
                   onClick={() => {
-                    // If it's already featured, let them turn it off
                     if (formData.isFeatured) {
                       setFormData({ ...formData, isFeatured: false });
                       return;
                     }
-                    // If not featured, check the limit
                     if (featuredCount >= 4) {
                       alert("You can only feature up to 4 items on the homepage. Please remove a featured item first.");
                       return;
@@ -259,9 +352,7 @@ export default function ProductModal({ product, onClose, onSuccess }) {
 
           </div>
 
-          {/* Footer Banner */}
           <div className="mt-8 bg-[#dbeafe] rounded-xl p-4 flex flex-col md:flex-row justify-between items-center gap-4">
-            
             <div className="flex items-center gap-6">
               <div className="flex items-center gap-2 text-blue-900">
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -278,27 +369,16 @@ export default function ProductModal({ product, onClose, onSuccess }) {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-blue-900">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-                <div>
-                  <p className="text-[10px] font-bold uppercase">Updated By</p>
-                  <p className="text-xs font-bold">{loggedInName}</p> 
-                </div>
-              </div>
             </div>
 
             <div className="flex gap-3 w-full md:w-auto">
               <button type="button" onClick={onClose} className="flex-1 md:flex-none px-6 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg text-sm font-bold hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
-              {/* ✅ Changed text to "Save" */}
               <button type="submit" disabled={uploading} className="flex-1 md:flex-none px-6 py-2 bg-[#4A90E2] text-white rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 transition-colors shadow-sm disabled:opacity-50">
                 {uploading ? 'Saving...' : 'Save'}
               </button>
             </div>
-
           </div>
         </form>
       </div>

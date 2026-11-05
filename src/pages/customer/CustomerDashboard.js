@@ -22,27 +22,40 @@ function CustomerDashboard() {
       if (!currentUser?.email) return;
 
       try {
-        // 1. Fetch Profile (Users doc, since customers might not have a clinic record yet)
+        // 1. Fetch User Document (for basic role/name)
         const userDoc = await getDoc(doc(db, 'users', currentUser.email));
-        if (userDoc.exists()) {
-          setProfile(userDoc.data());
+        const userBasicData = userDoc.exists() ? userDoc.data() : {};
+
+        let finalProfile = { ...userBasicData };
+
+        // 2. Fetch the actual profile data (onlineAccounts or customers)
+        if (userData?.linkedCustomerId) {
+          const custDoc = await getDoc(doc(db, 'customers', userData.linkedCustomerId));
+          if (custDoc.exists()) {
+            finalProfile = { ...finalProfile, ...custDoc.data() };
+          }
         } else {
-          setProfile({ firstName: 'Customer', lastName: '', phone: '', address: '' });
+          const onlineDoc = await getDoc(doc(db, 'onlineAccounts', currentUser.email));
+          if (onlineDoc.exists()) {
+            finalProfile = { ...finalProfile, ...onlineDoc.data() };
+          }
         }
 
-        // 2. Fetch Cart
+        setProfile(finalProfile);
+
+        // 3. Fetch Cart
         const cartDoc = await getDoc(doc(db, 'carts', currentUser.email));
         if (cartDoc.exists()) {
           setCartItems(cartDoc.data().items || []);
         }
 
-        // 3. Fetch Wishlist
+        // 4. Fetch Wishlist
         const wishDoc = await getDoc(doc(db, 'wishlists', currentUser.email));
         if (wishDoc.exists()) {
           setWishlistItems(wishDoc.data().items || []);
         }
 
-        // 4. Fetch Next Appointment
+        // 5. Fetch Next Appointment
         const q = query(
           collection(db, 'appointments'), 
           where('customerId', '==', customerId),
@@ -52,7 +65,6 @@ function CustomerDashboard() {
         const appts = [];
         apptSnap.forEach(d => appts.push({ id: d.id, ...d.data() }));
         
-        // Sort by date to find the closest one
         appts.sort((a, b) => new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`));
         if (appts.length > 0) setNextAppt(appts[0]);
 
@@ -62,12 +74,17 @@ function CustomerDashboard() {
       setLoading(false);
     };
     fetchData();
-  }, [currentUser, customerId]);
+  }, [currentUser, customerId, userData]);
 
   if (loading) return <div className="text-center py-20 text-gray-500">Loading your dashboard...</div>;
 
   const cartTotal = cartItems.reduce((acc, item) => acc + (Number(item.price) * item.quantity), 0);
   const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+
+  // ✅ Format the display name correctly
+  const displayName = profile?.firstName 
+    ? `${profile.firstName} ${profile.lastName || ''}`.trim() 
+    : profile?.name || currentUser?.email?.split('@')[0] || 'Customer';
 
   return (
     <div className="space-y-6">
@@ -75,10 +92,9 @@ function CustomerDashboard() {
       {/* ✅ WELCOME BANNER */}
       <div className="bg-white border border-gray-200 rounded-xl p-8 flex justify-between items-center relative overflow-hidden h-32">
         <h1 className="text-3xl font-bold text-[#4A90E2] z-10">
-          Hello, {profile?.firstName || 'Customer'}!
+          Hello, {profile?.firstName || displayName}!
         </h1>
         <div className="absolute right-0 top-0 bottom-0 w-1/3 bg-gray-50 flex items-center justify-center text-gray-300 border-l border-gray-200">
-          {/* ✅ SVG Welcome Icon */}
           <svg className="w-16 h-16 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1" d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
@@ -87,7 +103,7 @@ function CustomerDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
-        {/* ✅ MY CART SUMMARY */}
+        {/* MY CART SUMMARY */}
         <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -106,7 +122,6 @@ function CustomerDashboard() {
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                   ) : (
-                    /* ✅ SVG Image Placeholder */
                     <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -126,7 +141,7 @@ function CustomerDashboard() {
           </Link>
         </div>
 
-        {/* ✅ MY WISHLIST SUMMARY */}
+        {/* MY WISHLIST SUMMARY */}
         <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2">
@@ -145,7 +160,6 @@ function CustomerDashboard() {
                   {item.imageUrl ? (
                     <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
                   ) : (
-                    /* ✅ SVG Image Placeholder */
                     <svg className="w-6 h-6 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
@@ -165,7 +179,7 @@ function CustomerDashboard() {
           </Link>
         </div>
 
-        {/* ✅ QUICK ACTIONS */}
+        {/* QUICK ACTIONS */}
         <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
           <h3 className="font-bold text-lg mb-4">Quick Actions</h3>
           <div className="grid grid-cols-2 gap-3">
@@ -195,7 +209,7 @@ function CustomerDashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
-        {/* ✅ YOUR NEXT APPOINTMENT */}
+        {/* YOUR NEXT APPOINTMENT */}
         <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
           <div className="flex justify-between items-center mb-4">
             <div className="flex items-center gap-2">
@@ -218,7 +232,7 @@ function CustomerDashboard() {
           )}
         </div>
 
-        {/* ✅ QUICK PROFILE */}
+        {/* QUICK PROFILE */}
         <div className="bg-white border border-gray-200 rounded-xl p-5 shadow-sm">
           <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3">
             <div className="flex items-center gap-2">
@@ -241,14 +255,15 @@ function CustomerDashboard() {
                   <img src={profile.photoUrl} alt="Profile" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-4xl font-bold text-gray-400">
-                    {profile?.firstName ? profile.firstName.charAt(0).toUpperCase() : 'C'}
+                    {profile?.firstName ? profile.firstName.charAt(0).toUpperCase() : displayName.charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
             </div>
 
             <div className="flex-1 text-center sm:text-left">
-              <h2 className="text-xl font-bold text-gray-900">{profile?.firstName} {profile?.lastName}</h2>
+              {/* ✅ Show the correctly formatted name */}
+              <h2 className="text-xl font-bold text-gray-900">{displayName}</h2>
               <p className="text-sm text-gray-500 mb-3">{currentUser?.email}</p>
               
               <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 text-sm text-gray-600">
@@ -256,6 +271,7 @@ function CustomerDashboard() {
                   <svg className="w-4 h-4 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
                   </svg>
+                  {/* ✅ Check profile.phone */}
                   <span>{profile?.phone || 'Not provided'}</span>
                 </div>
 
@@ -264,6 +280,7 @@ function CustomerDashboard() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                   </svg>
+                  {/* ✅ Check profile.address */}
                   <span>{profile?.address || 'Not provided'}</span>
                 </div>
               </div>

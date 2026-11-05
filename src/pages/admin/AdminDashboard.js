@@ -70,13 +70,21 @@ function AdminDashboard() {
       custSnap.forEach((doc) => {
         const data = doc.data();
         totalCustomers++;
+        
+        // Check if they are new this week
+        const createdDate = data.createdAt ? new Date(data.createdAt) : null;
+        const isNewThisWeek = createdDate && createdDate >= lastWeek;
+
         if (data.createdAt) {
-          const createdDateStr = new Date(new Date(data.createdAt).getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
+          const createdDateStr = new Date(createdDate.getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
           if (createdDateStr === todayStr) newCustomersToday++;
-          const createdDate = new Date(data.createdAt);
-          if (createdDate >= lastWeek) newCustomersWeek++;
+          if (isNewThisWeek) newCustomersWeek++;
         }
-        if ((data.totalVisits || 0) > 1) returningCustomers++;
+
+        // ✅ Only count as returning if they have >1 visit AND aren't new this week
+        if ((data.totalVisits || 0) > 1 && !isNewThisWeek) {
+          returningCustomers++;
+        }
       });
 
       // 2. APPOINTMENTS
@@ -481,27 +489,33 @@ function AdminDashboard() {
                   <Link to="/admin/customers" className="text-sm text-[#4A90E2] hover:underline font-bold">View All →</Link>
                 </div>
                 
-                <div className="flex items-center gap-6 flex-1">
+                                <div className="flex items-center gap-6 flex-1">
                   
-                  {/* ✅ Small Donut Chart for New vs Returning */}
+                                    {/* ✅ Fixed Donut Chart */}
                   <div className="relative w-28 h-28 flex-shrink-0">
-                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                      {/* Background circle (Total) */}
-                      <circle cx="50" cy="50" r="40" fill="none" stroke="#f3f4f6" strokeWidth="15" />
+                    {/* Calculate percentages safely */}
+                    {(() => {
+                      const total = stats.totalCustomers || 1;
+                      const newCust = stats.newCustomersWeek || 0;
                       
-                      {/* New Customers Ring (Purple) */}
-                      <circle 
-                        cx="50" cy="50" r="40" fill="none" stroke="#a855f7" strokeWidth="15"
-                        strokeDasharray={`${(stats.newCustomersWeek / (stats.totalCustomers || 1)) * 251.2} 251.2`} 
-                      />
-                      
-                      {/* Returning Customers Ring (Green) - Offset to start where the purple ends */}
-                      <circle 
-                        cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="15"
-                        strokeDasharray={`${(stats.returningCustomers / (stats.totalCustomers || 1)) * 251.2} 251.2`} 
-                        strokeDashoffset={`-${(stats.newCustomersWeek / (stats.totalCustomers || 1)) * 251.2}`}
-                      />
-                    </svg>
+                      // Calculate how much of the circle the purple section should take
+                      const newPercent = Math.min((newCust / total) * 100, 100);
+                      const dashArray = (newPercent / 100) * 251.2;
+
+                      return (
+                        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                          {/* Background circle (Green - Returning) */}
+                          <circle cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="15" />
+                          
+                          {/* Foreground circle (Purple - New) */}
+                          <circle 
+                            cx="50" cy="50" r="40" fill="none" stroke="#a855f7" strokeWidth="15"
+                            strokeDasharray={`${dashArray} 251.2`} 
+                          />
+                        </svg>
+                      );
+                    })()}
+                    
                     {/* Center Text */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-2xl font-bold text-gray-900">{stats.totalCustomers}</span>
@@ -509,7 +523,7 @@ function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* ✅ Legend & Stats */}
+                  {/* Legend */}
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">

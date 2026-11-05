@@ -1,61 +1,61 @@
 // src/pages/admin/CustomerAccountsPage.js
 
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, query, where, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
-import CreateStaffModal from '../../components/CreateStaffModal'; // ✅ Import the staff modal
+import CreateStaffModal from '../../components/CreateStaffModal';
 
 function CustomerAccountsPage() {
   const { currentUser } = useAuth();
   
-  // ✅ Tab State
-  const [activeTab, setActiveTab] = useState('customers'); // 'customers' | 'staff'
+  // Tab State
+  const [activeTab, setActiveTab] = useState('customers'); // 'customers' | 'staff' | 'archived'
 
   // Data States
   const [customerAccounts, setCustomerAccounts] = useState([]);
   const [staffAccounts, setStaffAccounts] = useState([]);
-  const [archivedAccounts, setArchivedAccounts] = useState([]); // ✅ New State
+  const [archivedAccounts, setArchivedAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filter & Modals
   const [searchTerm, setSearchTerm] = useState('');
   const [accountToDelete, setAccountToDelete] = useState(null);
   const [alertConfig, setAlertConfig] = useState(null);
-  const [showStaffModal, setShowStaffModal] = useState(false); // ✅ Staff creation modal state
+  const [showStaffModal, setShowStaffModal] = useState(false);
+
+  // ✅ Pagination State
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 20;
 
   // Load Data
-    const loadData = async () => {
+  const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Pending Customer Accounts
-      const custQ = query(collection(db, 'customers'), where('status', '==', 'pending_link'));
-      const custSnap = await getDocs(custQ);
-      const custList = [];
-      custSnap.forEach(doc => custList.push({ id: doc.id, ...doc.data() }));
-      setCustomerAccounts(custList);
-
-      // 2. Fetch Staff & Admin Accounts
+      // 1. Fetch Online Customer Accounts & Staff (From Users Collection)
       const usersSnap = await getDocs(collection(db, 'users'));
+      const custList = [];
       const staffList = [];
-      usersSnap.forEach(doc => {
-        const data = doc.data();
-        if (data.role === 'admin' || data.role === 'staff') {
-          staffList.push({ id: doc.id, ...data });
-        }
-      });
-      setStaffAccounts(staffList);
-
-      // ✅ 3. Fetch ARCHIVED Customers
-      const archivedSnap = await getDocs(collection(db, 'customers'));
       const archivedList = [];
-      archivedSnap.forEach(doc => {
-        const data = doc.data();
-        if (data.isArchived === true) {
-          archivedList.push({ id: doc.id, ...data });
+
+      usersSnap.forEach(doc => {
+        const data = { id: doc.id, ...doc.data() };
+
+        if (data.role === 'admin' || data.role === 'staff') {
+          staffList.push(data);
+        } 
+        else if (data.role === 'customer') {
+          if (data.isArchived === true) {
+            archivedList.push(data);
+          } else {
+            custList.push(data);
+          }
         }
       });
+
+      setCustomerAccounts(custList);
+      setStaffAccounts(staffList);
       setArchivedAccounts(archivedList);
 
     } catch (err) {
@@ -73,9 +73,7 @@ function CustomerAccountsPage() {
     if (!accountToDelete) return;
     
     try {
-      // Delete from users collection (if staff/admin) OR customers (if pending)
-      const collectionName = accountToDelete.type === 'staff' ? 'users' : 'customers';
-      await deleteDoc(doc(db, collectionName, accountToDelete.id));
+      await deleteDoc(doc(db, 'users', accountToDelete.id));
       
       setAccountToDelete(null);
       loadData();
@@ -90,9 +88,9 @@ function CustomerAccountsPage() {
     }
   };
 
-  const handleRestore = async (customerId) => {
+  const handleRestore = async (accountId) => {
     try {
-      await updateDoc(doc(db, 'customers', customerId), {
+      await updateDoc(doc(db, 'users', accountId), {
         isArchived: false,
         restoredAt: new Date().toISOString()
       });
@@ -109,11 +107,11 @@ function CustomerAccountsPage() {
   };
 
   // Filter Logic
-    const getFilteredData = () => {
+  const getFilteredData = () => {
     let dataToFilter = [];
     if (activeTab === 'customers') dataToFilter = customerAccounts;
     if (activeTab === 'staff') dataToFilter = staffAccounts;
-    if (activeTab === 'archived') dataToFilter = archivedAccounts; // ✅ New Tab
+    if (activeTab === 'archived') dataToFilter = archivedAccounts;
 
     if (!searchTerm) return dataToFilter;
     
@@ -123,11 +121,22 @@ function CustomerAccountsPage() {
       item.firstName?.toLowerCase().includes(lower) ||
       item.lastName?.toLowerCase().includes(lower) ||
       item.name?.toLowerCase().includes(lower) ||
-      item.referenceId?.toLowerCase().includes(lower)
+      item.linkedCustomerId?.toLowerCase().includes(lower)
     );
   };
 
   const filteredData = getFilteredData();
+
+  // ✅ Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeTab]);
+
+  // ✅ Pagination Calculations
+  const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredData.slice(indexOfFirstItem, indexOfLastItem);
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -137,10 +146,9 @@ function CustomerAccountsPage() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Manage Accounts</h1>
-            <p className="text-gray-500 text-sm mt-1">Manage pending customer sign-ups and internal staff accounts.</p>
+            <p className="text-gray-500 text-sm mt-1">Manage registered online accounts and internal staff accounts.</p>
           </div>
           
-          {/* Only show "Add Staff" when on Staff tab */}
           {activeTab === 'staff' && (
             <button
               onClick={() => setShowStaffModal(true)}
@@ -151,7 +159,7 @@ function CustomerAccountsPage() {
           )}
         </div>
 
-        {/* ✅ Tabs */}
+        {/* Tabs */}
         <div className="flex flex-wrap border-b border-gray-200">
           <button
             onClick={() => setActiveTab('customers')}
@@ -187,17 +195,6 @@ function CustomerAccountsPage() {
           </button>
         </div>
 
-        <button
-            onClick={() => setActiveTab('archived')}
-            className={`py-3 px-6 text-base font-bold border-b-2 transition-colors ${
-              activeTab === 'archived' 
-                ? 'border-[#4A90E2] text-[#4A90E2]' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Archived Customers ({archivedAccounts.length})
-          </button>
-
         {/* Filter Bar */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-2">
           <div className="relative w-full max-w-md">
@@ -208,7 +205,7 @@ function CustomerAccountsPage() {
             </span>
             <input
               type="text"
-              placeholder={`Search ${activeTab === 'customers' ? 'customers' : 'staff'} by name or email...`}
+              placeholder={`Search ${activeTab === 'customers' ? 'customers' : activeTab === 'staff' ? 'staff' : 'archived'} by name, email or ID...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
@@ -223,7 +220,7 @@ function CustomerAccountsPage() {
               <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[#4A90E2] mx-auto"></div>
               <p className="text-gray-500 mt-3 text-base">Loading accounts...</p>
             </div>
-          ) : filteredData.length === 0 ? (
+          ) : currentItems.length === 0 ? (
             <div className="p-12 text-center text-gray-500 text-base">
               No accounts found.
             </div>
@@ -232,74 +229,87 @@ function CustomerAccountsPage() {
               <table className="w-full text-base">
                 <thead>
                   <tr className="bg-[#dbeafe] text-gray-800 text-left">
-                    <th className="px-6 py-4 font-bold">{activeTab === 'customers' ? 'Name' : 'Full Name'}</th>
+                    <th className="px-6 py-4 font-bold">{activeTab === 'staff' ? 'Full Name' : 'Name'}</th>
                     <th className="px-6 py-4 font-bold">Email (Login)</th>
-                    {activeTab === 'customers' && <th className="px-6 py-4 font-bold">Phone</th>}
+                    
+                    {activeTab === 'customers' && <th className="px-6 py-4 font-bold">Status / Linked ID</th>}
                     {activeTab === 'staff' && <th className="px-6 py-4 font-bold">Role</th>}
+                    
                     <th className="px-6 py-4 font-bold">Date Created</th>
                     <th className="px-6 py-4 font-bold text-center">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {filteredData.map((item) => {
+                  {currentItems.map((item) => {
                     const isSelf = item.email === currentUser?.email;
+                    const isAdminAccount = item.role === 'admin';
                     
                     return (
-                                        <tr key={item.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 text-gray-800 font-medium">
-                      {activeTab === 'customers' || activeTab === 'archived'
-                        ? `${item.lastName || ''}, ${item.firstName || ''}`
-                        : item.name || '—'
-                      }
-                      {/* ✅ Show Ref ID for archived */}
-                      {activeTab === 'archived' && (
-                        <span className="block text-xs text-gray-500 font-mono mt-1">{item.referenceId}</span>
-                      )}
-                      {isSelf && (
-                        <span className="ml-2 text-[10px] font-bold text-[#4A90E2] bg-blue-50 px-2 py-0.5 rounded-full uppercase">You</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 text-gray-600">{item.email || item.id}</td>
-                    
-                    {(activeTab === 'customers' || activeTab === 'archived') && (
-                      <td className="px-6 py-4 text-gray-600">{item.phone || '—'}</td>
-                    )}
-                    
-                    {activeTab === 'staff' && (
-                      <td className="px-6 py-4">
-                        <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${
-                          item.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                          {item.role}
-                        </span>
-                      </td>
-                    )}
-                    
-                    <td className="px-6 py-4 text-gray-500 text-sm">
-                      {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}
-                    </td>
-                    
-                    <td className="px-6 py-4 text-center">
-                      {/* ✅ Show Restore Button for Archived */}
-                      {activeTab === 'archived' ? (
-                        <button
-                          onClick={() => handleRestore(item.id)}
-                          className="bg-green-50 border border-green-200 text-green-600 px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-green-100 transition-colors"
-                        >
-                          Restore
-                        </button>
-                      ) : (
-                        !isSelf && (
-                          <button
-                            onClick={() => setAccountToDelete({ ...item, type: activeTab === 'customers' ? 'customer' : 'staff' })}
-                            className="bg-red-50 border border-red-200 text-red-600 px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-red-100 transition-colors"
-                          >
-                            Delete
-                          </button>
-                        )
-                      )}
-                    </td>
-                  </tr>
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-gray-800 font-medium">
+                          {item.name || `${item.firstName || ''} ${item.lastName || ''}`.trim() || '—'}
+                          {isSelf && (
+                            <span className="ml-2 text-[10px] font-bold text-[#4A90E2] bg-blue-50 px-2 py-0.5 rounded-full uppercase">You</span>
+                          )}
+                        </td>
+                        
+                        <td className="px-6 py-4 text-gray-600">{item.email || item.id}</td>
+
+                        {/* Status / Linked ID */}
+                        {activeTab === 'customers' && (
+                          <td className="px-6 py-4">
+                            {item.linkedCustomerId ? (
+                              <span className="bg-green-100 text-green-700 font-mono text-xs font-bold px-2.5 py-1 rounded inline-block">
+                                {item.linkedCustomerId}
+                              </span>
+                            ) : (
+                              <span className="bg-yellow-100 text-yellow-700 text-xs font-bold px-2.5 py-1 rounded inline-block">
+                                Unlinked
+                              </span>
+                            )}
+                          </td>
+                        )}
+                        
+                        {activeTab === 'staff' && (
+                          <td className="px-6 py-4">
+                            <span className={`px-3 py-1 rounded text-xs font-bold uppercase ${
+                              item.role === 'admin' ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'
+                            }`}>
+                              {item.role}
+                            </span>
+                          </td>
+                        )}
+                        
+                        <td className="px-6 py-4 text-gray-500 text-sm">
+                          {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : '—'}
+                        </td>
+                        
+                        <td className="px-6 py-4 text-center">
+                          {activeTab === 'archived' ? (
+                            <button
+                              onClick={() => handleRestore(item.id)}
+                              className="bg-green-50 border border-green-200 text-green-600 px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-green-100 transition-colors"
+                            >
+                              Restore
+                            </button>
+                          ) : (
+                            !isSelf && (
+                              <button
+                                onClick={() => setAccountToDelete({ ...item, type: activeTab === 'customers' ? 'customer' : 'staff' })}
+                                disabled={isAdminAccount}
+                                title={isAdminAccount ? "Admin accounts cannot be deleted" : "Delete account"}
+                                className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${
+                                  isAdminAccount 
+                                    ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed' 
+                                    : 'bg-red-50 border border-red-200 text-red-600 hover:bg-red-100'
+                                }`}
+                              >
+                                {isAdminAccount ? 'Protected' : 'Delete'}
+                              </button>
+                            )
+                          )}
+                        </td>
+                      </tr>
                     );
                   })}
                 </tbody>
@@ -307,6 +317,51 @@ function CustomerAccountsPage() {
             </div>
           )}
         </div>
+
+        {/* ✅ Pagination Controls */}
+        {filteredData.length > 0 && (
+          <div className="flex justify-center items-center gap-2 pt-4">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
+            >
+              Prev
+            </button>
+            
+            <div className="flex gap-1">
+              {[...Array(totalPages)].map((_, i) => {
+                const pageNum = i + 1;
+                // Hide middle pages if there are too many
+                if (totalPages > 5 && pageNum > 2 && pageNum < totalPages - 1 && pageNum !== currentPage) {
+                  if (pageNum === 3) return <span key={pageNum} className="px-2 py-1.5 text-gray-400">...</span>;
+                  return null;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1.5 rounded-md text-base border shadow-sm font-medium ${
+                      currentPage === pageNum 
+                        ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
+                        : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm font-medium"
+            >
+              Next
+            </button>
+          </div>
+        )}
 
       </div>
 

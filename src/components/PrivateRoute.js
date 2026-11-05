@@ -16,11 +16,24 @@ function PrivateRoute({ children, allowedRoles }) {
   }
 
   if (!currentUser) {
-    // ✅ Redirect to unified login
+    // Not logged in? Go to login
     return <Navigate to="/login" replace />;
   }
 
+  // ✅ Check if the user's role is allowed on this route
   if (allowedRoles && !allowedRoles.includes(userRole)) {
+    
+    // If an admin or staff tries to access a customer route, send them to the admin dashboard
+    if (userRole === 'admin' || userRole === 'staff') {
+      return <Navigate to="/admin/dashboard" replace />;
+    }
+
+    // If a customer tries to access an admin route, send them to the customer dashboard
+    if (userRole === 'customer') {
+      return <Navigate to="/customer/dashboard" replace />;
+    }
+
+    // Fallback
     return <Navigate to="/" replace />;
   }
 
