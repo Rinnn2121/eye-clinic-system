@@ -51,8 +51,7 @@ function CustomerTransactions() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-1">My Transactions</h1>
-      <p className="text-gray-500 text-sm mb-6">View your purchase history and receipts.</p>
+      <h1 className="text-3xl font-bold mb-6">Transactions</h1>
 
       {orders.length === 0 ? (
         <div className="text-center py-20 bg-white border border-gray-200 rounded-xl">

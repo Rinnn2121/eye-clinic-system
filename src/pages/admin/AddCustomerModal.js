@@ -1,7 +1,7 @@
 // src/pages/admin/AddCustomerModal.js
 
 import React, { useState } from 'react';
-import { doc, setDoc, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, collection, getDocs, getDoc, updateDoc, deleteDoc } from 'firebase/firestore'; // ✅ Added getDoc, updateDoc, deleteDoc
 import { db } from '../../firebase/config';
 
 function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
@@ -10,6 +10,7 @@ function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
     lastName: '',
     nickname: '',
     phone: '',
+    email: '', // ✅ New field for linking online accounts
     address: '',
     age: '',
     occupation: '',
@@ -17,10 +18,8 @@ function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   
-  // ✅ Tracks the created customer ID so we can show the success UI
   const [createdCustomerId, setCreatedCustomerId] = useState(null);
 
-  // ✅ Generate unique Reference ID
   const generateUniqueReferenceId = async () => {
     let attempts = 0;
     while (attempts < 50) {
@@ -53,6 +52,7 @@ function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
         lastName: form.lastName.trim(),
         nickname: form.nickname.trim(),
         phone: form.phone.trim(),
+        email: form.email.trim().toLowerCase(), // ✅ Save the email to the customer record
         address: form.address.trim(),
         age: Number(form.age) || 0,
         occupation: form.occupation.trim(),
@@ -63,13 +63,41 @@ function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
 
       await setDoc(doc(db, 'customers', referenceId), customerData);
 
-      // Notify parent (this might trigger a background refresh, but won't close the modal)
+      // ✅ AUTO-LINK: If they provided an email, connect their online user doc to this new record
+      if (form.email.trim()) {
+        const emailToLink = form.email.trim().toLowerCase();
+        try {
+          const userDocRef = doc(db, 'users', emailToLink);
+          const userDocSnap = await getDoc(userDocRef);
+          
+          if (userDocSnap.exists()) {
+            // Update their online profile to point to this new clinic reference ID
+            await updateDoc(userDocRef, {
+              linkedCustomerId: referenceId
+            });
+            
+            // Delete their old pending onlineAccount doc since they are now a real customer
+            const onlineAccountRef = doc(db, 'onlineAccounts', emailToLink);
+            const onlineSnap = await getDoc(onlineAccountRef);
+            if (onlineSnap.exists()) {
+              await deleteDoc(onlineAccountRef);
+            }
+          }
+        } catch (linkErr) {
+          console.error("Could not auto-link account:", linkErr);
+          // We don't stop the creation process if the link fails
+        }
+      }
+
       if (onCustomerCreated) {
         onCustomerCreated({ id: referenceId, ...customerData });
       }
 
-      // ✅ Set the ID to show the success screen (keeps modal open)
-      setCreatedCustomerId(referenceId);
+      if (isWizard) {
+        onClose(referenceId);
+      } else {
+        setCreatedCustomerId(referenceId);
+      }
       
     } catch (err) {
       console.error('Error adding customer:', err);
@@ -82,7 +110,6 @@ function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto shadow-2xl">
         
-        {/* ✅ If customer is NOT created yet, show the Form */}
         {!createdCustomerId ? (
           <>
             {/* Header */}
@@ -135,19 +162,28 @@ function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
                 />
               </div>
 
-               {/* Phone */}
+              {/* Phone */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone No.</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
                 <input
                   type="tel" 
                   required 
                   maxLength={11}
-                  pattern="[0-9]{11}"
-                  title="Please enter exactly 11 digits."
                   value={form.phone}
                   onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, '') })}
                   className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
                   placeholder="09XXXXXXXXX"
+                />
+              </div>
+
+              {/* ✅ New Email Field */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Email Address (Optional)</label>
+                <input
+                  type="email" 
+                  value={form.email}
+                  onChange={(e) => setForm({ ...form, email: e.target.value })}
+                  className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
                 />
               </div>
 
@@ -199,7 +235,7 @@ function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
             </form>
           </>
         ) : (
-          /* ✅ If customer IS created, show the Success UI inside the SAME modal */
+          /* Success UI */
           <div className="p-8 text-center">
             <div className="w-16 h-16 bg-green-100 text-green-600 rounded-full flex items-center justify-center mx-auto mb-4">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -217,7 +253,7 @@ function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
               Would you like to start their visit now?
             </p>
             
-                        <div className="flex gap-3">
+            <div className="flex gap-3">
               <button
                 onClick={() => onClose(null)}
                 className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
@@ -228,8 +264,7 @@ function AddCustomerModal({ onClose, onCustomerCreated, isWizard = false }) {
                 onClick={() => onClose(createdCustomerId)}
                 className="flex-1 bg-[#4A90E2] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-[#4A90E2]/90 transition-colors"
               >
-                {/* ✅ Change text based on context */}
-                {isWizard ? 'Continue to Booking' : 'Start Visit'}
+                Start Visit
               </button>
             </div>
           </div>

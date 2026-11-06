@@ -1,7 +1,7 @@
 // src/pages/customer/CustomerProfile.js
 
 import React, { useState, useEffect } from 'react';
-import { doc, getDoc, updateDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, collection, query, where, getDocs, deleteDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -9,8 +9,8 @@ import { sendEmailVerification } from 'firebase/auth';
 import { auth } from '../../firebase/config';
 
 function CustomerProfile() {
-const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth();  
-  
+  const { currentUser, userData, updateProfilePicture } = useAuth(); 
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -34,20 +34,18 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
   // Modals
   const [alertConfig, setAlertConfig] = useState(null);
 
-  // 1. Load profile (either from official linked record OR from pending account)
+  // 1. Load profile 
   useEffect(() => {
     const loadProfile = async () => {
       if (!currentUser?.email) return;
 
       try {
-        // Check if user doc has a linkedCustomerId
         const userRef = doc(db, 'users', currentUser.email);
         const userSnap = await getDoc(userRef);
         const userInfo = userSnap.data() || {};
         const linkedCustomerId = userInfo.linkedCustomerId;
 
         if (linkedCustomerId) {
-          // ✅ Linked to an official clinic record
           const custRef = doc(db, 'customers', linkedCustomerId);
           const custSnap = await getDoc(custRef);
           if (custSnap.exists()) {
@@ -63,7 +61,6 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
             setLinkedId(linkedCustomerId);
           }
         } else {
-          // ⏳ Not linked yet — load from pending account (customers/{email})
           const pendingRef = doc(db, 'onlineAccounts', currentUser.email);
           const pendingSnap = await getDoc(pendingRef);
           if (pendingSnap.exists()) {
@@ -86,8 +83,8 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
     loadProfile();
   }, [currentUser]);
 
-  // 2. Handle Save (update pending account or official record)
-      const handleSave = async () => {
+  // 2. Handle Save
+  const handleSave = async () => {
     setSaving(true);
     try {
       if (isLinked) {
@@ -107,17 +104,6 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
           address: profile.address.trim(),
         });
       }
-
-      // ✅ ALSO UPDATE THE USERS COLLECTION so the Navbar changes
-      await updateDoc(doc(db, 'users', currentUser.email), {
-        name: `${profile.firstName.trim()} ${profile.lastName.trim()}`.trim(),
-        firstName: profile.firstName.trim(),
-        lastName: profile.lastName.trim()
-      });
-
-      // ✅ Refresh the Auth Context to update Navbar/Sidebar instantly
-      await refreshUserData();
-
       setAlertConfig({
         type: 'success',
         title: 'Profile Updated',
@@ -130,7 +116,7 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
     setSaving(false);
   };
 
-  // 3. Handle Link Account (customer types their reference ID)
+  // 3. Handle Link Account
   const handleLink = async () => {
     if (!referenceId.trim()) return;
 
@@ -138,7 +124,6 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
     try {
       const idToLink = referenceId.trim().toUpperCase();
 
-      // Step A: Check if the reference ID exists in the customers collection
       const linkedCustomerRef = doc(db, 'customers', idToLink);
       const linkedCustomerSnap = await getDoc(linkedCustomerRef);
 
@@ -154,7 +139,6 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
 
       const linkedData = linkedCustomerSnap.data();
 
-      // Step B: Check if it's already linked to someone else
       const usersQuery = query(collection(db, 'users'), where('linkedCustomerId', '==', idToLink));
       const usersSnap = await getDocs(usersQuery);
       
@@ -168,7 +152,6 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
         return;
       }
 
-      // Step C: Merge data — keep profile info from the pending account if linked record is missing data
       const mergedProfile = {
         firstName: linkedData.firstName || profile.firstName,
         lastName: linkedData.lastName || profile.lastName,
@@ -178,31 +161,19 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
         email: linkedData.email || currentUser.email,
       };
 
-      // Step D: Update the OFFICIAL customer record with the merged data
       await updateDoc(doc(db, 'customers', idToLink), mergedProfile);
 
-      // Step E: Delete the pending account record (if it exists)
       const pendingRef = doc(db, 'onlineAccounts', currentUser.email);
       const pendingSnap = await getDoc(pendingRef);
       if (pendingSnap.exists()) {
-        const { deleteDoc } = await import('firebase/firestore');
         await deleteDoc(pendingRef);
       }
 
-      // Step F: Update the USER doc with linkedCustomerId
-            // Step F: Update the USER doc with linkedCustomerId
       await updateDoc(doc(db, 'users', currentUser.email), {
         linkedCustomerId: idToLink,
-        role: 'customer',
-        name: `${mergedProfile.firstName} ${mergedProfile.lastName}`.trim(), // ✅ Update name
-        firstName: mergedProfile.firstName, // ✅ Update first name
-        lastName: mergedProfile.lastName    // ✅ Update last name
+        role: 'customer'
       });
 
-      // ✅ Refresh context so Navbar knows you are linked
-      await refreshUserData();
-
-      // Step G: Update local state
       setProfile({
         firstName: mergedProfile.firstName,
         lastName: mergedProfile.lastName,
@@ -227,21 +198,20 @@ const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth
     setLinking(false);
   };
 
-  // ✅ Handle Cloudinary Upload
+  // Handle Cloudinary Upload
   const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     setUploadingImage(true);
     try {
-      // Your exact Cloudinary details from InventoryPage
       const cloudName = 'vmdtvqty'; 
       const uploadPreset = 'profile_unsigned';
 
       const data = new FormData();
-data.append('file', file);
-data.append('upload_preset', uploadPreset);
-data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
+      data.append('file', file);
+      data.append('upload_preset', uploadPreset);
+      data.append('folder', 'eyeclinic_profiles');
 
       const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/image/upload`, {
         method: 'POST',
@@ -252,7 +222,7 @@ data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
       
       if (result.secure_url) {
         setImageUrl(result.secure_url);
-        await updateProfilePicture(result.secure_url); // Save to Firestore & Context
+        await updateProfilePicture(result.secure_url);
         setAlertConfig({ type: 'success', title: 'Photo Updated!', message: 'Your profile picture has been saved.' });
       } else {
         throw new Error('Upload failed');
@@ -282,13 +252,29 @@ data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
       
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold mb-1">My Profile</h1>
+        <h1 className="text-3xl font-bold mb-1">Profile</h1>
         <p className="text-gray-500 text-sm mb-6">
           Manage your personal information and account details.
         </p>
       </div>
 
-      {/* ✅ LINK ACCOUNT BANNER (only if not linked) */}
+      {/* ✅ UNVERIFIED EMAIL BANNER - Moved outside the grid so it doesn't break the layout */}
+      {!currentUser?.emailVerified && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <p className="font-bold text-yellow-800">Email not verified</p>
+            <p className="text-sm text-yellow-700">Please verify your email to secure your account.</p>
+          </div>
+          <button 
+            onClick={handleResend}
+            className="bg-white text-yellow-800 border border-yellow-300 px-4 py-2 rounded-lg text-sm font-bold hover:bg-yellow-100 whitespace-nowrap"
+          >
+            Resend Email
+          </button>
+        </div>
+      )}
+
+      {/* LINK ACCOUNT BANNER (only if not linked) */}
       {!isLinked && (
         <div className="bg-[#dbeafe] border border-blue-200 rounded-xl p-6">
           <div className="flex items-start gap-4">
@@ -323,7 +309,7 @@ data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
         </div>
       )}
 
-      {/* ✅ LINKED STATUS (if linked) */}
+      {/* LINKED STATUS (if linked) */}
       {isLinked && (
         <div className="bg-green-50 border border-green-200 rounded-xl p-4 flex items-center gap-3">
           <div className="w-8 h-8 bg-green-500 text-white rounded-full flex items-center justify-center flex-shrink-0">
@@ -341,61 +327,45 @@ data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
       {/* PROFILE FORM */}
       <div className="bg-white border border-gray-200 rounded-xl p-8 flex flex-col md:flex-row gap-8">
         
-        {/* In the Avatar section: */}
-    <div className="flex-1 flex flex-col items-center justify-center border-r border-gray-100 pr-8">
-      <div className="relative w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mb-3 overflow-hidden group border-2 border-transparent hover:border-[#4A90E2] transition-colors">
-        
-        {/* Show Image or Initial */}
-        {imageUrl ? (
-          <img src={imageUrl} alt="Profile" className="w-full h-full object-cover" />
-        ) : (
-          <svg className="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        )}
-
-        {/* Hover Overlay for Uploading */}
-        <label className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
-          {uploadingImage ? (
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
-          ) : (
-            <>
-              <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+        {/* Avatar section */}
+        <div className="flex-1 flex flex-col items-center justify-center border-r border-gray-100 pr-8">
+          <div className="relative w-32 h-32 bg-gray-100 rounded-full flex items-center justify-center mb-3 overflow-hidden group border-2 border-transparent hover:border-[#4A90E2] transition-colors">
+            
+            {imageUrl ? (
+              <img src={imageUrl} alt="Profile" className="w-full h-full object-cover" />
+            ) : (
+              <svg className="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <span className="text-xs font-bold">Change</span>
-            </>
-          )}
-          <input 
-            type="file" 
-            accept="image/*" 
-            className="hidden" 
-            onChange={handleImageUpload} 
-            disabled={uploadingImage}
-          />
-        </label>
-      </div>
-      <p className="text-sm font-medium text-gray-500 mt-1">Profile Picture</p>
-    </div>
+            )}
 
-     {/* Form */}
+            <label className="absolute inset-0 bg-black/50 text-white flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 cursor-pointer transition-opacity">
+              {uploadingImage ? (
+                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-white"></div>
+              ) : (
+                <>
+                  <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  <span className="text-xs font-bold">Change</span>
+                </>
+              )}
+              <input 
+                type="file" 
+                accept="image/*" 
+                className="hidden" 
+                onChange={handleImageUpload} 
+                disabled={uploadingImage}
+              />
+            </label>
+          </div>
+          <p className="text-sm font-medium text-gray-500 mt-1">Profile Picture</p>
+        </div>
+
+        {/* Form Fields */}
         <div className="flex-1 space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            {!currentUser?.emailVerified && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 flex items-center justify-between mb-6">
-            <div>
-              <p className="font-bold text-yellow-800">Email not verified</p>
-              <p className="text-sm text-yellow-700">Please verify your email to secure your account.</p>
-            </div>
-            <button 
-              onClick={handleResend}
-              className="bg-white text-yellow-800 border border-yellow-300 px-4 py-2 rounded-lg text-sm font-bold hover:bg-yellow-100"
-            >
-              Resend Email
-            </button>
-          </div>
-        )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
               <input
@@ -436,18 +406,13 @@ data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
             />
           </div>
 
-                    <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Phone No. (11 Digits) *</label>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number *</label>
             <input
               type="tel"
-              required
-              maxLength={11}
-              pattern="[0-9]{11}"
-              title="Please enter exactly 11 digits."
               value={profile.phone}
-              onChange={(e) => setProfile({ ...profile, phone: e.target.value.replace(/\D/g, '') })}
+              onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
               className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
-              placeholder="09XXXXXXXXX"
             />
           </div>
 
@@ -473,7 +438,6 @@ data.append('folder', 'eyeclinic_profiles'); // ✅ Profile folder
         </div>
       </div>
       
-
       {/* Alerts */}
       {alertConfig && (
         <ConfirmModal

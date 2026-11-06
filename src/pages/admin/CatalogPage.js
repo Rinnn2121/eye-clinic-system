@@ -17,13 +17,14 @@ function CatalogPage() {
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState('All Products');
-  const [sortBy, setSortBy] = useState('Price: Low to High');
+  // ✅ Changed default sort to 'Newest'
+  const [sortBy, setSortBy] = useState('Newest');
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12; 
 
-  // Modal States
+  // ✅ Modal States
   const [previewProduct, setPreviewProduct] = useState(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -62,38 +63,38 @@ function CatalogPage() {
       }
     }
 
-        result.sort((a, b) => {
-      // 1. Disabled items always at the bottom
+    result.sort((a, b) => {
       if (a.isActive === false && b.isActive !== false) return 1;
       if (a.isActive !== false && b.isActive === false) return -1;
       
-      // 2. Featured items always at the top
       if (a.isFeatured && !b.isFeatured) return -1;
       if (!a.isFeatured && b.isFeatured) return 1;
 
-      // 3. Sorting logic
+      // ✅ Added Newest logic
+      if (sortBy === 'Newest') {
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      }
       if (sortBy === 'Price: Low to High') return a.price - b.price;
       if (sortBy === 'Price: High to Low') return b.price - a.price;
       if (sortBy === 'Name: A-Z') return a.name.localeCompare(b.name);
-      if (sortBy === 'Name: Z-A') return b.name.localeCompare(a.name);
-      
       return 0;
     });
 
     return result;
   }, [products, searchTerm, activeTab, sortBy]);
 
+  // ✅ Pagination Logic
   const totalPages = Math.ceil(processedProducts.length / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = processedProducts.slice(indexOfFirstItem, indexOfLastItem);
 
+  // Reset to page 1 when filters change
   useEffect(() => { 
     setCurrentPage(1); 
   }, [searchTerm, activeTab, sortBy]);
 
-  // ✅ Removed 'Lens' and 'Coating'
-  const tabs = ['All Products', 'Metal Frame', 'Plastic Frame', 'Package', 'Service'];
+  const tabs = ['All Products', 'Metal Frame', 'Plastic Frame', 'Lens', 'Coating', 'Package', 'Service'];
 
   const handleProductClick = (item) => {
     setPreviewProduct(item);
@@ -118,7 +119,6 @@ function CatalogPage() {
         <div className="flex justify-between items-start mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Catalog</h1>
-            <p className="text-gray-500 text-sm mt-1">Browse and manage frames, lenses and optical accessories.</p>
           </div>
           
           {isAdmin && (
@@ -152,10 +152,11 @@ function CatalogPage() {
             onChange={(e) => setSortBy(e.target.value)}
             className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-600 outline-none cursor-pointer hover:bg-gray-50 transition-colors"
           >
-            <option>Price: Low to High</option>
-            <option>Price: High to Low</option>
-            <option>Name: A-Z</option>
-            <option>Name: Z-A</option>
+            {/* ✅ Added Newest option */}
+            <option value="Newest">Newest First</option>
+            <option value="Price: Low to High">Price: Low to High</option>
+            <option value="Price: High to Low">Price: High to Low</option>
+            <option value="Name: A-Z">Name: A-Z</option>
           </select>
         </div>
 
@@ -198,7 +199,7 @@ function CatalogPage() {
                     </svg>
                   )}
                   
-                  {/* Featured Badge */}
+                  {/* ✅ Featured Badge */}
                   {item.isFeatured && (
                     <div className="absolute top-2 right-2 bg-yellow-400 text-yellow-900 text-[10px] font-bold px-2 py-0.5 rounded shadow-sm flex items-center gap-1">
                       <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
@@ -227,54 +228,48 @@ function CatalogPage() {
           </div>
         )}
 
-                {/* ✅ Pagination & Summary */}
+        {/* ✅ Pagination */}
         {processedProducts.length > 0 && (
-          <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-200 mt-6 mb-4">
+          <div className="flex justify-center items-center gap-2 mt-6">
+            <button
+              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Prev
+            </button>
             
-            <div className="text-sm font-medium text-gray-500 order-2 md:order-1">
-              Showing {processedProducts.length} records • Page {currentPage} of {totalPages}
+            <div className="flex gap-1">
+              {[...Array(totalPages)].map((_, i) => {
+                const pageNum = i + 1;
+                // Show ellipsis for large page counts
+                if (totalPages > 7 && pageNum > 3 && pageNum < totalPages - 1 && pageNum !== currentPage) {
+                  if (pageNum === 4) return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
+                  return null;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={`px-3 py-1.5 rounded-md text-sm border ${
+                      currentPage === pageNum 
+                        ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
+                        : 'border-gray-300 text-gray-600 hover:bg-gray-50'
+                    }`}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
             </div>
 
-            <div className="flex items-center gap-2 order-1 md:order-2">
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage === 1}
-                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Prev
-              </button>
-              
-              <div className="flex gap-1">
-                {[...Array(totalPages)].map((_, i) => {
-                  const pageNum = i + 1;
-                  if (totalPages > 7 && pageNum > 3 && pageNum < totalPages - 1 && pageNum !== currentPage) {
-                    if (pageNum === 4) return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
-                    return null;
-                  }
-                  return (
-                    <button
-                      key={pageNum}
-                      onClick={() => setCurrentPage(pageNum)}
-                      className={`px-3 py-1.5 rounded-md text-sm border ${
-                        currentPage === pageNum 
-                          ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
-                          : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {pageNum}
-                    </button>
-                  );
-                })}
-              </div>
-
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage === totalPages}
-                className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50"
-              >
-                Next
-              </button>
-            </div>
+            <button
+              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+            >
+              Next
+            </button>
           </div>
         )}
 

@@ -269,16 +269,19 @@ function ProductDetailPage() {
             <div className="w-full h-px bg-gray-300 my-4"></div>
             <p className="text-xl font-bold text-gray-900 mb-8">₱ {Number(product.price).toLocaleString(undefined, { minimumFractionDigits: 2 })}</p>
 
-            <div className="mb-10">
-              <p className="text-sm font-bold text-gray-900 mb-3">Frame Colors:</p>
-              <div className="flex flex-wrap gap-2">
-                {colors.map(c => (
-                  <button key={c} onClick={() => setSelectedColor(c)} className={`px-3 py-1.5 text-[11px] font-medium border ${selectedColor === c ? 'border-[#4A90E2] text-[#4A90E2]' : 'border-gray-400 text-gray-800'} bg-white transition-colors`}>
-                    {c}
-                  </button>
-                ))}
+                        {/* ✅ Only show Frame Colors if it is NOT a Package/Service */}
+            {product.category !== 'Package' && product.category !== 'Service' && (
+              <div className="mb-10">
+                <p className="text-sm font-bold text-gray-900 mb-3">Frame Colors:</p>
+                <div className="flex flex-wrap gap-2">
+                  {colors.map(c => (
+                    <button key={c} onClick={() => setSelectedColor(c)} className={`px-3 py-1.5 text-[11px] font-medium border ${selectedColor === c ? 'border-[#4A90E2] text-[#4A90E2]' : 'border-gray-400 text-gray-800'} bg-white transition-colors`}>
+                      {c}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="flex items-center gap-3 mb-6">
               <div className="flex items-center border border-gray-400 h-10 w-24">

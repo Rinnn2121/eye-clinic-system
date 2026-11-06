@@ -256,9 +256,6 @@ function SalesPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Sales Overview</h1>
-            <p className="text-gray-500 text-base mt-1">
-              Track your clinic's sales performance and transactions.
-            </p>
           </div>
           <div className="flex items-center gap-3">
             <select

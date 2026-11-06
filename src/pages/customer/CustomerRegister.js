@@ -15,10 +15,6 @@ function CustomerRegister() {
     confirmPassword: ''
   });
   
-  // ✅ State for password visibility
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const { signup } = useAuth(); 
@@ -30,6 +26,10 @@ function CustomerRegister() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (formData.phone.length !== 11) {
+      return setError('Phone number must be exactly 11 digits.');
+    }
 
     if (formData.password !== formData.confirmPassword) {
       return setError('Passwords do not match');
@@ -54,31 +54,14 @@ function CustomerRegister() {
     setLoading(false);
   };
 
-  // ✅ Eye icons
-  const EyeOpen = () => (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-    </svg>
-  );
-
-  const EyeClosed = () => (
-    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
-    </svg>
-  );
-
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         
-        {/* ✅ Logo Section */}
-        <div className="text-center mb-8 flex justify-center">
-          <img 
-            src="/images/vslogo.png" 
-            alt="Vitug-Sumaya Optical Clinic" 
-            className="h-24 w-auto object-contain" 
-          />
+        {/* Logo Section */}
+        <div className="text-center mb-8">
+          <h1 className="text-3xl font-bold text-[#4A90E2]">VITUG-SUMAYA</h1>
+          <p className="text-sm text-gray-500 tracking-wider">OPTICAL CLINIC</p>
         </div>
 
         {/* Register Form */}
@@ -126,9 +109,15 @@ function CustomerRegister() {
               <div>
                 <label className="block text-gray-700 font-medium mb-1 text-sm">Phone Number *</label>
                 <input
-                  type="tel" name="phone" required
+                  type="tel" 
+                  name="phone" 
+                  required 
+                  maxLength={11} // ✅ Enforces 11 digits maximum
+                  value={formData.phone} 
+                  // ✅ Strips out any non-number characters (letters, dashes, etc)
+                  onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-                  value={formData.phone} onChange={handleChange}
+                  placeholder="09XXXXXXXXX"
                 />
               </div>
             </div>
@@ -143,44 +132,23 @@ function CustomerRegister() {
               />
             </div>
 
-            {/* ✅ Password with Eye Toggle */}
+            {/* Password */}
             <div>
               <label className="block text-gray-700 font-medium mb-1 text-sm">Password *</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"} 
-                  name="password" required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none pr-10"
-                  value={formData.password} onChange={handleChange}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#4A90E2] transition-colors focus:outline-none"
-                >
-                  {showPassword ? <EyeClosed /> : <EyeOpen />}
-                </button>
-              </div>
+              <input
+                type="password" name="password" required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
+                value={formData.password} onChange={handleChange}
+              />
             </div>
 
-            {/* ✅ Confirm Password with Eye Toggle */}
             <div>
               <label className="block text-gray-700 font-medium mb-1 text-sm">Confirm Password *</label>
-              <div className="relative">
-                <input
-                  type={showConfirmPassword ? "text" : "password"} 
-                  name="confirmPassword" required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none pr-10"
-                  value={formData.confirmPassword} onChange={handleChange}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-[#4A90E2] transition-colors focus:outline-none"
-                >
-                  {showConfirmPassword ? <EyeClosed /> : <EyeOpen />}
-                </button>
-              </div>
+              <input
+                type="password" name="confirmPassword" required
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
+                value={formData.confirmPassword} onChange={handleChange}
+              />
             </div>
 
             <button

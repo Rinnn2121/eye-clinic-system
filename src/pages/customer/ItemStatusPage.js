@@ -54,8 +54,7 @@ function ItemStatusPage() {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold mb-1">Items Pick-Up Status</h1>
-      <p className="text-gray-500 text-sm mb-6">Track the status of your items and get ready to pick them up at the clinic.</p>
+      <h1 className="text-3xl font-bold mb-6">Items Pick-Up Status</h1>
 
       {orders.length === 0 ? (
         <div className="text-center py-20 bg-white border border-gray-200 rounded-xl">

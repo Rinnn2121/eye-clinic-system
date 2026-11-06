@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { collection, getDocs, query, orderBy, limit, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, query, orderBy, limit } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import SalesChart from '../../components/SalesChart';
@@ -11,16 +11,16 @@ import QuickServiceInvoiceModal from '../../components/QuickServiceInvoiceModal'
 import QuickInventoryModal from '../../components/QuickInventoryModal';
 import AppointmentWizardModal from '../../components/AppointmentWizardModal';
 import ConfirmModal from '../../components/ConfirmModal';
-import ProductModal from '../../components/ProductModal'; // ✅ For Inventory click
-import TransactionDetailsModal from '../../components/TransactionDetailsModal'; // ✅ For Recent Sales click
-import AppointmentDetailsModal from '../../components/AppointmentDetailsModal'; // ✅ For Appointments click
+import ProductModal from '../../components/ProductModal'; 
+import TransactionDetailsModal from '../../components/TransactionDetailsModal'; 
+import AppointmentDetailsModal from '../../components/AppointmentDetailsModal'; 
 import ProductPreviewModal from '../../components/ProductPreviewModal';
 
 function AdminDashboard() {
   const navigate = useNavigate();
-  const { userRole } = useAuth();
+  // ✅ Grab userData from AuthContext to get the name
+  const { userRole, userData } = useAuth(); 
   const [loading, setLoading] = useState(true);
-  
 
   // State for real data
   const [stats, setStats] = useState({
@@ -46,7 +46,7 @@ function AdminDashboard() {
   const [showAppointmentModal, setShowAppointmentModal] = useState(false);
   const [showInventoryModal, setShowInventoryModal] = useState(false);
   const [alertConfig, setAlertConfig] = useState(null);
-   const [previewProduct, setPreviewProduct] = useState(null);
+  const [previewProduct, setPreviewProduct] = useState(null);
 
   // ✅ Clickable Modal States
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -70,21 +70,13 @@ function AdminDashboard() {
       custSnap.forEach((doc) => {
         const data = doc.data();
         totalCustomers++;
-        
-        // Check if they are new this week
-        const createdDate = data.createdAt ? new Date(data.createdAt) : null;
-        const isNewThisWeek = createdDate && createdDate >= lastWeek;
-
         if (data.createdAt) {
-          const createdDateStr = new Date(createdDate.getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
+          const createdDateStr = new Date(new Date(data.createdAt).getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
           if (createdDateStr === todayStr) newCustomersToday++;
-          if (isNewThisWeek) newCustomersWeek++;
+          const createdDate = new Date(data.createdAt);
+          if (createdDate >= lastWeek) newCustomersWeek++;
         }
-
-        // ✅ Only count as returning if they have >1 visit AND aren't new this week
-        if ((data.totalVisits || 0) > 1 && !isNewThisWeek) {
-          returningCustomers++;
-        }
+        if ((data.totalVisits || 0) > 1) returningCustomers++;
       });
 
       // 2. APPOINTMENTS
@@ -220,6 +212,9 @@ function AdminDashboard() {
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
 
+  // ✅ Determine the display name for the greeting
+  const displayName = userData?.name || userData?.firstName || (userRole === 'admin' ? 'Admin' : 'Staff');
+
   return (
     <div className="min-h-screen bg-gray-50 p-6 font-sans">
       <div className="w-full mx-auto space-y-6">
@@ -227,8 +222,9 @@ function AdminDashboard() {
         {/* HEADER */}
         <div className="flex justify-between items-start">
           <div>
+            {/* ✅ Dynamic Greeting */}
             <h1 className="text-3xl font-bold text-gray-900">
-              Welcome back, {userRole === 'admin' ? 'Admin' : 'Staff'}!
+              Welcome back, {displayName}!
             </h1>
             <p className="text-gray-500 text-base mt-1">Here's a quick look at today's optical activities.</p>
           </div>
@@ -250,10 +246,7 @@ function AdminDashboard() {
               <div className="bg-[#e0e7ff] rounded-2xl p-5 border border-indigo-200 shadow-sm h-full">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="bg-[#6366f1] text-white p-2 rounded-full w-11 h-11 flex items-center justify-center">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-  <circle cx="12" cy="12" r="10" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-  <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M9 16V8h4a3 3 0 0 1 0 6H9m-1-3h6m-6 3h6" />
-</svg>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   </div>
                   <span className="text-base font-semibold text-gray-700 group-hover:text-indigo-600 transition-colors">Sales</span>
                 </div>
@@ -351,7 +344,6 @@ function AdminDashboard() {
                       <tr><td colSpan="3" className="p-4 text-center text-gray-500">No sales yet</td></tr>
                     ) : (
                       recentSales.slice(0, 5).map((sale) => (
-                        // ✅ Made Recent Sales Clickable
                         <tr 
                           key={sale.id} 
                           onClick={() => setSelectedSale(sale)}
@@ -401,54 +393,23 @@ function AdminDashboard() {
                   </div>
                 </div>
               </div>
-
-              {/* ✅ CENTERED COLUMN LABELS */}
-              <div className="flex items-center bg-gray-50/50 px-4 mb-2 shadow-md py-3 border-b border-gray-100 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                <div className="w-1/5 text-center">Time</div>
-                <div className="w-1/3 text-center">Name</div>
-                <div className="flex-1 text-center">Service</div>
-                <div className="w-[15%] text-center">Status</div>
-              </div>
               
-              {/* ✅ Scrollable table container with fixed height */}
               <div className="bg-white max-h-[350px] overflow-y-auto">
                 {todaysAppts.length === 0 ? (
                   <div className="flex items-center justify-center py-8"><p className="text-gray-500 text-base py-8 text-center">No appointments scheduled for today.</p></div>
                 ) : (
                   todaysAppts.map((apt, idx) => (
-                    // ✅ Made Appointment Clickable & added my-4
                     <div 
                       key={idx} 
                       onClick={() => setSelectedAppt(apt)}
-                      className="flex items-center justify-between py-4 px-2 my-3 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all mx-0"
+                      className="flex items-center justify-between py-4 px-6 my-4 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md cursor-pointer transition-all mx-4"
                     >
-                      {/* ✅ Time Centered */}
-                      <div className="w-1/5 flex justify-center flex-shrink-0">
-                        <span className="font-semibold text-gray-800 text-base">
-                          {apt.time ? new Date(`2000-01-01T${apt.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}
-                        </span>
-                      </div>
-
-                      {/* ✅ Name Centered */}
-                      <div className="w-1/3 flex justify-center min-w-0 pr-3">
-                        <span className="text-base font-medium text-gray-700 truncate block">{apt.customerName || 'Walk-in'}</span>
-                      </div>
-
-                      {/* ✅ Service Centered */}
-                      <div className="flex-1 flex justify-center min-w-0 pr-3">
-                        <span className="text-base text-gray-500 truncate block">{apt.reason || 'Eye Examination'}</span>
-                      </div>
-
-                       {/* ✅ Status Centered (Removed bullet, added colored background) */}
-                      <div className="w-[15%] flex-shrink-0 flex items-center justify-center">
-                        <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                          apt.status === 'Completed' ? 'bg-[#bbf7d0] text-green-800' :
-                          apt.status === 'Cancelled' ? 'bg-[#fecdd3] text-red-800' : 
-                          apt.status === 'Scheduled' ? 'bg-blue-100 text-blue-800' :
-                          'bg-[#fef3c7] text-yellow-800'
-                        }`}>
-                          {apt.status || 'Pending'}
-                        </span>
+                      <div className="w-1/5 flex-shrink-0"><span className="font-semibold text-gray-800 text-base">{apt.time ? new Date(`2000-01-01T${apt.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '—'}</span></div>
+                      <div className="w-1/3 min-w-0 pr-3"><span className="text-base font-medium text-gray-700 truncate block">{apt.customerName || 'Walk-in'}</span></div>
+                      <div className="flex-1 min-w-0 pr-3"><span className="text-base text-gray-500 truncate block">{apt.reason || 'Eye Examination'}</span></div>
+                      <div className="w-[15%] flex-shrink-0 text-right flex items-center justify-end gap-2">
+                        <span className={`w-2 h-2 rounded-full ${apt.status === 'Completed' ? 'bg-green-500' : apt.status === 'Cancelled' ? 'bg-red-500' : 'bg-yellow-500'}`}></span>
+                        <span className={`text-sm font-bold ${apt.status === 'Completed' ? 'text-green-600' : apt.status === 'Cancelled' ? 'text-red-500' : 'text-yellow-600'}`}>{apt.status || 'Pending'}</span>
                       </div>
                     </div>
                   ))
@@ -470,7 +431,7 @@ function AdminDashboard() {
                       {inventoryList.slice(0, 5).map((item) => (
                         <tr 
                           key={item.id} 
-                          onClick={() => setPreviewProduct(item)} // ✅ Opens Preview
+                          onClick={() => setPreviewProduct(item)}
                           className="border-b border-gray-100 last:border-0 hover:bg-gray-50 cursor-pointer transition-colors"
                         >
                           <td className="px-3 py-2 font-bold text-gray-800 truncate">{item.name}</td>
@@ -489,33 +450,27 @@ function AdminDashboard() {
                   <Link to="/admin/customers" className="text-sm text-[#4A90E2] hover:underline font-bold">View All →</Link>
                 </div>
                 
-                                <div className="flex items-center gap-6 flex-1">
+                <div className="flex items-center gap-6 flex-1">
                   
-                                    {/* ✅ Fixed Donut Chart */}
+                  {/* ✅ Small Donut Chart for New vs Returning */}
                   <div className="relative w-28 h-28 flex-shrink-0">
-                    {/* Calculate percentages safely */}
-                    {(() => {
-                      const total = stats.totalCustomers || 1;
-                      const newCust = stats.newCustomersWeek || 0;
+                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+                      {/* Background circle (Total) */}
+                      <circle cx="50" cy="50" r="40" fill="none" stroke="#f3f4f6" strokeWidth="15" />
                       
-                      // Calculate how much of the circle the purple section should take
-                      const newPercent = Math.min((newCust / total) * 100, 100);
-                      const dashArray = (newPercent / 100) * 251.2;
-
-                      return (
-                        <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                          {/* Background circle (Green - Returning) */}
-                          <circle cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="15" />
-                          
-                          {/* Foreground circle (Purple - New) */}
-                          <circle 
-                            cx="50" cy="50" r="40" fill="none" stroke="#a855f7" strokeWidth="15"
-                            strokeDasharray={`${dashArray} 251.2`} 
-                          />
-                        </svg>
-                      );
-                    })()}
-                    
+                      {/* New Customers Ring (Purple) */}
+                      <circle 
+                        cx="50" cy="50" r="40" fill="none" stroke="#a855f7" strokeWidth="15"
+                        strokeDasharray={`${(stats.newCustomersWeek / (stats.totalCustomers || 1)) * 251.2} 251.2`} 
+                      />
+                      
+                      {/* Returning Customers Ring (Green) - Offset to start where the purple ends */}
+                      <circle 
+                        cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="15"
+                        strokeDasharray={`${(stats.returningCustomers / (stats.totalCustomers || 1)) * 251.2} 251.2`} 
+                        strokeDashoffset={`-${(stats.newCustomersWeek / (stats.totalCustomers || 1)) * 251.2}`}
+                      />
+                    </svg>
                     {/* Center Text */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-2xl font-bold text-gray-900">{stats.totalCustomers}</span>
@@ -523,7 +478,7 @@ function AdminDashboard() {
                     </div>
                   </div>
 
-                  {/* Legend */}
+                  {/* ✅ Legend & Stats */}
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -583,7 +538,6 @@ function AdminDashboard() {
                   const isSelected = selectedDate === formattedDate;
                   const hasAppointments = appointments.some(a => a.date === formattedDate);
                   
-                  // ✅ Check if the date is in the past
                   const todayStr = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
                   const isPast = formattedDate < todayStr;
 
@@ -591,7 +545,6 @@ function AdminDashboard() {
                     <div key={i} className="flex flex-col items-center justify-center p-0.5 h-10">
                       <button 
                         onClick={() => setSelectedDate(formattedDate)}
-                        // ✅ Passed dates are grayed but still clickable
                         className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors font-medium ${
                           isSelected ? 'bg-blue-600 text-white font-bold' : 
                           isPast ? 'text-gray-300 bg-gray-50 hover:bg-gray-200' : 
@@ -682,15 +635,15 @@ function AdminDashboard() {
       )}
 
       {showInventoryModal && (
-  <QuickInventoryModal 
-    onClose={() => setShowInventoryModal(false)} 
-    inventoryList={inventoryList} 
-    onItemClick={(item) => {
-      setShowInventoryModal(false); // Close Search
-      setPreviewProduct(item);      // Open Preview Modal
-    }}
-  />
-)}
+        <QuickInventoryModal 
+          onClose={() => setShowInventoryModal(false)} 
+          inventoryList={inventoryList} 
+          onItemClick={(item) => {
+            setShowInventoryModal(false);
+            setSelectedProduct(item);
+          }}
+        />
+      )}
 
       {/* ✅ Product Preview Modal */}
       {previewProduct && (
@@ -699,7 +652,6 @@ function AdminDashboard() {
           isAdmin={userRole === 'admin'}
           onClose={() => setPreviewProduct(null)}
           onEdit={() => {
-            // If they want to edit, redirect to the catalog page
             setPreviewProduct(null);
             navigate('/admin/catalog'); 
           }}
@@ -729,26 +681,28 @@ function AdminDashboard() {
       {/* ✅ Appointment Details Modal (From Today's Appointments) */}
       {selectedAppt && (
         <AppointmentDetailsModal 
-  appointment={selectedAppt} 
-  onClose={() => setSelectedAppt(null)} 
-  onConfirm={async (apt) => {
-    try {
-      await updateDoc(doc(db, 'appointments', apt.id), { status: 'Scheduled' });
-      setSelectedAppt(null);
-      fetchDashboardData(); // Refresh stats
-      setAlertConfig({ type: 'success', title: 'Confirmed', message: 'Appointment confirmed.' });
-    } catch (e) { console.error(e); }
-  }}
-  onCancel={async (apt) => {
-    try {
-      await updateDoc(doc(db, 'appointments', apt.id), { status: 'Cancelled' });
-      setSelectedAppt(null);
-      fetchDashboardData();
-      setAlertConfig({ type: 'success', title: 'Cancelled', message: 'Appointment cancelled.' });
-    } catch (e) { console.error(e); }
-  }}
-  isAdmin={true}
-/>
+          appointment={selectedAppt} 
+          onClose={() => setSelectedAppt(null)} 
+          isAdmin={true}
+          onConfirm={async (apt) => {
+            try {
+              const { updateDoc, doc } = await import('firebase/firestore');
+              await updateDoc(doc(db, 'appointments', apt.id), { status: 'Scheduled' });
+              setSelectedAppt(null);
+              fetchDashboardData();
+              setAlertConfig({ type: 'success', title: 'Confirmed', message: 'Appointment confirmed.' });
+            } catch (e) { console.error(e); }
+          }}
+          onCancel={async (apt) => {
+            try {
+              const { updateDoc, doc } = await import('firebase/firestore');
+              await updateDoc(doc(db, 'appointments', apt.id), { status: 'Cancelled' });
+              setSelectedAppt(null);
+              fetchDashboardData();
+              setAlertConfig({ type: 'success', title: 'Cancelled', message: 'Appointment cancelled.' });
+            } catch (e) { console.error(e); }
+          }}
+        />
       )}
 
       {alertConfig && (

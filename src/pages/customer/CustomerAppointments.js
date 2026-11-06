@@ -100,8 +100,7 @@ function CustomerAppointments() {
       {/* Header with Book Button */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-3xl font-bold mb-1">My Appointments</h1>
-          <p className="text-gray-500 text-sm">View and manage your appointments.</p>
+          <h1 className="text-3xl font-bold mb-1">Appointments</h1>
         </div>
         <button
           onClick={() => setShowBookingModal(true)}

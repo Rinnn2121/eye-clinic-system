@@ -10,15 +10,16 @@ import BookingWizardModal from '../../components/BookingWizardModal';
 import ConfirmModal from '../../components/ConfirmModal';
 
 // ✅ Reusable Swipeable Carousel
-function SwipeableCarousel({ id, title, products, viewMoreLink = "/customer/products", maxItems }) {
+function SwipeableCarousel({ id, title, products, viewMoreLink = "/customer/products", maxItems, isPackage }) {
   const [currentPage, setCurrentPage] = useState(0);
   const scrollRef = useRef(null);
 
   const displayProducts = maxItems ? products.slice(0, maxItems) : products;
 
+  // ✅ Group into pages of 4
   const pages = [];
-  for (let i = 0; i < displayProducts.length; i += 2) {
-    pages.push(displayProducts.slice(i, i + 2));
+  for (let i = 0; i < displayProducts.length; i += 4) {
+    pages.push(displayProducts.slice(i, i + 4));
   }
 
   const handleScroll = (e) => {
@@ -55,7 +56,7 @@ function SwipeableCarousel({ id, title, products, viewMoreLink = "/customer/prod
       </div>
 
       <div className="relative">
-        {/* ✅ Left Arrow (Desktop only) */}
+        {/* Left Arrow (Desktop) */}
         <button 
           onClick={() => scrollByAmount('left')} 
           className="hidden md:flex absolute left-0 top-[40%] -translate-y-1/2 -ml-5 z-10 w-10 h-10 bg-white shadow-md border border-gray-200 rounded-full items-center justify-center text-gray-600 hover:text-[#4A90E2] opacity-0 group-hover:opacity-100 transition-opacity"
@@ -63,7 +64,7 @@ function SwipeableCarousel({ id, title, products, viewMoreLink = "/customer/prod
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" /></svg>
         </button>
 
-        {/* ✅ Right Arrow (Desktop only) */}
+        {/* Right Arrow (Desktop) */}
         <button 
           onClick={() => scrollByAmount('right')} 
           className="hidden md:flex absolute right-0 top-[40%] -translate-y-1/2 -mr-5 z-10 w-10 h-10 bg-white shadow-md border border-gray-200 rounded-full items-center justify-center text-gray-600 hover:text-[#4A90E2] opacity-0 group-hover:opacity-100 transition-opacity"
@@ -71,7 +72,6 @@ function SwipeableCarousel({ id, title, products, viewMoreLink = "/customer/prod
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" /></svg>
         </button>
 
-        {/* ✅ Re-applied hide-scrollbar class to hide the gray bar everywhere */}
         <div 
           ref={scrollRef}
           onScroll={handleScroll}
@@ -86,14 +86,16 @@ function SwipeableCarousel({ id, title, products, viewMoreLink = "/customer/prod
                 <Link 
                   to={`/customer/products/${product.id}`} 
                   key={product.id} 
-                  className="group/card cursor-pointer block w-1/2"
+                  // ✅ Changed to w-1/4 on desktop to fit 4 per page
+                  className="group/card cursor-pointer block w-1/2 md:w-1/4"
                 >
-                  <div className="w-full aspect-square bg-gray-50 rounded-xl overflow-hidden mb-4 flex items-center justify-center border border-gray-100 relative">
+                  {/* ✅ Conditional aspect ratio: Square for packages, 4/3 for everything else */}
+                  <div className={`w-full ${isPackage ? 'aspect-square' : 'aspect-[4/3]'} bg-gray-50 rounded-xl overflow-hidden mb-4 flex items-center justify-center border border-gray-100 relative`}>
                     {product.imageUrl ? (
                       <img 
                         src={product.imageUrl} 
                         alt={product.name} 
-                        className="w-full h-full object-contain p-4 group-hover/card:scale-105 transition-transform duration-500" 
+                        className="w-full h-full object-contain p-2 group-hover/card:scale-105 transition-transform duration-500" 
                       />
                     ) : (
                       <div className="text-gray-300">
@@ -104,12 +106,15 @@ function SwipeableCarousel({ id, title, products, viewMoreLink = "/customer/prod
                     )}
                   </div>
                   <div className="flex flex-col">
-                    <h3 className="font-bold text-gray-900 text-base md:text-lg leading-tight truncate">{product.name}</h3>
+                    <h3 className="font-bold text-gray-900 text-sm md:text-base leading-tight truncate">{product.name}</h3>
                     <p className="font-bold text-gray-900 mt-1">₱ {Number(product.price).toLocaleString()}</p>
                   </div>
                 </Link>
               ))}
-              {pageProducts.length === 1 && <div className="w-1/2"></div>}
+              {/* Fill empty slots if a page has less than 4 items */}
+              {Array.from({ length: 4 - pageProducts.length }).map((_, i) => (
+                <div key={`empty-${i}`} className="w-1/2 md:w-1/4 pointer-events-none"></div>
+              ))}
             </div>
           ))}
         </div>
@@ -181,9 +186,10 @@ function LandingPage() {
         const featuredFrames = frames.filter(p => p.isFeatured === true);
         setBestSellers(featuredFrames);
         
-        setMetalFrames(sorted.filter(p => p.category === 'Metal Frame').slice(0, 6));
-        setPlasticFrames(sorted.filter(p => p.category === 'Plastic Frame').slice(0, 6));
-        setPackages(sorted.filter(p => p.category === 'Package').slice(0, 6));
+        // ✅ Adjusted limits to grab enough for 1 page of 4 items (or 2 pages of 4 = 8)
+        setMetalFrames(sorted.filter(p => p.category === 'Metal Frame').slice(0, 8));
+        setPlasticFrames(sorted.filter(p => p.category === 'Plastic Frame').slice(0, 8));
+        setPackages(sorted.filter(p => p.category === 'Package').slice(0, 8));
 
       } catch (error) {
         console.error('Error loading products:', error);
@@ -330,9 +336,9 @@ function LandingPage() {
           <section className="relative flex flex-col md:flex-row items-stretch rounded-2xl overflow-hidden bg-white shadow-sm border border-gray-200">            
             <div className="relative z-10 w-full md:w-1/2 p-8 md:p-12 lg:p-16 flex flex-col justify-center bg-white">
               
-              <p className="text-[10px] font-bold text-[#4A90E2] uppercase tracking-widest mb-3">
-                Welcome to Vitug-Sumaya Optical Clinic
-              </p>
+              <p className="text-2xl md:text-[32px] font-bold text-[#4A90E2] uppercase tracking-widest mb-3 leading-tight">
+  Welcome to Vitug-Sumaya Optical Clinic
+</p>
 
               <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight">
                 Find the right frames <br />
@@ -407,9 +413,9 @@ function LandingPage() {
           </a>
         </div>
 
-        <SwipeableCarousel id="metal-frames" title="Metal Frames" products={metalFrames} maxItems={6} />
-        <SwipeableCarousel id="plastic-frames" title="Plastic Frames" products={plasticFrames} maxItems={6} />
-        <SwipeableCarousel id="packages" title="Packages" products={packages} maxItems={6} />
+        <SwipeableCarousel id="metal-frames" title="Metal Frames" products={metalFrames} maxItems={8} />
+        <SwipeableCarousel id="plastic-frames" title="Plastic Frames" products={plasticFrames} maxItems={8} />
+        <SwipeableCarousel id="packages" title="Packages" products={packages} maxItems={8} isPackage={true} />
 
       </div>
 

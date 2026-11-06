@@ -158,7 +158,6 @@ function LabOrdersPage() {
         {/* Header */}
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Lab & Pickup Orders</h1>
-          <p className="text-gray-500 text-base mt-1">Track orders sent to the lab and manage customer pickups.</p>
         </div>
 
         {/* ✅ Shortened Search Bar Container */}

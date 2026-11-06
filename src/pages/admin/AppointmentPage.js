@@ -258,7 +258,6 @@ function AppointmentPage() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Appointments</h1>
-            <p className="text-gray-500 text-base mt-1">Manage and monitor your clinic's upcoming and scheduled appointments.</p>
           </div>
           <div className="flex items-center gap-3">
             <select 
@@ -460,7 +459,7 @@ function AppointmentPage() {
                 {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => <span key={d}>{d}</span>)}
               </div>
               
-              <div className="grid grid-cols-7 gap-1 text-center text-base">
+                            <div className="grid grid-cols-7 gap-1 text-center text-base">
                 {[...Array(firstDayOfMonth)].map((_, i) => (
                   <div key={`empty-${i}`} className="p-1"></div>
                 ))}
@@ -469,16 +468,22 @@ function AppointmentPage() {
                   const day = i + 1;
                   const formattedDate = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                   
-                  const isToday = day === new Date().getDate();
+                  const isToday = day === new Date().getDate() && currentMonth === new Date().getMonth() && currentYear === new Date().getFullYear();
                   const isSelected = selectedDate === formattedDate;
                   const hasAppointments = appointments.some(a => a.date === formattedDate);
+
+                  // ✅ Check if the date is in the past (using PHT timezone)
+                  const todayStr = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
+                  const isPast = formattedDate < todayStr;
 
                   return (
                     <div key={i} className="flex flex-col items-center justify-center p-0.5 h-10">
                       <button 
                         onClick={() => setSelectedDate(formattedDate)}
+                        // ✅ Passed dates are grayed but still clickable
                         className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors font-medium ${
                           isSelected ? 'bg-blue-600 text-white font-bold' : 
+                          isPast ? 'text-gray-300 bg-gray-50 hover:bg-gray-200' : 
                           isToday ? 'bg-blue-100 text-blue-600 font-bold' : 
                           'text-gray-700 hover:bg-gray-100'
                         }`}
@@ -487,7 +492,7 @@ function AppointmentPage() {
                       </button>
                       <div className={`w-1 h-1 rounded-full mt-1 ${
                         hasAppointments 
-                          ? (isSelected ? 'bg-blue-600' : 'bg-blue-500') 
+                          ? (isSelected ? 'bg-blue-600' : isPast ? 'bg-gray-300' : 'bg-blue-500') 
                           : 'bg-transparent'
                       }`}></div>
                     </div>

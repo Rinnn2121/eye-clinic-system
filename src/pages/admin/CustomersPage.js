@@ -175,9 +175,6 @@ function CustomersPage() {
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Customers</h1>
-            <p className="text-gray-500 text-base mt-1">
-              View and manage customer profiles, visit history, prescriptions and payments.
-            </p>
           </div>
           <div className="flex items-center gap-3">
             <select 

@@ -141,7 +141,7 @@ function WishlistPage() {
     <div className="min-h-screen bg-white">
       
       <div className="w-full max-w-[1200px] mx-auto px-4 pb-20">
-        <h1 className="text-3xl font-medium text-gray-900 mb-8">My Wishlist</h1>
+        <h1 className="text-3xl font-medium text-gray-900 mb-8">Wishlist</h1>
 
         {wishlistItems.length === 0 ? (
           <div className="text-center py-20 text-gray-500">

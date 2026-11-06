@@ -70,7 +70,7 @@ function PatientRecordPage() {
     customLens: '',
     customCoating: '',
     
-    frameSubtotal: 0, // ✅ New field
+    frameSubtotal: 0,
     total: 0, 
     deposit: '', 
     balance: 0,
@@ -247,7 +247,6 @@ function PatientRecordPage() {
         lensType: { name: finalLens },
         coating: { name: finalCoating },
         
-        // ✅ New Price Breakdown Saved Here
         frameSubtotal: record.frameSubtotal,
         additionalCharges: additionalCharges,
         
@@ -273,7 +272,6 @@ function PatientRecordPage() {
       });
 
       // 3. Save the order for sales tracking
-      // ✅ We map the additional charges into the items array so they show up in Sales Reports
       const orderItems = [
         { name: finalFrame || 'Frame', category: 'Frame', qty: 1, price: record.frameSubtotal },
         { name: finalLens || 'Lens', category: 'Lens', qty: 1, price: 0 },
@@ -298,24 +296,29 @@ function PatientRecordPage() {
         items: orderItems,
       });
 
-      // 4. Mark appointment as completed
-      const possibleIds = [customerId, customer?.email].filter(Boolean); 
+      // ✅ 4. Mark appointment as completed
+      // We check the new Reference ID, the official customer email, and the online account email
+      const possibleIds = [customerId, customer?.email, record.email].filter(Boolean); 
 
       if (possibleIds.length > 0) {
         const apptQuery = query(
           collection(db, 'appointments'),
           where('customerId', 'in', possibleIds),
-          where('status', 'in', ['Pending', 'Scheduled'])
+          where('status', 'in', ['Pending', 'Scheduled', 'Confirmed'])
         );
         
         const apptSnap = await getDocs(apptQuery);
+        
         if (!apptSnap.empty) {
+          // If they have multiple, complete the oldest pending one
           const pendingAppts = [];
           apptSnap.forEach(doc => pendingAppts.push({ id: doc.id, ...doc.data() }));
-          pendingAppts.sort((a, b) => a.date.localeCompare(b.date));
+          pendingAppts.sort((a, b) => new Date(a.date + 'T' + a.time) - new Date(b.date + 'T' + b.time));
           
           await updateDoc(doc(db, 'appointments', pendingAppts[0].id), {
-            status: 'Completed'
+            status: 'Completed',
+            completedAt: new Date().toISOString(),
+            completedBy: currentUser?.email
           });
         }
       }
@@ -373,7 +376,17 @@ function PatientRecordPage() {
 
         <div className="grid grid-cols-2 gap-4 mb-3">
           <div className="flex items-end gap-2"><span className="text-sm font-medium">AGE:</span><input value={record.age} onChange={(e) => setRecord({ ...record, age: e.target.value })} className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none focus:border-[#4A90E2]" /></div>
-          <div className="flex items-end gap-2"><span className="text-sm font-medium">CONTACT NO:</span><input value={record.phone} onChange={(e) => setRecord({ ...record, phone: e.target.value })} className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none focus:border-[#4A90E2]" /></div>
+          <div className="flex items-end gap-2">
+            <span className="text-sm font-medium">CONTACT NO:</span>
+            <input 
+              type="tel" 
+              maxLength={11}
+              value={record.phone} 
+              onChange={(e) => setRecord({ ...record, phone: e.target.value.replace(/\D/g, '') })} 
+              className="flex-1 border-b border-gray-400 pb-1 text-sm outline-none focus:border-[#4A90E2]" 
+              placeholder="09XXXXXXXXX"
+            />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-4 mb-6">
@@ -461,7 +474,6 @@ function PatientRecordPage() {
         </div>
 
         {/* NOTES */}
-                {/* NOTES */}
         <div className="mb-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Prescription Notes / Remarks</label>
@@ -484,7 +496,7 @@ function PatientRecordPage() {
           </div>
         </div>
 
-        {/* ✅ FRAME, LENS, COATING SECTION */}
+        {/* FRAME, LENS, COATING SECTION */}
         <div className="space-y-4 mb-6 bg-blue-50 p-4 rounded-xl border border-blue-200">
           
           <div className="flex items-center gap-3">
@@ -551,10 +563,9 @@ function PatientRecordPage() {
           
         </div>
 
-        {/* ✅ NEW PAYMENT SECTION WITH SUBTOTAL & CHARGES */}
+        {/* PAYMENT SECTION */}
         <div className="space-y-4 mb-6 bg-gray-50 p-5 rounded-xl border border-gray-200 shadow-sm">
           
-          {/* Frame Subtotal */}
           <div className="flex items-center gap-4 border-b border-gray-200 pb-3">
             <span className="text-sm font-medium w-28 text-gray-600">FRAME SUBTOTAL:</span>
             <div className="flex-1 flex items-center">
@@ -571,7 +582,6 @@ function PatientRecordPage() {
             </div>
           </div>
 
-          {/* Additional Charges */}
           <div className="border-b border-gray-200 pb-3">
             <span className="block text-sm font-medium text-gray-600 mb-2">ADDITIONAL CHARGES:</span>
             
@@ -591,7 +601,6 @@ function PatientRecordPage() {
               </div>
             )}
 
-            {/* Add Charge Inputs */}
             <div className="flex gap-2">
               <input 
                 type="text" 
@@ -621,7 +630,6 @@ function PatientRecordPage() {
             </div>
           </div>
 
-          {/* Grand Total */}
           <div className="flex items-center gap-4 pt-1">
             <span className="text-sm font-bold w-28 text-gray-900">GRAND TOTAL:</span>
             <div className="flex-1 flex items-center">
@@ -630,7 +638,6 @@ function PatientRecordPage() {
             </div>
           </div>
 
-          {/* Deposit */}
           <div className="flex items-center gap-4 pt-3 border-t border-gray-200">
             <span className="text-sm font-medium w-28 text-gray-600">DEPOSIT:</span>
             <input 
@@ -647,7 +654,6 @@ function PatientRecordPage() {
             />
           </div>
 
-          {/* Inline Warning for 50% rule */}
           {record.deposit && Number(record.deposit) < (Number(record.total) * 0.5) && (
             <p className="text-xs text-red-500 font-medium ml-32">
               Deposit must be at least 50% of the total (₱{(Number(record.total) * 0.5).toLocaleString()}).
@@ -743,17 +749,15 @@ function PatientRecordPage() {
         onConfirm={() => setSaveError('')}
       />
 
-      {/* ✅ The Lab Modal - onClose stays on page */}
       {showLabModal && savedRecordForLab && (
         <LabOrderModal 
           record={savedRecordForLab}
           onClose={() => {
             setShowLabModal(false);
-            // Stay on page if they cancel
           }}
           onSuccess={() => {
             setShowLabModal(false);
-            navigate('/admin/lab-orders'); // Navigate only on success
+            navigate('/admin/lab-orders'); 
           }}
         />
       )}

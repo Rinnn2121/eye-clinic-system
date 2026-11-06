@@ -115,11 +115,10 @@ function ProductPage() {
         </div>
       </div>
 
-      {/* Top Bar: Search & Sort */}
-      <div className="bg-white sticky top-16 z-30 pt-2">
+      {/* ✅ Top Bar: Removed sticky classes */}
+      <div className="bg-white">
         <div className="max-w-[1440px] mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
           
-          {/* Search Bar aligned to the product grid */}
           <div className="w-full md:pl-[288px] flex-1 md:pr-8">
             <div className="relative w-full max-w-lg">
               <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
@@ -137,7 +136,6 @@ function ProductPage() {
             </div>
           </div>
 
-          {/* Sort */}
           <div className="flex items-center gap-2 w-full md:w-auto flex-shrink-0">
             <span className="text-sm text-gray-500 whitespace-nowrap">Sort by:</span>
             <select
@@ -154,12 +152,11 @@ function ProductPage() {
         </div>
       </div>
 
-      {/* ✅ Main Content Area - Reduced top padding from py-8 to pt-4 to bring it closer to the search bar */}
+      {/* Main Content Area */}
       <div className="flex-1 w-full max-w-[1440px] mx-auto px-4 pt-4 pb-8 flex flex-col md:flex-row gap-8">        
         {/* LEFT SIDEBAR: Filters */}
         <div className="w-full md:w-64 flex-shrink-0 space-y-8">
           
-          {/* Filter by Price */}
           <div>
             <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
               <span>Filter by Price</span>
@@ -181,7 +178,6 @@ function ProductPage() {
             </div>
           </div>
 
-          {/* Filter by Type */}
           <div>
             <h3 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
               <span>Filter by Type</span>
@@ -228,23 +224,28 @@ function ProductPage() {
           ) : (
             <>
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-10">
-                {currentItems.map((product) => (
+                                {currentItems.map((product) => (
                   <Link 
                     to={`/customer/products/${product.id}`}
                     key={product.id} 
                     className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 flex flex-col group"
                   >
-                    <div className="w-full aspect-square bg-gray-100 flex items-center justify-center overflow-hidden relative">
+                    {/* ✅ Changed to aspect-[4/3], bg-white, p-2, and object-contain */}
+                    <div className="w-full aspect-[4/3] bg-white flex items-center justify-center overflow-hidden relative border-b border-gray-100 p-2">
                       {product.imageUrl ? (
                         <img 
-                        src={product.imageUrl} 
-                        alt={product.name} 
-                        className="w-full h-full object-contain p-4 group-hover:scale-105 transition-transform duration-500" 
-                      />
+                          src={product.imageUrl} 
+                          alt={product.name} 
+                          // ✅ object-contain ensures the WHOLE image fits without cutting off the arms
+                          className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500" 
+                        />
                       ) : (
-                        <span className="text-5xl opacity-20">🖼️</span>
+                        <div className="w-full h-full flex items-center justify-center text-gray-300">
+                          <span className="text-5xl opacity-20">🖼️</span>
+                        </div>
                       )}
                     </div>
+                    
                     <div className="p-4 flex flex-col flex-1 text-center">
                       <h3 className="font-semibold text-gray-900 text-sm truncate">{product.name}</h3>
                       <p className="text-base font-bold text-gray-900 mt-2">₱{Number(product.price).toLocaleString()}</p>
