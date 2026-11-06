@@ -5,7 +5,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';        
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';                  
-import { signOut } from 'firebase/auth'; 
+import { signOut, sendPasswordResetEmail } from 'firebase/auth'; 
 import { auth } from '../../firebase/config'; 
 import emailjs from '@emailjs/browser';
 
@@ -16,6 +16,12 @@ function CustomerLogin() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   
+  // ✅ State for Forgot Password
+  const [resetEmail, setResetEmail] = useState('');
+  const [showResetModal, setShowResetModal] = useState(false);
+  const [resetMessage, setResetMessage] = useState({ type: '', text: '' });
+  const [resetting, setResetting] = useState(false);
+
   const { login } = useAuth(); 
   const navigate = useNavigate();
 
@@ -50,7 +56,6 @@ function CustomerLogin() {
           },
           'EnPJnnKQXm7ASqkp9'       
         );
-        console.log('Login notification email sent successfully.');
       } catch (emailErr) {
         console.error('Email notification failed:', emailErr);
       }
@@ -75,11 +80,35 @@ function CustomerLogin() {
     }
   };
 
+  // ✅ Handle Forgot Password
+  const handleForgotPassword = async (e) => {
+    e.preventDefault();
+    if (!resetEmail) return;
+    
+    setResetting(true);
+    setResetMessage({ type: '', text: '' });
+
+    try {
+      await sendPasswordResetEmail(auth, resetEmail);
+      setResetMessage({ 
+        type: 'success', 
+        text: 'Password reset link sent! Please check your inbox (and spam folder).' 
+      });
+    } catch (err) {
+      console.error(err);
+      setResetMessage({ 
+        type: 'error', 
+        text: 'Failed to send reset email. Please make sure the email is registered.' 
+      });
+    }
+    setResetting(false);
+  };
+
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
         
-        {/* ✅ Logo Section */}
+        {/* Logo Section */}
         <div className="text-center mb-8 flex justify-center">
           <img 
             src="/images/vslogo.png" 
@@ -89,7 +118,7 @@ function CustomerLogin() {
         </div>
 
         <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
-
+          
           {error && (
             <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4 text-sm">
               {error}
@@ -137,6 +166,17 @@ function CustomerLogin() {
                   )}
                 </button>
               </div>
+              
+              {/* ✅ Moved Forgot Password here */}
+              <div className="flex justify-end mt-2">
+                <button 
+                  type="button" 
+                  onClick={() => setShowResetModal(true)}
+                  className="text-xs text-[#4A90E2] hover:underline font-medium"
+                >
+                  Forgot Password?
+                </button>
+              </div>
             </div>
 
             <button
@@ -156,6 +196,54 @@ function CustomerLogin() {
           </div>
         </div>
       </div>
+
+      {/* ✅ Forgot Password Modal */}
+      {showResetModal && (
+        <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[90]">
+          <div className="bg-white rounded-xl w-full max-w-sm shadow-2xl p-6">
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Reset Password</h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Enter your registered email address. We'll send you a link to reset your password.
+            </p>
+
+            {resetMessage.text && (
+              <div className={`p-3 rounded mb-4 text-sm ${
+                resetMessage.type === 'success' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
+              }`}>
+                {resetMessage.text}
+              </div>
+            )}
+
+            <form onSubmit={handleForgotPassword}>
+              <input
+                type="email"
+                required
+                value={resetEmail}
+                onChange={(e) => setResetEmail(e.target.value)}
+                placeholder="Enter your email"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg mb-4 outline-none focus:ring-2 focus:ring-[#4A90E2]"
+              />
+              <div className="flex gap-2">
+                {/* ✅ Changed Cancel to Close */}
+                <button
+                  type="button"
+                  onClick={() => { setShowResetModal(false); setResetMessage({ type: '', text: '' }); }}
+                  className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-50"
+                >
+                  Close
+                </button>
+                <button
+                  type="submit"
+                  disabled={resetting}
+                  className="flex-1 bg-[#4A90E2] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 disabled:opacity-50"
+                >
+                  {resetting ? 'Sending...' : 'Send Link'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
