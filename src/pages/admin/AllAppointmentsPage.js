@@ -335,25 +335,32 @@ function AllAppointmentsPage() {
           </div>
         </div>
 
-        {/* Pagination */}
+                {/* ✅ Pagination & Summary */}
         {filteredAppointments.length > 0 && (
-          <div className="flex justify-center items-center gap-2">
-            <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">Prev</button>
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4 border-t border-gray-100 mt-2">
             
-            <div className="flex gap-1">
-              {[...Array(totalPages)].map((_, i) => {
-                const pageNum = i + 1;
-                if (totalPages > 7 && pageNum > 3 && pageNum < totalPages - 1 && pageNum !== currentPage) {
-                  if (pageNum === 4) return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
-                  return null;
-                }
-                return (
-                  <button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`px-3 py-1.5 rounded-md text-sm border ${currentPage === pageNum ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' : 'border-gray-300 text-gray-600 hover:bg-gray-50'}`}>{pageNum}</button>
-                );
-              })}
+            <div className="text-sm font-medium text-gray-500 order-2 md:order-1">
+              Showing {filteredAppointments.length} records • Page {currentPage} of {totalPages}
             </div>
 
-            <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 hover:bg-gray-50 disabled:opacity-50">Next</button>
+            <div className="flex items-center gap-2 order-1 md:order-2">
+              <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50">Prev</button>
+              
+              <div className="flex gap-1">
+                {[...Array(totalPages)].map((_, i) => {
+                  const pageNum = i + 1;
+                  if (totalPages > 7 && pageNum > 3 && pageNum < totalPages - 1 && pageNum !== currentPage) {
+                    if (pageNum === 4) return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
+                    return null;
+                  }
+                  return (
+                    <button key={pageNum} onClick={() => setCurrentPage(pageNum)} className={`px-3 py-1.5 rounded-md text-sm border ${currentPage === pageNum ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'}`}>{pageNum}</button>
+                  );
+                })}
+              </div>
+
+              <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1.5 border border-gray-300 rounded-md text-sm text-gray-600 bg-white hover:bg-gray-50 disabled:opacity-50">Next</button>
+            </div>
           </div>
         )}
 

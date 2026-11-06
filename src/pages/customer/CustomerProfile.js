@@ -9,8 +9,8 @@ import { sendEmailVerification } from 'firebase/auth';
 import { auth } from '../../firebase/config';
 
 function CustomerProfile() {
-  const { currentUser, userData, updateProfilePicture } = useAuth(); 
-
+const { currentUser, userData, updateProfilePicture, refreshUserData } = useAuth();  
+  
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [linking, setLinking] = useState(false);
@@ -87,26 +87,37 @@ function CustomerProfile() {
   }, [currentUser]);
 
   // 2. Handle Save (update pending account or official record)
-  const handleSave = async () => {
+      const handleSave = async () => {
     setSaving(true);
     try {
       if (isLinked) {
-  await updateDoc(doc(db, 'customers', linkedId), {
-    firstName: profile.firstName.trim(),
-    lastName: profile.lastName.trim(),
-    nickname: profile.nickname.trim(),
-    phone: profile.phone.trim(),
-    address: profile.address.trim(),
-  });
-} else {
-  await updateDoc(doc(db, 'onlineAccounts', currentUser.email), {
-    firstName: profile.firstName.trim(),
-    lastName: profile.lastName.trim(),
-    nickname: profile.nickname.trim(),
-    phone: profile.phone.trim(),
-    address: profile.address.trim(),
-  });
-}
+        await updateDoc(doc(db, 'customers', linkedId), {
+          firstName: profile.firstName.trim(),
+          lastName: profile.lastName.trim(),
+          nickname: profile.nickname.trim(),
+          phone: profile.phone.trim(),
+          address: profile.address.trim(),
+        });
+      } else {
+        await updateDoc(doc(db, 'onlineAccounts', currentUser.email), {
+          firstName: profile.firstName.trim(),
+          lastName: profile.lastName.trim(),
+          nickname: profile.nickname.trim(),
+          phone: profile.phone.trim(),
+          address: profile.address.trim(),
+        });
+      }
+
+      // ✅ ALSO UPDATE THE USERS COLLECTION so the Navbar changes
+      await updateDoc(doc(db, 'users', currentUser.email), {
+        name: `${profile.firstName.trim()} ${profile.lastName.trim()}`.trim(),
+        firstName: profile.firstName.trim(),
+        lastName: profile.lastName.trim()
+      });
+
+      // ✅ Refresh the Auth Context to update Navbar/Sidebar instantly
+      await refreshUserData();
+
       setAlertConfig({
         type: 'success',
         title: 'Profile Updated',
@@ -179,10 +190,17 @@ function CustomerProfile() {
       }
 
       // Step F: Update the USER doc with linkedCustomerId
+            // Step F: Update the USER doc with linkedCustomerId
       await updateDoc(doc(db, 'users', currentUser.email), {
         linkedCustomerId: idToLink,
-        role: 'customer'
+        role: 'customer',
+        name: `${mergedProfile.firstName} ${mergedProfile.lastName}`.trim(), // ✅ Update name
+        firstName: mergedProfile.firstName, // ✅ Update first name
+        lastName: mergedProfile.lastName    // ✅ Update last name
       });
+
+      // ✅ Refresh context so Navbar knows you are linked
+      await refreshUserData();
 
       // Step G: Update local state
       setProfile({

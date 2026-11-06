@@ -45,10 +45,13 @@ export function AuthProvider({ children }) {
   const signup = async (email, password, customerData) => {
     const result = await createUserWithEmailAndPassword(auth, email, password);
 
+        // 1. Create the User Role document
     await setDoc(doc(db, 'users', email), {
       email: email,
       role: 'customer',
-      name: `${customerData.firstName} ${customerData.lastName}`,
+      firstName: customerData.firstName, // ✅ Save first name
+      lastName: customerData.lastName,   // ✅ Save last name
+      name: `${customerData.firstName} ${customerData.lastName}`, // Keep for backward compatibility
       createdAt: new Date().toISOString()
     });
 
@@ -90,6 +93,7 @@ export function AuthProvider({ children }) {
   };
 
 
+    // Add this to force context to fetch the latest user data
   const refreshUserData = async () => {
     if (!currentUser?.email) return;
     try {
@@ -141,7 +145,7 @@ export function AuthProvider({ children }) {
     return unsubscribe;
   }, []);
 
-  const value = {
+    const value = {
     currentUser,
     userRole,
     userData,
@@ -151,7 +155,7 @@ export function AuthProvider({ children }) {
     loading,
     resendVerification,
     updateProfilePicture,
-    refreshUserData 
+    refreshUserData
   };
 
   return (

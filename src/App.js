@@ -6,6 +6,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import Navbar from './components/Navbar';
 import PrivateRoute from './components/PrivateRoute';
 import AdminLayout from './components/AdminLayout';
+import ScrollToTop from './components/ScrollToTop';
 
 // --- PUBLIC PAGES ---
 import LandingPage from './pages/customer/LandingPage';
@@ -59,6 +60,7 @@ function App() {
     <Router>
       <AuthProvider>
         <AppShell>
+          <ScrollToTop /> 
           <Routes>
             {/* =========================================
                 PUBLIC ROUTES

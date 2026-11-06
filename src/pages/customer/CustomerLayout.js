@@ -49,7 +49,10 @@ function CustomerLayout() {
             )}
           </div>
           <h2 className="font-bold text-gray-900 text-lg text-center truncate w-full">
-            {userData?.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : 'Customer Name'}
+            {userData?.name || 
+             (userData?.firstName ? `${userData.firstName} ${userData.lastName || ''}`.trim() : null) || 
+             currentUser?.email?.split('@')[0] || 
+             'Customer Name'}
           </h2>
           <p className="text-xs text-gray-600 mt-1 truncate w-full text-center">{currentUser?.email}</p>
         </div>

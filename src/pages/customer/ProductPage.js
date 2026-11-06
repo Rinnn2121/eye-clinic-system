@@ -4,19 +4,19 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, getDocs } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Link } from 'react-router-dom';
-import Footer from '../../components/Footer'; // ✅ Import the Footer
+import Footer from '../../components/Footer';
 
 function ProductPage() {
   const [allFrames, setAllFrames] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // ✅ Filter States
+  // Filter States
   const [searchTerm, setSearchTerm] = useState('');
   const [maxPrice, setMaxPrice] = useState(5000); 
   const [selectedTypes, setSelectedTypes] = useState(['Metal Frame', 'Plastic Frame']);
   const [sortBy, setSortBy] = useState('Newest');
 
-  // ✅ Pagination State
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 12;
 
@@ -30,8 +30,9 @@ function ProductPage() {
           const data = doc.data();
           const isFrame = data.category === 'Metal Frame' || data.category === 'Plastic Frame';
           const isActive = data.isActive !== false;
+          const showOnWebsite = data.showOnWebsite !== false; 
           
-          if (isFrame && isActive) {
+          if (isFrame && isActive && showOnWebsite) {
             items.push({ id: doc.id, ...data });
           }
         });
@@ -57,14 +58,13 @@ function ProductPage() {
     } else {
       setSelectedTypes([...selectedTypes, type]);
     }
-    setCurrentPage(1); // Reset to page 1 on filter change
+    setCurrentPage(1);
   };
 
   // 3. Filter & Sort Logic
   const filteredProducts = useMemo(() => {
     let result = allFrames;
 
-    // Filter by Search
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
       result = result.filter(p => 
@@ -73,74 +73,89 @@ function ProductPage() {
       );
     }
 
-    // Filter by Type (Checkboxes)
     if (selectedTypes.length > 0) {
       result = result.filter(p => selectedTypes.includes(p.category));
     }
 
-    // Filter by Max Price
     result = result.filter(p => Number(p.price) <= maxPrice);
 
-    // Sort
+    // Sort Logic
     result.sort((a, b) => {
-      if (sortBy === 'Price: Low to High') return Number(a.price) - Number(b.price);
-      if (sortBy === 'Price: High to Low') return Number(b.price) - Number(a.price);
-      if (sortBy === 'Name: A-Z') return a.name.localeCompare(b.name);
+      if (sortBy === 'Newest') {
+        return new Date(b.createdAt || 0) - new Date(a.createdAt || 0);
+      }
+      if (sortBy === 'Price: Low to High') {
+        return Number(a.price) - Number(b.price);
+      }
+      if (sortBy === 'Price: High to Low') {
+        return Number(b.price) - Number(a.price);
+      }
+      if (sortBy === 'Name: A-Z') {
+        return a.name.localeCompare(b.name);
+      }
       return 0; 
     });
 
     return result;
   }, [allFrames, searchTerm, selectedTypes, maxPrice, sortBy]);
 
-  // ✅ Pagination Calculation
+  // Pagination Calculation
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
   const currentItems = filteredProducts.slice(indexOfFirstItem, indexOfLastItem);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-white flex flex-col">
       
+      {/* Header with faint line */}
+      <div className="max-w-[1440px] w-full mx-auto px-4 pt-10 mb-2">
+        <div className="border-b border-gray-200 pb-4">
+          <h1 className="text-3xl font-bold text-gray-900">Our Eyewear Collection</h1>
+        </div>
+      </div>
+
       {/* Top Bar: Search & Sort */}
-      <div className="bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
+      <div className="bg-white sticky top-16 z-30 pt-2">
+        <div className="max-w-[1440px] mx-auto px-4 py-3 flex flex-col md:flex-row items-center justify-between gap-4">
           
-          {/* Search */}
-          <div className="relative w-full md:w-96">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
-              {/* ✅ SVG Search */}
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-            </span>
-            <input
-              type="text"
-              placeholder="Search for frames..."
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-              className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
-            />
+          {/* Search Bar aligned to the product grid */}
+          <div className="w-full md:pl-[288px] flex-1 md:pr-8">
+            <div className="relative w-full max-w-lg">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </span>
+              <input
+                type="text"
+                placeholder="Search for frames..."
+                value={searchTerm}
+                onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                className="w-full pl-9 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-[#4A90E2]"
+              />
+            </div>
           </div>
 
           {/* Sort */}
-          <div className="flex items-center gap-2 w-full md:w-auto">
+          <div className="flex items-center gap-2 w-full md:w-auto flex-shrink-0">
             <span className="text-sm text-gray-500 whitespace-nowrap">Sort by:</span>
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value)}
               className="w-full md:w-48 border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white text-gray-700 outline-none cursor-pointer"
             >
-              <option>Newest</option>
-              <option>Price: Low to High</option>
-              <option>Price: High to Low</option>
-              <option>Name: A-Z</option>
+              <option value="Newest">Newest</option>
+              <option value="Price: Low to High">Price: Low to High</option>
+              <option value="Price: High to Low">Price: High to Low</option>
+              <option value="Name: A-Z">Name: A-Z</option>
             </select>
           </div>
         </div>
       </div>
 
-      {/* Main Content Area */}
-<div className="flex-1 w-full max-w-[1440px] mx-auto px-4 py-8 flex flex-col md:flex-row gap-8">        
+      {/* ✅ Main Content Area - Reduced top padding from py-8 to pt-4 to bring it closer to the search bar */}
+      <div className="flex-1 w-full max-w-[1440px] mx-auto px-4 pt-4 pb-8 flex flex-col md:flex-row gap-8">        
         {/* LEFT SIDEBAR: Filters */}
         <div className="w-full md:w-64 flex-shrink-0 space-y-8">
           
@@ -193,7 +208,6 @@ function ProductPage() {
               </label>
             </div>
           </div>
-
         </div>
 
         {/* RIGHT SIDE: Product Grid */}
@@ -213,7 +227,6 @@ function ProductPage() {
             </div>
           ) : (
             <>
-              {/* Product Grid */}
               <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-10">
                 {currentItems.map((product) => (
                   <Link 
@@ -240,7 +253,7 @@ function ProductPage() {
                 ))}
               </div>
 
-              {/* ✅ Pagination Controls */}
+              {/* Pagination Controls */}
               <div className="flex justify-center items-center gap-2 mt-auto">
                 <button
                   onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
@@ -253,7 +266,6 @@ function ProductPage() {
                 <div className="flex gap-1">
                   {[...Array(totalPages)].map((_, i) => {
                     const pageNum = i + 1;
-                    // Show dots for very long pagination
                     if (totalPages > 7 && pageNum > 3 && pageNum < totalPages - 1 && pageNum !== currentPage) {
                       if (pageNum === 4) return <span key={pageNum} className="px-2 py-1 text-gray-400">...</span>;
                       return null;
@@ -287,7 +299,6 @@ function ProductPage() {
         </div>
       </div>
 
-      {/* ✅ Footer */}
       <Footer />
 
     </div>

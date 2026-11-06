@@ -7,7 +7,6 @@ import NotificationBell from './NotificationBell';
 import ProfileMenu from './ProfileMenu'; 
 
 export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen, onMobileClose }) {
-  // ✅ Grab user data to display the name
   const { userRole, userData, currentUser } = useAuth();
   const isAdmin = userRole === 'admin';
 
@@ -15,9 +14,10 @@ export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen,
     if (onMobileClose) onMobileClose();
   };
 
-  const linkClass = ({ isActive }) =>
+  // ✅ Updated to force left-alignment on mobile
+  const getLinkClass = (isMobile) => ({ isActive }) =>
     `flex items-center gap-3 w-full rounded-xl transition-all duration-200 ${
-      isExpanded ? 'px-4 py-3 justify-start' : 'p-3 justify-center'
+      isMobile || isExpanded ? 'px-4 py-3 justify-start' : 'p-3 justify-center'
     } ${
       isActive
         ? 'bg-white text-[#1e40af] font-bold shadow-sm'
@@ -26,10 +26,41 @@ export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen,
 
   const SidebarContent = ({ isMobile = false }) => {
     const expanded = isMobile ? true : isExpanded;
+    const linkClass = getLinkClass(isMobile); // ✅ Apply the correct class based on device
 
-    // ✅ Format user's display name
+    // Format user's display name
     const displayName = userData?.name || userData?.firstName || currentUser?.email?.split('@')[0] || 'Admin Staff';
-    const displayRole = userRole === 'admin' ? 'Administrator' : 'Staff';
+    const displayRole = userRole === 'admin' ? 'ADMINISTRATOR' : 'STAFF';
+    const initial = displayName.charAt(0).toUpperCase();
+
+    // ✅ Custom Trigger for Profile Menu (Picture + Name)
+    const customProfileTrigger = (
+      <div className="px-2 py-2 w-full">
+        <div className={`flex items-center gap-3 p-3 rounded-xl transition-all duration-200 hover:bg-white/50 w-full cursor-pointer ${expanded ? 'px-4 py-3 justify-start' : 'justify-center'}`}>
+          
+          {/* Profile Picture */}
+          <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center flex-shrink-0 overflow-hidden shadow-sm">
+            {userData?.photoUrl ? (
+              <img src={userData.photoUrl} alt={displayName} className="w-full h-full object-cover" />
+            ) : (
+              <span className="font-bold text-sm text-gray-700">{initial}</span>
+            )}
+          </div>
+          
+          {/* Profile Name & Role (Only shows when expanded) */}
+          {expanded && (
+            <div className="flex flex-col min-w-0 text-left">
+              <span className="text-sm font-bold text-gray-900 truncate">
+                {displayName}
+              </span>
+              <span className="text-[10px] font-bold text-gray-500 tracking-wider truncate">
+                {displayRole}
+              </span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
 
     return (
       <div className="flex flex-col h-full bg-[#b8cff2] text-gray-800 border-r border-blue-200">
@@ -128,25 +159,12 @@ export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen,
         </div>
 
         {/* ✅ Bottom Section: Profile Info & Menu */}
-        <div className="border-t border-blue-200 flex-shrink-0 p-3">
-          <div className={`flex items-center gap-3 ${expanded ? 'justify-start' : 'justify-center'}`}>
-            
-            {/* Profile Picture (Trigger for Dropdown) */}
-            <ProfileMenu showManageAccounts align="right-sidebar" />
-            
-            {/* Profile Name & Role (Only shows when expanded) */}
-            {expanded && (
-              <div className="flex flex-col min-w-0">
-                <span className="text-sm font-bold text-gray-900 truncate">
-                  {displayName}
-                </span>
-                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider truncate">
-                  {displayRole}
-                </span>
-              </div>
-            )}
-
-          </div>
+        <div className="border-t border-blue-200 flex-shrink-0 p-0 pb-2">
+          <ProfileMenu 
+            showManageAccounts 
+            align="right-sidebar" 
+            customTrigger={customProfileTrigger} 
+          />
         </div>
 
       </div>
@@ -155,6 +173,7 @@ export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen,
 
   return (
     <>
+      {/* DESKTOP / TABLET: Floating overlay style */}
       <aside
         onClick={(e) => e.stopPropagation()} 
         className={`hidden md:flex flex-col fixed inset-y-0 left-0 z-50 shadow-lg transition-all duration-300 ease-in-out ${
@@ -164,6 +183,7 @@ export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen,
         <SidebarContent isMobile={false} />
       </aside>
 
+      {/* MOBILE: Slide-out drawer overlay */}
       <div
         className={`md:hidden fixed inset-0 bg-black/60 z-40 transition-opacity duration-300 ${
           isMobileOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
@@ -173,7 +193,7 @@ export default function AdminSidebar({ isExpanded, onToggleExpand, isMobileOpen,
       />
       <aside
         onClick={(e) => e.stopPropagation()} 
-        className={`md:hidden fixed inset-y-0 left-0 w-64 max-w-[80vw] z-50 transform transition-transform duration-300 flex flex-col ${
+        className={`md:hidden fixed inset-y-0 left-0 w-64 max-w-[80vw] z-50 transform transition-transform duration-300 flex flex-col bg-[#b8cff2] ${
           isMobileOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >

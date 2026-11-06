@@ -372,7 +372,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
           {step === 2 && (
             <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Your Cart</h3>
+                <h3 className="text-xl font-bold text-gray-900">Items in your Cart (Optional)</h3>
               </div>
               
               {cartItems.length === 0 ? (
@@ -428,8 +428,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <p className="text-xs leading-relaxed font-medium">
-                  Items in your cart will be shared with the clinic to help prepare for your visit. 
-                  This does NOT represent an online purchase.
+                  Selecting frames is OPTIONAL. Your appointment can be booked for a clinic service-only.
                 </p>
               </div>
             </div>
@@ -585,7 +584,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                 }}
                 className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors"
               >
-                Continue
+                Close
               </button>
             </div>
             

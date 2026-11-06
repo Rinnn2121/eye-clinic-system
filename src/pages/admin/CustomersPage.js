@@ -25,7 +25,7 @@ function CustomersPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 10; // ✅ 10 per page
+  const itemsPerPage = 10; 
 
   // Top Stats State
   const [stats, setStats] = useState({
@@ -79,9 +79,8 @@ function CustomersPage() {
       const q = query(collection(db, 'customers'));
       const snap = await getDocs(q);
       const list = [];
-            snap.forEach((doc) => {
+      snap.forEach((doc) => {
         const data = doc.data();
-        // ✅ Only push to the list if they are NOT archived
         if (data.isArchived !== true) {
           list.push({ id: doc.id, ...data });
         }
@@ -340,7 +339,6 @@ function CustomersPage() {
                     
                     return (
                       <tr key={c.id} className="hover:bg-gray-50">
-                        {/* ✅ Increased py-4 to give rows more vertical space */}
                         <td className="px-4 py-4 font-mono text-[#4A90E2] font-semibold text-sm">{c.referenceId}</td>
                         <td className="px-4 py-4 text-gray-800 font-semibold">
                           {c.lastName}, {c.firstName}
@@ -374,13 +372,13 @@ function CustomersPage() {
                         <td className="px-4 py-4">
                           <div className="flex items-center justify-center gap-2">
                             <button
-                              onClick={() => handleStartVisit(c.id)} // ✅ Updated function name
+                              onClick={() => handleStartVisit(c.id)}
                               className="bg-[#4A90E2] text-white px-3 py-1 rounded text-xs font-medium hover:bg-[#4A90E2]/90 transition-colors flex items-center gap-1"
                             >
                               <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4v16m8-8H4" />
                               </svg>
-                              Start Visit {/* ✅ Changed text */}
+                              Start Visit
                             </button>
                             
                             <button
@@ -403,47 +401,58 @@ function CustomersPage() {
           )}
         </div>
 
-        {/* Pagination */}
-        <div className="flex justify-center items-center gap-2 p-4 mt-2">
-          <button 
-            onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-            disabled={currentPage === 1}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            Prev
-          </button>
-          
-          <div className="flex gap-1">
-            {[...Array(totalPages)].map((_, i) => {
-              const pageNum = i + 1;
-              if (totalPages > 5 && pageNum > 2 && pageNum < totalPages - 1 && pageNum !== currentPage) {
-                if (pageNum === 3) return <span key={pageNum} className="px-2 py-1.5 text-gray-400">...</span>;
-                return null;
-              }
-              return (
-                <button
-                  key={pageNum}
-                  onClick={() => setCurrentPage(pageNum)}
-                  className={`px-3 py-1.5 rounded-md text-base border shadow-sm ${
-                    currentPage === pageNum 
-                      ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
-                      : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {pageNum}
-                </button>
-              );
-            })}
-          </div>
+        {/* ✅ Pagination & Summary Row */}
+        {filtered.length > 0 && (
+          <div className="flex flex-col md:flex-row justify-between items-center gap-4 p-4 mt-2">
+            
+            {/* Text on the Left */}
+            <div className="text-sm font-medium text-gray-500 order-2 md:order-1">
+              Showing {filtered.length} records • Page {currentPage} of {totalPages}
+            </div>
 
-          <button 
-            onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-            disabled={currentPage === totalPages}
-            className="px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
-          >
-            Next
-          </button>
-        </div>
+            {/* Buttons on the Right */}
+            <div className="flex items-center gap-2 order-1 md:order-2">
+              <button 
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                Prev
+              </button>
+              
+              <div className="flex gap-1">
+                {[...Array(totalPages)].map((_, i) => {
+                  const pageNum = i + 1;
+                  if (totalPages > 5 && pageNum > 2 && pageNum < totalPages - 1 && pageNum !== currentPage) {
+                    if (pageNum === 3) return <span key={pageNum} className="px-2 py-1.5 text-gray-400">...</span>;
+                    return null;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`px-3 py-1.5 rounded-md text-base border shadow-sm ${
+                        currentPage === pageNum 
+                          ? 'bg-blue-50 border-[#4A90E2] text-[#4A90E2] font-bold' 
+                          : 'bg-white border-gray-300 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button 
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1.5 border border-gray-300 rounded-md text-base bg-white text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed shadow-sm"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Modal */}

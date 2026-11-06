@@ -21,7 +21,7 @@ function AboutPage() {
             </p>
             
             <a 
-              href="https://www.facebook.com/aocopticalclinic" 
+              href="https://www.facebook.com/vitugsumayaoptical" 
               target="_blank" 
               rel="noreferrer"
               className="inline-flex items-center gap-2 border border-[#4A90E2] text-[#4A90E2] px-6 py-2.5 rounded-md font-medium text-sm hover:bg-[#4A90E2] hover:text-white transition-colors w-fit"

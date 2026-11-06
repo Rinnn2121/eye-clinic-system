@@ -5,7 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import ConfirmModal from './ConfirmModal';
 
-export default function ProfileMenu({ align = 'right', direction = 'down', showManageAccounts = false }) {
+// ✅ Add customTrigger prop
+export default function ProfileMenu({ align = 'right', direction = 'down', showManageAccounts = false, customTrigger }) {
   const { currentUser, userRole, userData, logout } = useAuth();
   const navigate = useNavigate();
   const [isOpen, setIsOpen] = useState(false);
@@ -50,17 +51,23 @@ export default function ProfileMenu({ align = 'right', direction = 'down', showM
   return (
     <div className="relative" ref={dropdownRef}>
       {/* Trigger Button */}
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-center w-10 h-10 bg-white text-gray-700 hover:text-[#1e40af] rounded-full shadow-sm transition-colors border border-gray-200 overflow-hidden"
-        title="My Account"
-      >
-        {userData?.photoUrl ? (
-          <img src={userData.photoUrl} alt={displayName} className="w-full h-full object-cover" />
-        ) : (
-          <span className="font-bold text-sm">{initial}</span>
-        )}
-      </button>
+      {customTrigger ? (
+        <div onClick={() => setIsOpen(!isOpen)} className="w-full cursor-pointer">
+          {customTrigger}
+        </div>
+      ) : (
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="flex items-center justify-center w-10 h-10 bg-white text-gray-700 hover:text-[#1e40af] rounded-full shadow-sm transition-colors border border-gray-200 overflow-hidden"
+          title="My Account"
+        >
+          {userData?.photoUrl ? (
+            <img src={userData.photoUrl} alt={displayName} className="w-full h-full object-cover" />
+          ) : (
+            <span className="font-bold text-sm">{initial}</span>
+          )}
+        </button>
+      )}
 
       {/* Dropdown */}
       {isOpen && (
@@ -85,7 +92,6 @@ export default function ProfileMenu({ align = 'right', direction = 'down', showM
           </div>
 
           <div className="p-2">
-            {/* ✅ Admin-only: Manage Accounts (Now properly checks BOTH the prop and the role) */}
             {showManageAccounts && userRole === 'admin' && (
               <>
                 <Link
@@ -98,12 +104,10 @@ export default function ProfileMenu({ align = 'right', direction = 'down', showM
                   </svg>
                   Manage Accounts
                 </Link>
-
                 <div className="border-t border-gray-100 my-1"></div>
               </>
             )}
 
-            {/* Profile Link */}
             <Link
               to={profileLink}
               onClick={() => setIsOpen(false)}
@@ -117,7 +121,6 @@ export default function ProfileMenu({ align = 'right', direction = 'down', showM
 
             <div className="border-t border-gray-100 my-1"></div>
 
-            {/* Logout */}
             <button
               onClick={() => {
                 setIsOpen(false);
@@ -134,7 +137,6 @@ export default function ProfileMenu({ align = 'right', direction = 'down', showM
         </div>
       )}
 
-      {/* Logout Confirm */}
       <ConfirmModal
         isOpen={showLogoutModal}
         title="Log Out?"
@@ -145,7 +147,6 @@ export default function ProfileMenu({ align = 'right', direction = 'down', showM
         onCancel={() => setShowLogoutModal(false)}
         onConfirm={confirmLogout}
       />
-
     </div>
   );
 }

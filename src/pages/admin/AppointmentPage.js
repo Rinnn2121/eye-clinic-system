@@ -1,7 +1,7 @@
 // src/pages/admin/AppointmentPage.js
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,7 +32,7 @@ function AppointmentPage() {
   const [alertConfig, setAlertConfig] = useState(null); 
   const [showPendingModal, setShowPendingModal] = useState(false);
 
-  const loadAppointments = async () => {
+    const loadAppointments = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'appointments'));
       const items = [];
@@ -40,11 +40,38 @@ function AppointmentPage() {
         items.push({ id: doc.id, ...doc.data() });
       });
 
+      // ✅ FETCH REAL NAMES FOR ONLINE BOOKINGS
+      const apptsWithNames = await Promise.all(items.map(async (apt) => {
+        // If the name contains '@' or matches the email prefix, it means it's an online booking
+        // and we need to fetch their actual name from the database.
+        if (apt.customerId && apt.customerId.includes('@')) {
+          // Check if the customer is linked to a physical record
+          const userDoc = await getDoc(doc(db, 'users', apt.customerId));
+          let linkedId = userDoc.exists() ? userDoc.data().linkedCustomerId : null;
+
+          if (linkedId) {
+            const custDoc = await getDoc(doc(db, 'customers', linkedId));
+            if (custDoc.exists()) {
+              const data = custDoc.data();
+              return { ...apt, customerName: `${data.firstName} ${data.lastName}`.trim(), phone: data.phone };
+            }
+          } else {
+            // If not linked, check the onlineAccounts collection
+            const onlineDoc = await getDoc(doc(db, 'onlineAccounts', apt.customerId));
+            if (onlineDoc.exists()) {
+              const data = onlineDoc.data();
+              return { ...apt, customerName: `${data.firstName} ${data.lastName}`.trim(), phone: data.phone };
+            }
+          }
+        }
+        return apt;
+      }));
+
       const now = new Date();
       const todayStr = new Date(now.getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
       const currentTimeStr = now.toTimeString().slice(0, 5);
 
-      const updatedItems = await Promise.all(items.map(async (apt) => {
+      const updatedItems = await Promise.all(apptsWithNames.map(async (apt) => {
         const statusLower = (apt.status || '').toLowerCase();
         
         if (statusLower === 'pending' || statusLower === 'scheduled') {

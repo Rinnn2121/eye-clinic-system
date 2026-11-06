@@ -1,5 +1,7 @@
 // src/pages/admin/CustomerAccountsPage.js
 
+// src/pages/admin/CustomerAccountsPage.js
+
 import React, { useState, useEffect } from 'react';
 import { collection, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
@@ -37,7 +39,6 @@ function CustomerAccountsPage() {
       const usersSnap = await getDocs(collection(db, 'users'));
       const custList = [];
       const staffList = [];
-      const archivedList = [];
 
       usersSnap.forEach(doc => {
         const data = { id: doc.id, ...doc.data() };
@@ -46,16 +47,22 @@ function CustomerAccountsPage() {
           staffList.push(data);
         } 
         else if (data.role === 'customer') {
-          if (data.isArchived === true) {
-            archivedList.push(data);
-          } else {
-            custList.push(data);
-          }
+          custList.push(data);
         }
       });
 
       setCustomerAccounts(custList);
       setStaffAccounts(staffList);
+
+      // ✅ 2. Fetch ARCHIVED Customers from the 'customers' collection
+      const archivedSnap = await getDocs(collection(db, 'customers'));
+      const archivedList = [];
+      archivedSnap.forEach(doc => {
+        const data = doc.data();
+        if (data.isArchived === true) {
+          archivedList.push({ id: doc.id, ...data });
+        }
+      });
       setArchivedAccounts(archivedList);
 
     } catch (err) {
@@ -88,9 +95,10 @@ function CustomerAccountsPage() {
     }
   };
 
+  // ✅ Restore Archived Customer (From customers collection)
   const handleRestore = async (accountId) => {
     try {
-      await updateDoc(doc(db, 'users', accountId), {
+      await updateDoc(doc(db, 'customers', accountId), {
         isArchived: false,
         restoredAt: new Date().toISOString()
       });
@@ -121,7 +129,8 @@ function CustomerAccountsPage() {
       item.firstName?.toLowerCase().includes(lower) ||
       item.lastName?.toLowerCase().includes(lower) ||
       item.name?.toLowerCase().includes(lower) ||
-      item.linkedCustomerId?.toLowerCase().includes(lower)
+      item.linkedCustomerId?.toLowerCase().includes(lower) ||
+      item.referenceId?.toLowerCase().includes(lower)
     );
   };
 
@@ -230,7 +239,7 @@ function CustomerAccountsPage() {
                 <thead>
                   <tr className="bg-[#dbeafe] text-gray-800 text-left">
                     <th className="px-6 py-4 font-bold">{activeTab === 'staff' ? 'Full Name' : 'Name'}</th>
-                    <th className="px-6 py-4 font-bold">Email (Login)</th>
+                    <th className="px-6 py-4 font-bold">{activeTab === 'archived' ? 'Reference ID' : 'Email (Login)'}</th>
                     
                     {activeTab === 'customers' && <th className="px-6 py-4 font-bold">Status / Linked ID</th>}
                     {activeTab === 'staff' && <th className="px-6 py-4 font-bold">Role</th>}
@@ -247,13 +256,25 @@ function CustomerAccountsPage() {
                     return (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-gray-800 font-medium">
-                          {item.name || `${item.firstName || ''} ${item.lastName || ''}`.trim() || '—'}
+                          {/* For Archived, show the physical patient name */}
+                          {activeTab === 'archived' 
+                            ? `${item.lastName || ''}, ${item.firstName || ''}`
+                            : item.name || `${item.firstName || ''} ${item.lastName || ''}`.trim() || '—'
+                          }
+                          
                           {isSelf && (
                             <span className="ml-2 text-[10px] font-bold text-[#4A90E2] bg-blue-50 px-2 py-0.5 rounded-full uppercase">You</span>
                           )}
                         </td>
                         
-                        <td className="px-6 py-4 text-gray-600">{item.email || item.id}</td>
+                        <td className="px-6 py-4 text-gray-600">
+                          {/* For Archived, show Reference ID. For others, show Email */}
+                          {activeTab === 'archived' ? (
+                             <span className="font-mono text-xs font-bold text-[#4A90E2]">{item.referenceId}</span>
+                          ) : (
+                             item.email || item.id
+                          )}
+                        </td>
 
                         {/* Status / Linked ID */}
                         {activeTab === 'customers' && (
@@ -332,7 +353,6 @@ function CustomerAccountsPage() {
             <div className="flex gap-1">
               {[...Array(totalPages)].map((_, i) => {
                 const pageNum = i + 1;
-                // Hide middle pages if there are too many
                 if (totalPages > 5 && pageNum > 2 && pageNum < totalPages - 1 && pageNum !== currentPage) {
                   if (pageNum === 3) return <span key={pageNum} className="px-2 py-1.5 text-gray-400">...</span>;
                   return null;
