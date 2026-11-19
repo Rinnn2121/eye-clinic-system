@@ -1,23 +1,13 @@
-// src/contexts/AuthContext.js
-
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { auth, db } from '../firebase/config';
 import { 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  signOut, 
-  onAuthStateChanged,
-  setPersistence,
-  browserSessionPersistence,
-  sendEmailVerification
+  signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut, 
+  onAuthStateChanged, setPersistence, browserLocalPersistence, sendEmailVerification 
 } from 'firebase/auth';
-import { doc, getDoc,updateDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, setDoc } from 'firebase/firestore';
 
 const AuthContext = createContext();
-
-export function useAuth() {
-  return useContext(AuthContext);
-}
+export function useAuth() { return useContext(AuthContext); }
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(null);
@@ -26,141 +16,124 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const configurePersistence = async () => {
-      try {
-        await setPersistence(auth, browserSessionPersistence);
-      } catch (error) {
-        console.error('Error setting persistence:', error);
-      }
-    };
-    configurePersistence();
+    setPersistence(auth, browserLocalPersistence);
+  }, []);
+
+  useEffect(() => {
+    sessionStorage.setItem('browser_alive', 'true');
+    const handleBeforeUnload = () => sessionStorage.removeItem('browser_alive');
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, []);
 
   const login = async (email, password) => {
     const result = await signInWithEmailAndPassword(auth, email, password);
+    
+    try {
+      const userDoc = await getDoc(doc(db, 'users', email));
+      if (userDoc.exists()) {
+        const role = userDoc.data().role || 'customer';
+        // ✅ Save to localStorage before the new tab even loads
+        localStorage.setItem('userRoleCache', role);
+        setUserRole(role);
+      }
+    } catch (err) {
+      console.error("Login role fetch error:", err);
+    }
+    
     return result;
   };
 
+  const logout = async () => {
+    localStorage.removeItem('userRoleCache');
+    await signOut(auth);
+  };
 
   const signup = async (email, password, customerData) => {
     const result = await createUserWithEmailAndPassword(auth, email, password);
-
-        // 1. Create the User Role document
+    localStorage.setItem('userRoleCache', 'customer');
     await setDoc(doc(db, 'users', email), {
-      email: email,
-      role: 'customer',
-      firstName: customerData.firstName, // ✅ Save first name
-      lastName: customerData.lastName,   // ✅ Save last name
-      name: `${customerData.firstName} ${customerData.lastName}`, // Keep for backward compatibility
-      createdAt: new Date().toISOString()
+      email: email, role: 'customer', name: `${customerData.firstName} ${customerData.lastName}`, createdAt: new Date().toISOString()
     });
-
-  
     await setDoc(doc(db, 'onlineAccounts', email), {
-      firstName: customerData.firstName,
-      lastName: customerData.lastName,
-      nickname: customerData.nickname || '',
-      phone: customerData.phone,
-      email: email,
-      createdAt: new Date().toISOString(),
-      totalVisits: 0,
+      firstName: customerData.firstName, lastName: customerData.lastName, nickname: customerData.nickname || '',
+      phone: customerData.phone, email: email, createdAt: new Date().toISOString(), totalVisits: 0,
     });
-
+    setUserRole('customer');
     return result;
   };
 
   const resendVerification = async () => {
-    if (auth.currentUser) {
-      await sendEmailVerification(auth.currentUser);
-    }
+    if (auth.currentUser) await sendEmailVerification(auth.currentUser);
   };
-
-  const logout = async () => {
-    await signOut(auth);
-  };
-
 
   const updateProfilePicture = async (newPhotoUrl) => {
     if (!currentUser?.email) return;
-    
-
-    await updateDoc(doc(db, 'users', currentUser.email), {
-      photoUrl: newPhotoUrl
-    });
-    
-
+    await updateDoc(doc(db, 'users', currentUser.email), { photoUrl: newPhotoUrl });
     setUserData(prev => ({ ...prev, photoUrl: newPhotoUrl }));
   };
 
-
-    // Add this to force context to fetch the latest user data
   const refreshUserData = async () => {
     if (!currentUser?.email) return;
     try {
       const userDoc = await getDoc(doc(db, 'users', currentUser.email));
       if (userDoc.exists()) {
+        const role = userDoc.data().role || 'customer';
+        setUserRole(role);
         setUserData(userDoc.data());
+        localStorage.setItem('userRoleCache', role);
       }
-    } catch (err) {
-      console.error("Error refreshing user data:", err);
-    }
+    } catch (err) { console.error("Error:", err); }
   };
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true); 
-      
       if (user) {
         setCurrentUser(user);
         
+        // ✅ 1. IMMEDIATELY set role from cache (prevents flash)
+        const cachedRole = localStorage.getItem('userRoleCache');
+        if (cachedRole) {
+          setUserRole(cachedRole); 
+        }
+        
+        // ✅ 2. Fetch the real role from Firestore (this overrides the cache if different)
         try {
           const userDoc = await getDoc(doc(db, 'users', user.email));
-          
           if (userDoc.exists()) {
-            setUserRole(userDoc.data().role || 'customer');
+            const realRole = userDoc.data().role || 'customer';
+            setUserRole(realRole);
             setUserData(userDoc.data());
+            localStorage.setItem('userRoleCache', realRole);
           } else {
-            const newUserData = {
-              email: user.email,
-              role: 'customer',
-              name: user.email.split('@')[0],
-              createdAt: new Date().toISOString()
-            };
+            // Only create a new doc if it genuinely doesn't exist
+            const newUserData = { email: user.email, role: 'customer', name: user.email.split('@')[0], createdAt: new Date().toISOString() };
             await setDoc(doc(db, 'users', user.email), newUserData);
             setUserRole('customer');
             setUserData(newUserData);
+            localStorage.setItem('userRoleCache', 'customer');
           }
         } catch (error) {
-          console.error('Error getting role:', error);
-          setUserRole('customer');
+          // ✅ If Firestore fails, DO NOT wipe the role. Keep the cached one.
+          console.error("AuthState role fetch error:", error);
+          if (!cachedRole) setUserRole('customer'); 
         }
       } else {
-        setCurrentUser(null);
-        setUserRole(null);
-        setUserData(null);
+        // Only clear if actually signed out (no cached role)
+        if (!localStorage.getItem('userRoleCache')) {
+          setCurrentUser(null);
+          setUserRole(null);
+          setUserData(null);
+        }
       }
-      
       setLoading(false);
     });
     return unsubscribe;
   }, []);
 
-    const value = {
-    currentUser,
-    userRole,
-    userData,
-    login,
-    signup,
-    logout,
-    loading,
-    resendVerification,
-    updateProfilePicture,
-    refreshUserData
+  const value = {
+    currentUser, userRole, userData, login, signup, logout, loading, resendVerification, updateProfilePicture, refreshUserData
   };
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  );
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

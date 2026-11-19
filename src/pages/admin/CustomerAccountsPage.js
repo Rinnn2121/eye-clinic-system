@@ -1,9 +1,7 @@
 // src/pages/admin/CustomerAccountsPage.js
 
-// src/pages/admin/CustomerAccountsPage.js
-
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, deleteDoc, doc, updateDoc } from 'firebase/firestore';
+import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../contexts/AuthContext';
 import ConfirmModal from '../../components/ConfirmModal';
@@ -12,22 +10,24 @@ import CreateStaffModal from '../../components/CreateStaffModal';
 function CustomerAccountsPage() {
   const { currentUser } = useAuth();
   
-  // Tab State
-  const [activeTab, setActiveTab] = useState('customers'); // 'customers' | 'staff' | 'archived'
+  // ✅ 5 Tabs now
+  const [activeTab, setActiveTab] = useState('users'); // 'users' | 'customers' | 'staff' | 'archived_customers' | 'archived_accounts'
 
   // Data States
-  const [customerAccounts, setCustomerAccounts] = useState([]);
+  const [userAccounts, setUserAccounts] = useState([]);
+  const [customerRecords, setCustomerRecords] = useState([]);
   const [staffAccounts, setStaffAccounts] = useState([]);
+  const [archivedCustomers, setArchivedCustomers] = useState([]);
   const [archivedAccounts, setArchivedAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
 
   // Filter & Modals
   const [searchTerm, setSearchTerm] = useState('');
-  const [accountToDelete, setAccountToDelete] = useState(null);
+  const [accountToArchive, setAccountToArchive] = useState(null); 
   const [alertConfig, setAlertConfig] = useState(null);
   const [showStaffModal, setShowStaffModal] = useState(false);
 
-  // ✅ Pagination State
+  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 20;
 
@@ -35,35 +35,45 @@ function CustomerAccountsPage() {
   const loadData = async () => {
     setLoading(true);
     try {
-      // 1. Fetch Online Customer Accounts & Staff (From Users Collection)
+      // 1. Fetch Users Collection
       const usersSnap = await getDocs(collection(db, 'users'));
-      const custList = [];
+      const onlineCustList = [];
       const staffList = [];
+      const archAccountsList = [];
 
       usersSnap.forEach(doc => {
         const data = { id: doc.id, ...doc.data() };
-
-        if (data.role === 'admin' || data.role === 'staff') {
-          staffList.push(data);
-        } 
-        else if (data.role === 'customer') {
-          custList.push(data);
-        }
-      });
-
-      setCustomerAccounts(custList);
-      setStaffAccounts(staffList);
-
-      // ✅ 2. Fetch ARCHIVED Customers from the 'customers' collection
-      const archivedSnap = await getDocs(collection(db, 'customers'));
-      const archivedList = [];
-      archivedSnap.forEach(doc => {
-        const data = doc.data();
+        
         if (data.isArchived === true) {
-          archivedList.push({ id: doc.id, ...data });
+          archAccountsList.push({ ...data, type: data.role === 'admin' || data.role === 'staff' ? 'staff' : 'user' });
+        } else if (data.role === 'admin' || data.role === 'staff') {
+          staffList.push(data);
+        } else {
+          onlineCustList.push(data);
         }
       });
-      setArchivedAccounts(archivedList);
+
+      setUserAccounts(onlineCustList);
+      setStaffAccounts(staffList);
+      setArchivedAccounts(archAccountsList);
+
+      // 2. Fetch Customers Collection
+      const custSnap = await getDocs(collection(db, 'customers'));
+      const recordList = [];
+      const archCustList = [];
+      
+      custSnap.forEach(doc => {
+        const data = { id: doc.id, ...doc.data() };
+        
+        if (data.isArchived === true) {
+          archCustList.push({ ...data, type: 'customer_record' });
+        } else {
+          recordList.push(data);
+        }
+      });
+
+      setCustomerRecords(recordList);
+      setArchivedCustomers(archCustList);
 
     } catch (err) {
       console.error('Error loading accounts:', err);
@@ -75,38 +85,86 @@ function CustomerAccountsPage() {
     loadData();
   }, []);
 
-  // Delete Account Logic
-  const handleDelete = async () => {
-    if (!accountToDelete) return;
+  // ✅ SYNCED ARCHIVE LOGIC
+  const handleArchive = async () => {
+    if (!accountToArchive) return;
     
     try {
-      await deleteDoc(doc(db, 'users', accountToDelete.id));
+      const emailToArchive = accountToArchive.email;
+
+      // 1. Archive in the 'users' collection (if they have an email)
+      if (emailToArchive) {
+        const usersQuery = query(collection(db, 'users'), where('email', '==', emailToArchive));
+        const usersSnap = await getDocs(usersQuery);
+        
+        const promises = usersSnap.docs.map(userDoc => 
+          updateDoc(doc(db, 'users', userDoc.id), { isArchived: true, archivedAt: new Date().toISOString() })
+        );
+        await Promise.all(promises);
+      } else if (accountToArchive.type === 'user' || accountToArchive.type === 'staff') {
+        await updateDoc(doc(db, 'users', accountToArchive.id), { isArchived: true, archivedAt: new Date().toISOString() });
+      }
+
+      // 2. Archive in the 'customers' collection (if they have a clinic record)
+      if (accountToArchive.type === 'customer_record') {
+        await updateDoc(doc(db, 'customers', accountToArchive.id), { isArchived: true, archivedAt: new Date().toISOString() });
+      } else if (emailToArchive) {
+        const custQuery = query(collection(db, 'customers'), where('email', '==', emailToArchive));
+        const custSnap = await getDocs(custQuery);
+        
+        const custPromises = custSnap.docs.map(custDoc => 
+          updateDoc(doc(db, 'customers', custDoc.id), { isArchived: true, archivedAt: new Date().toISOString() })
+        );
+        await Promise.all(custPromises);
+      }
       
-      setAccountToDelete(null);
+      setAccountToArchive(null);
       loadData();
       setAlertConfig({
         type: 'success',
-        title: 'Account Removed',
-        message: 'The account has been successfully deleted.'
+        title: 'Account Archived',
+        message: 'The account has been successfully moved to archives.'
       });
     } catch (err) {
       console.error(err);
-      setAlertConfig({ type: 'error', title: 'Error', message: 'Failed to delete account.' });
+      setAlertConfig({ type: 'error', title: 'Error', message: 'Failed to archive account.' });
     }
   };
 
-  // ✅ Restore Archived Customer (From customers collection)
-  const handleRestore = async (accountId) => {
+  // ✅ SYNCED RESTORE LOGIC
+  const handleRestore = async (account) => {
     try {
-      await updateDoc(doc(db, 'customers', accountId), {
-        isArchived: false,
-        restoredAt: new Date().toISOString()
-      });
+      const emailToRestore = account.email;
+
+      // 1. Restore in 'users'
+      if (emailToRestore) {
+        const usersQuery = query(collection(db, 'users'), where('email', '==', emailToRestore));
+        const usersSnap = await getDocs(usersQuery);
+        const promises = usersSnap.docs.map(userDoc => 
+          updateDoc(doc(db, 'users', userDoc.id), { isArchived: false, restoredAt: new Date().toISOString() })
+        );
+        await Promise.all(promises);
+      } else if (account.type === 'user' || account.type === 'staff') {
+        await updateDoc(doc(db, 'users', account.id), { isArchived: false, restoredAt: new Date().toISOString() });
+      }
+
+      // 2. Restore in 'customers'
+      if (account.type === 'customer_record') {
+        await updateDoc(doc(db, 'customers', account.id), { isArchived: false, restoredAt: new Date().toISOString() });
+      } else if (emailToRestore) {
+        const custQuery = query(collection(db, 'customers'), where('email', '==', emailToRestore));
+        const custSnap = await getDocs(custQuery);
+        const custPromises = custSnap.docs.map(custDoc => 
+          updateDoc(doc(db, 'customers', custDoc.id), { isArchived: false, restoredAt: new Date().toISOString() })
+        );
+        await Promise.all(custPromises);
+      }
+      
       loadData();
       setAlertConfig({
         type: 'success',
         title: 'Account Restored',
-        message: 'The customer has been moved back to the active list.'
+        message: 'The account has been moved back to the active list.'
       });
     } catch (err) {
       console.error(err);
@@ -117,9 +175,11 @@ function CustomerAccountsPage() {
   // Filter Logic
   const getFilteredData = () => {
     let dataToFilter = [];
-    if (activeTab === 'customers') dataToFilter = customerAccounts;
+    if (activeTab === 'users') dataToFilter = userAccounts;
+    if (activeTab === 'customers') dataToFilter = customerRecords;
     if (activeTab === 'staff') dataToFilter = staffAccounts;
-    if (activeTab === 'archived') dataToFilter = archivedAccounts;
+    if (activeTab === 'archived_customers') dataToFilter = archivedCustomers;
+    if (activeTab === 'archived_accounts') dataToFilter = archivedAccounts;
 
     if (!searchTerm) return dataToFilter;
     
@@ -136,12 +196,10 @@ function CustomerAccountsPage() {
 
   const filteredData = getFilteredData();
 
-  // ✅ Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, activeTab]);
 
-  // ✅ Pagination Calculations
   const totalPages = Math.ceil(filteredData.length / itemsPerPage) || 1;
   const indexOfLastItem = currentPage * itemsPerPage;
   const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -167,39 +225,51 @@ function CustomerAccountsPage() {
           )}
         </div>
 
-        {/* Tabs */}
+        {/* ✅ 5 Tabs */}
         <div className="flex flex-wrap border-b border-gray-200">
+          <button
+            onClick={() => setActiveTab('users')}
+            className={`py-3 px-6 text-sm md:text-base font-bold border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'users' ? 'border-[#4A90E2] text-[#4A90E2]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Customer Accounts ({userAccounts.length})
+          </button>
+
           <button
             onClick={() => setActiveTab('customers')}
             className={`py-3 px-6 text-sm md:text-base font-bold border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === 'customers' 
-                ? 'border-[#4A90E2] text-[#4A90E2]' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              activeTab === 'customers' ? 'border-[#4A90E2] text-[#4A90E2]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Customer Accounts ({customerAccounts.length})
+            Customers ({customerRecords.length})
           </button>
           
           <button
             onClick={() => setActiveTab('staff')}
             className={`py-3 px-6 text-sm md:text-base font-bold border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === 'staff' 
-                ? 'border-[#4A90E2] text-[#4A90E2]' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              activeTab === 'staff' ? 'border-[#4A90E2] text-[#4A90E2]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Staff & Admin Accounts ({staffAccounts.length})
+            Staff & Admin ({staffAccounts.length})
           </button>
           
           <button
-            onClick={() => setActiveTab('archived')}
+            onClick={() => setActiveTab('archived_customers')}
             className={`py-3 px-6 text-sm md:text-base font-bold border-b-2 transition-colors whitespace-nowrap ${
-              activeTab === 'archived' 
-                ? 'border-[#4A90E2] text-[#4A90E2]' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              activeTab === 'archived_customers' ? 'border-[#4A90E2] text-[#4A90E2]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
-            Archived Customers ({archivedAccounts.length})
+            Archived Customers ({archivedCustomers.length})
+          </button>
+
+          <button
+            onClick={() => setActiveTab('archived_accounts')}
+            className={`py-3 px-6 text-sm md:text-base font-bold border-b-2 transition-colors whitespace-nowrap ${
+              activeTab === 'archived_accounts' ? 'border-[#4A90E2] text-[#4A90E2]' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Archived Accounts ({archivedAccounts.length})
           </button>
         </div>
 
@@ -213,7 +283,7 @@ function CustomerAccountsPage() {
             </span>
             <input
               type="text"
-              placeholder={`Search ${activeTab === 'customers' ? 'customers' : activeTab === 'staff' ? 'staff' : 'archived'} by name, email or ID...`}
+              placeholder={`Search accounts...`}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-9 pr-4 py-2 border border-gray-200 rounded-lg text-base focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
@@ -237,10 +307,10 @@ function CustomerAccountsPage() {
               <table className="w-full text-base">
                 <thead>
                   <tr className="bg-[#dbeafe] text-gray-800 text-left">
-                    <th className="px-6 py-4 font-bold">{activeTab === 'staff' ? 'Full Name' : 'Name'}</th>
-                    <th className="px-6 py-4 font-bold">{activeTab === 'archived' ? 'Reference ID' : 'Email (Login)'}</th>
+                    <th className="px-6 py-4 font-bold">Name</th>
+                    <th className="px-6 py-4 font-bold">{activeTab === 'customers' || activeTab === 'archived_customers' ? 'Reference ID' : activeTab === 'archived_accounts' ? 'Type / ID' : 'Email (Login)'}</th>
                     
-                    {activeTab === 'customers' && <th className="px-6 py-4 font-bold">Status / Linked ID</th>}
+                    {activeTab === 'users' && <th className="px-6 py-4 font-bold">Status / Linked ID</th>}
                     {activeTab === 'staff' && <th className="px-6 py-4 font-bold">Role</th>}
                     
                     <th className="px-6 py-4 font-bold">Date Created</th>
@@ -251,32 +321,32 @@ function CustomerAccountsPage() {
                   {currentItems.map((item) => {
                     const isSelf = item.email === currentUser?.email;
                     const isAdminAccount = item.role === 'admin';
+                    const isArchivedTab = activeTab.includes('archived');
+                    const isCustomerTab = activeTab.includes('customers');
                     
                     return (
                       <tr key={item.id} className="hover:bg-gray-50">
                         <td className="px-6 py-4 text-gray-800 font-medium">
-                          {/* For Archived, show the physical patient name */}
-                          {activeTab === 'archived' 
+                          {isCustomerTab
                             ? `${item.lastName || ''}, ${item.firstName || ''}`
                             : item.name || `${item.firstName || ''} ${item.lastName || ''}`.trim() || '—'
                           }
-                          
                           {isSelf && (
                             <span className="ml-2 text-[10px] font-bold text-[#4A90E2] bg-blue-50 px-2 py-0.5 rounded-full uppercase">You</span>
                           )}
                         </td>
                         
                         <td className="px-6 py-4 text-gray-600">
-                          {/* For Archived, show Reference ID. For others, show Email */}
-                          {activeTab === 'archived' ? (
+                          {isCustomerTab ? (
                              <span className="font-mono text-xs font-bold text-[#4A90E2]">{item.referenceId}</span>
+                          ) : activeTab === 'archived_accounts' ? (
+                             <span className="text-xs font-bold text-gray-500">{item.type === 'staff' ? 'Staff' : 'Online Account'}</span>
                           ) : (
                              item.email || item.id
                           )}
                         </td>
 
-                        {/* Status / Linked ID */}
-                        {activeTab === 'customers' && (
+                        {activeTab === 'users' && (
                           <td className="px-6 py-4">
                             {item.linkedCustomerId ? (
                               <span className="bg-green-100 text-green-700 font-mono text-xs font-bold px-2.5 py-1 rounded inline-block">
@@ -305,9 +375,9 @@ function CustomerAccountsPage() {
                         </td>
                         
                         <td className="px-6 py-4 text-center">
-                          {activeTab === 'archived' ? (
+                          {isArchivedTab ? (
                             <button
-                              onClick={() => handleRestore(item.id)}
+                              onClick={() => handleRestore(item)}
                               className="bg-green-50 border border-green-200 text-green-600 px-4 py-1.5 rounded-lg text-sm font-bold hover:bg-green-100 transition-colors"
                             >
                               Restore
@@ -315,16 +385,16 @@ function CustomerAccountsPage() {
                           ) : (
                             !isSelf && (
                               <button
-                                onClick={() => setAccountToDelete({ ...item, type: activeTab === 'customers' ? 'customer' : 'staff' })}
+                                onClick={() => setAccountToArchive({ ...item, type: activeTab === 'customers' ? 'customer_record' : activeTab === 'users' ? 'user' : 'staff' })}
                                 disabled={isAdminAccount}
-                                title={isAdminAccount ? "Admin accounts cannot be deleted" : "Delete account"}
+                                title={isAdminAccount ? "Admin accounts cannot be archived" : "Archive account"}
                                 className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-colors ${
                                   isAdminAccount 
                                     ? 'bg-gray-100 border border-gray-200 text-gray-400 cursor-not-allowed' 
-                                    : 'bg-red-50 border border-red-200 text-red-600 hover:bg-red-100'
+                                    : 'bg-orange-50 border border-orange-200 text-orange-600 hover:bg-orange-100'
                                 }`}
                               >
-                                {isAdminAccount ? 'Protected' : 'Delete'}
+                                {isAdminAccount ? 'Protected' : 'Archive'}
                               </button>
                             )
                           )}
@@ -338,7 +408,7 @@ function CustomerAccountsPage() {
           )}
         </div>
 
-        {/* ✅ Pagination Controls */}
+        {/* Pagination Controls */}
         {filteredData.length > 0 && (
           <div className="flex justify-center items-center gap-2 pt-4">
             <button
@@ -384,7 +454,7 @@ function CustomerAccountsPage() {
 
       </div>
 
-      {/* ✅ Create Staff Modal */}
+      {/* Create Staff Modal */}
       {showStaffModal && (
         <CreateStaffModal 
           onClose={() => setShowStaffModal(false)} 
@@ -395,19 +465,19 @@ function CustomerAccountsPage() {
         />
       )}
 
-      {/* ✅ Delete Confirmation Modal */}
+      {/* Archive Confirmation Modal */}
       <ConfirmModal
-        isOpen={!!accountToDelete}
-        title={`Delete ${accountToDelete?.type === 'staff' ? 'Staff' : 'Customer'} Account?`}
-        message={`Are you sure you want to permanently delete the account for ${accountToDelete?.email || accountToDelete?.name}? This action cannot be undone.`}
-        iconType="delete"
-        confirmText="Yes, Delete"
+        isOpen={!!accountToArchive}
+        title={`Archive Account?`}
+        message={`Are you sure you want to archive this account? They will be moved to the Archived tab and can be restored later.`}
+        iconType="warning"
+        confirmText="Yes, Archive"
         confirmColor="red"
-        onCancel={() => setAccountToDelete(null)}
-        onConfirm={handleDelete}
+        onCancel={() => setAccountToArchive(null)}
+        onConfirm={handleArchive}
       />
 
-      {/* ✅ Success/Error Alerts */}
+      {/* Success/Error Alerts */}
       {alertConfig && (
         <ConfirmModal
           isOpen={true}

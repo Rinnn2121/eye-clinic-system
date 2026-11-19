@@ -7,7 +7,6 @@ import { db } from '../firebase/config';
 export default function LabOrderModal({ record, onClose, onSuccess }) {
   const [saving, setSaving] = useState(false);
   
-  // ✅ Use optional chaining so it doesn't crash if record is undefined
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     patientName: record?.customerName || '',
@@ -23,7 +22,6 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
     notes: ''
   });
 
-  // ✅ Safe guard AFTER hooks
   if (!record) return null;
 
   const handleSubmit = async (e) => {
@@ -31,7 +29,7 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
     setSaving(true);
 
     try {
-             const orderData = {
+      const orderData = {
         patientName: record.customerName,
         date: formData.date,
         frameCategory: record.frameCategory,
@@ -46,7 +44,8 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
         patientId: record.customerId,
         recordId: record.id,
         totalAmount: record.totalAmount,
-        balance: record.balance, // ✅ Add this line!
+        balance: record.balance,
+        items: record.cartItems || [], // ✅ Save all the frames ordered
         status: 'in_progress',
         createdAt: new Date().toISOString(),
       };
@@ -63,8 +62,8 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[100]">
-      <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[100] overflow-y-auto">
+      <div className="bg-white rounded-xl w-full max-w-lg shadow-2xl overflow-hidden my-8">
         
         {/* Header */}
         <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 flex justify-between items-center">
@@ -81,106 +80,84 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
           <div className="flex justify-between items-end gap-4">
             <div className="flex-1">
               <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Patient Name</label>
-              <input 
-                type="text" readOnly value={formData.patientName}
-                className="w-full border-b-2 border-gray-300 pb-1 text-lg font-bold text-gray-900 outline-none bg-transparent"
-              />
+              <input type="text" readOnly value={formData.patientName} className="w-full border-b-2 border-gray-300 pb-1 text-lg font-bold text-gray-900 outline-none bg-transparent" />
             </div>
             <div className="w-1/3">
               <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Date</label>
-              <input 
-                type="date" 
-                required 
-                value={formData.date}
-                readOnly      // ✅ Lock it
-                disabled      // ✅ Lock it
-                className="w-full border-b-2 border-gray-300 pb-1 text-sm outline-none bg-gray-50 text-gray-600 cursor-not-allowed"
-              />
+              <input type="date" required value={formData.date} readOnly disabled className="w-full border-b-2 border-gray-300 pb-1 text-sm outline-none bg-gray-50 text-gray-600 cursor-not-allowed" />
             </div>
           </div>
 
-          {/* Specific Frame Input */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Frame Category</label>
-              <input 
-                type="text" readOnly value={formData.frameCategory}
-                className="w-full border-b-2 border-gray-300 pb-1 text-sm font-bold text-gray-500 bg-gray-50 outline-none"
-              />
+          {/* ✅ SHOW CART ITEMS IF ANY */}
+          {record.cartItems && record.cartItems.length > 0 ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <label className="block text-xs font-bold text-[#1e40af] uppercase mb-2">Items Ordered</label>
+              <div className="space-y-2">
+                {record.cartItems.map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-center bg-white p-2 rounded border border-blue-100 shadow-sm">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 bg-gray-50 rounded border border-gray-200 flex items-center justify-center overflow-hidden">
+                        {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : <span className="text-[10px] text-gray-400">🖼️</span>}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-gray-900">{item.name}</p>
+                        <p className="text-[10px] text-gray-500">Color: {item.color} • Qty: {item.qty}</p>
+                      </div>
+                    </div>
+                    <span className="text-sm font-bold text-gray-700">₱{Number(item.price).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-                        <div>
-              <label className="block text-xs font-bold text-[#4A90E2] uppercase mb-1">Frame Description (Brand or Type) *</label>
-              <input 
-                type="text" required value={formData.specificFrame}
-                onChange={(e) => setFormData({...formData, specificFrame: e.target.value})}
-                className="w-full border-b-2 border-[#4A90E2] pb-1 text-sm font-bold text-gray-900 outline-none"
-              />
+          ) : (
+            // Fallback if no cart items (walk-in)
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Frame Category</label>
+                <input type="text" readOnly value={formData.frameCategory} className="w-full border-b-2 border-gray-300 pb-1 text-sm font-bold text-gray-500 bg-gray-50 outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#4A90E2] uppercase mb-1">Frame Description *</label>
+                <input type="text" required value={formData.specificFrame} onChange={(e) => setFormData({...formData, specificFrame: e.target.value})} className="w-full border-b-2 border-[#4A90E2] pb-1 text-sm font-bold text-gray-900 outline-none" />
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Lens</label>
-                <input 
-                  type="text" readOnly value={formData.lens}
-                  className="w-full border-b border-gray-400 pb-1 text-sm outline-none bg-gray-50"
-                />
+                <input type="text" readOnly value={formData.lens} className="w-full border-b border-gray-400 pb-1 text-sm outline-none bg-gray-50" />
               </div>
               <div>
                 <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Tint / Coating</label>
-                <input 
-                type="text" 
-                value={formData.tint}
-                onChange={(e) => setFormData({...formData, tint: e.target.value})}
-                className="w-full border-b-2 border-gray-300 pb-1 text-sm outline-none focus:border-[#4A90E2]"
-              />
+                <input type="text" value={formData.tint} onChange={(e) => setFormData({...formData, tint: e.target.value})} className="w-full border-b-2 border-gray-300 pb-1 text-sm outline-none focus:border-[#4A90E2]" />
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Instructions / Notes</label>
-              <textarea 
-                value={formData.notes}
-                onChange={(e) => setFormData({...formData, notes: e.target.value})}
-                className="w-full h-[100px] border-2 border-gray-300 rounded-xl p-3 text-sm outline-none focus:border-[#4A90E2] resize-none"
-              />
+              <textarea value={formData.notes} onChange={(e) => setFormData({...formData, notes: e.target.value})} className="w-full h-[100px] border-2 border-gray-300 rounded-xl p-3 text-sm outline-none focus:border-[#4A90E2] resize-none" />
             </div>
           </div>
 
           <div className="space-y-3 pt-4 border-t border-gray-200">
             <div className="grid grid-cols-[60px_1fr] items-center gap-2">
               <span className="text-sm font-bold text-gray-700">OD:</span>
-              <input 
-                type="text" value={formData.od}
-                onChange={(e) => setFormData({...formData, od: e.target.value})}
-                className="w-full border-b border-gray-400 pb-1 text-sm outline-none"
-              />
+              <input type="text" value={formData.od} onChange={(e) => setFormData({...formData, od: e.target.value})} className="w-full border-b border-gray-400 pb-1 text-sm outline-none" />
             </div>
             <div className="grid grid-cols-[60px_1fr] items-center gap-2">
               <span className="text-sm font-bold text-gray-700">OS:</span>
-              <input 
-                type="text" value={formData.os}
-                onChange={(e) => setFormData({...formData, os: e.target.value})}
-                className="w-full border-b border-gray-400 pb-1 text-sm outline-none"
-              />
+              <input type="text" value={formData.os} onChange={(e) => setFormData({...formData, os: e.target.value})} className="w-full border-b border-gray-400 pb-1 text-sm outline-none" />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="grid grid-cols-[60px_1fr] items-center gap-2">
                 <span className="text-sm font-bold text-gray-700">ADD:</span>
-                <input 
-                  type="text" value={formData.add}
-                  onChange={(e) => setFormData({...formData, add: e.target.value})}
-                  className="w-full border-b border-gray-400 pb-1 text-sm outline-none"
-                />
+                <input type="text" value={formData.add} onChange={(e) => setFormData({...formData, add: e.target.value})} className="w-full border-b border-gray-400 pb-1 text-sm outline-none" />
               </div>
               <div className="grid grid-cols-[60px_1fr] items-center gap-2">
                 <span className="text-sm font-bold text-gray-700">PD:</span>
-                <input 
-                  type="text" value={formData.pd}
-                  onChange={(e) => setFormData({...formData, pd: e.target.value})}
-                  className="w-full border-b border-gray-400 pb-1 text-sm outline-none"
-                />
+                <input type="text" value={formData.pd} onChange={(e) => setFormData({...formData, pd: e.target.value})} className="w-full border-b border-gray-400 pb-1 text-sm outline-none" />
               </div>
             </div>
           </div>
@@ -192,12 +169,8 @@ export default function LabOrderModal({ record, onClose, onSuccess }) {
             </div>
             
             <div className="flex gap-2">
-              <button type="button" onClick={onClose} className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">
-                Cancel
-              </button>
-              <button type="submit" disabled={saving} className="px-5 py-2 bg-[#4A90E2] text-white rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 disabled:opacity-50">
-                {saving ? 'Sending...' : 'Send to Lab'}
-              </button>
+              <button type="button" onClick={onClose} className="px-5 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
+              <button type="submit" disabled={saving} className="px-5 py-2 bg-[#4A90E2] text-white rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 disabled:opacity-50">{saving ? 'Sending...' : 'Send to Lab'}</button>
             </div>
           </div>
         </form>

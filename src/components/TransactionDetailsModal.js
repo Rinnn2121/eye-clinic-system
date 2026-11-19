@@ -40,14 +40,12 @@ function TransactionDetailsModal({ sale, onClose }) {
           
           {/* Top Section: Receipt Info */}
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6 pb-6 border-b border-gray-100">
-            {/* Icon */}
             <div className="bg-blue-50 text-[#4A90E2] w-12 h-12 rounded-full flex items-center justify-center text-2xl flex-shrink-0">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
               </svg>
             </div>
             
-            {/* Receipt No */}
             <div>
               <p className="text-xs text-gray-500 font-medium mb-1">Receipt No.</p>
               <div className="flex items-center gap-3">
@@ -60,13 +58,11 @@ function TransactionDetailsModal({ sale, onClose }) {
               </div>
             </div>
 
-            {/* Date & Time */}
             <div className="md:ml-auto md:border-l border-gray-200 md:pl-8">
               <p className="text-xs text-gray-500 font-medium mb-1">Date & Time</p>
               <p className="font-bold text-gray-900 text-sm">{formattedDate}</p>
             </div>
 
-            {/* Payment Method */}
             <div className="md:border-l border-gray-200 md:pl-8">
               <p className="text-xs text-gray-500 font-medium mb-1">Payment Method</p>
               <p className={`font-bold text-sm ${sale.paymentMethod === 'Cash' ? 'text-green-600' : 'text-blue-600'}`}>
@@ -104,8 +100,19 @@ function TransactionDetailsModal({ sale, onClose }) {
                       sale.items.map((item, idx) => (
                         <tr key={idx} className="text-gray-700">
                           <td className="px-3 py-2">
-                            <span className="font-medium">{item.name || 'Unknown Item'}</span>
-                            {item.category && <p className="text-xs text-gray-400">{item.category}</p>}
+                            <div className="flex items-center gap-2">
+                              {item.imageUrl && (
+                                <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-200">
+                                  <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                </div>
+                              )}
+                              <div>
+                                <span className="font-medium">{item.name || 'Unknown Item'}</span>
+                                {item.color && item.color !== 'Standard' && (
+                                  <p className="text-[10px] text-gray-500">Color: {item.color}</p>
+                                )}
+                              </div>
+                            </div>
                           </td>
                           <td className="px-3 py-2 text-center">{item.qty || 1}</td>
                           <td className="px-3 py-2 text-right">

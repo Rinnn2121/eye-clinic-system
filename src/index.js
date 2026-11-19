@@ -4,6 +4,16 @@ import './index.css';
 import App from './App';
 import reportWebVitals from './reportWebVitals';
 
+if (!sessionStorage.getItem('page_refreshed')) {
+  // First load in this session — clear the previous session's auth flag
+  sessionStorage.setItem('page_refreshed', 'true');
+}
+
+window.addEventListener('beforeunload', () => {
+  // If this is the LAST tab closing, the next open will clear auth
+  sessionStorage.removeItem('page_refreshed');
+});
+
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(
   <React.StrictMode>

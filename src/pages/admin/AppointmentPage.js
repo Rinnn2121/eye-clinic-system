@@ -1,7 +1,7 @@
 // src/pages/admin/AppointmentPage.js
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, getDocs, updateDoc, doc, getDoc } from 'firebase/firestore';
+import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
@@ -20,10 +20,10 @@ function AppointmentPage() {
   const [searchTerm, setSearchTerm] = useState('');
   const [serviceFilter, setServiceFilter] = useState('All Service');
   const [statusFilter, setStatusFilter] = useState('All Status');
-  const [timeFilter, setTimeFilter] = useState('Today');
   
-  // Calendar State
+  // ✅ Calendar States
   const [selectedDate, setSelectedDate] = useState(new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0]);
+  const [calendarDate, setCalendarDate] = useState(new Date()); // Tracks the currently viewed month
 
   // Modal States
   const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -32,7 +32,11 @@ function AppointmentPage() {
   const [alertConfig, setAlertConfig] = useState(null); 
   const [showPendingModal, setShowPendingModal] = useState(false);
 
-    const loadAppointments = async () => {
+  // ✅ Calendar Navigation Functions
+  const handlePrevMonth = () => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() - 1, 1));
+  const handleNextMonth = () => setCalendarDate(new Date(calendarDate.getFullYear(), calendarDate.getMonth() + 1, 1));
+
+  const loadAppointments = async () => {
     try {
       const querySnapshot = await getDocs(collection(db, 'appointments'));
       const items = [];
@@ -40,40 +44,14 @@ function AppointmentPage() {
         items.push({ id: doc.id, ...doc.data() });
       });
 
-      // ✅ FETCH REAL NAMES FOR ONLINE BOOKINGS
-      const apptsWithNames = await Promise.all(items.map(async (apt) => {
-        // If the name contains '@' or matches the email prefix, it means it's an online booking
-        // and we need to fetch their actual name from the database.
-        if (apt.customerId && apt.customerId.includes('@')) {
-          // Check if the customer is linked to a physical record
-          const userDoc = await getDoc(doc(db, 'users', apt.customerId));
-          let linkedId = userDoc.exists() ? userDoc.data().linkedCustomerId : null;
-
-          if (linkedId) {
-            const custDoc = await getDoc(doc(db, 'customers', linkedId));
-            if (custDoc.exists()) {
-              const data = custDoc.data();
-              return { ...apt, customerName: `${data.firstName} ${data.lastName}`.trim(), phone: data.phone };
-            }
-          } else {
-            // If not linked, check the onlineAccounts collection
-            const onlineDoc = await getDoc(doc(db, 'onlineAccounts', apt.customerId));
-            if (onlineDoc.exists()) {
-              const data = onlineDoc.data();
-              return { ...apt, customerName: `${data.firstName} ${data.lastName}`.trim(), phone: data.phone };
-            }
-          }
-        }
-        return apt;
-      }));
-
       const now = new Date();
       const todayStr = new Date(now.getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
       const currentTimeStr = now.toTimeString().slice(0, 5);
 
-      const updatedItems = await Promise.all(apptsWithNames.map(async (apt) => {
+      const updatedItems = await Promise.all(items.map(async (apt) => {
         const statusLower = (apt.status || '').toLowerCase();
         
+        // Auto-cancel expired appointments
         if (statusLower === 'pending' || statusLower === 'scheduled') {
           const isPastDate = apt.date < todayStr;
           const isTodayButPastTime = apt.date === todayStr && apt.time < currentTimeStr;
@@ -175,15 +153,9 @@ function AppointmentPage() {
   };
 
   const stats = useMemo(() => {
-    const total = appointments.length;
-    const completed = appointments.filter(a => a.status === 'Completed').length;
-    const cancelled = appointments.filter(a => a.status === 'Cancelled').length;
-    
-    const pending = appointments.filter(a => a.status === 'Pending').length;
-    const scheduled = appointments.filter(a => a.status === 'Scheduled').length;
-    
+    // Schedule under calendar: Only show Pending & Scheduled here
     const dateAppts = appointments
-      .filter(a => a.date === selectedDate)
+      .filter(a => a.date === selectedDate && (a.status === 'Pending' || a.status === 'Scheduled'))
       .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
       .map(a => ({
         ...a,
@@ -192,7 +164,11 @@ function AppointmentPage() {
           : ''
       }));
 
-    return { total, completed, cancelled, pending, scheduled, dateAppts };
+    const pending = appointments.filter(a => a.status === 'Pending').length;
+    const scheduled = appointments.filter(a => a.status === 'Scheduled').length;
+    const completed = appointments.filter(a => a.status === 'Completed').length;
+
+    return { pending, scheduled, completed, dateAppts };
   }, [appointments, selectedDate]);
 
   const pendingAppointmentsList = useMemo(() => {
@@ -203,6 +179,9 @@ function AppointmentPage() {
 
   const filteredAppointments = useMemo(() => {
     let result = [...appointments];
+
+    // Filter by selected calendar date (Shows everything, including Completed/Cancelled)
+    result = result.filter(a => a.date === selectedDate);
 
     if (searchTerm) {
       const lower = searchTerm.toLowerCase();
@@ -218,36 +197,12 @@ function AppointmentPage() {
       result = result.filter(a => a.status === statusFilter);
     }
 
-    if (timeFilter !== 'All Time') {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      result = result.filter(a => {
-        const aptDate = new Date(`${a.date}T00:00:00`);
-        
-        if (timeFilter === 'Today') {
-          const todayStr = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
-          return a.date === todayStr;
-        }
-        if (timeFilter === 'This Week') {
-          const startOfWeek = new Date(today);
-          startOfWeek.setDate(today.getDate() - today.getDay());
-          const endOfWeek = new Date(startOfWeek);
-          endOfWeek.setDate(startOfWeek.getDate() + 6);
-          return aptDate >= startOfWeek && aptDate <= endOfWeek;
-        }
-        if (timeFilter === 'This Month') {
-          return aptDate.getMonth() === today.getMonth() && aptDate.getFullYear() === today.getFullYear();
-        }
-        return true;
-      });
-    }
-
     return result;
-  }, [appointments, searchTerm, serviceFilter, statusFilter, timeFilter]);
+  }, [appointments, searchTerm, serviceFilter, statusFilter, selectedDate]);
 
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth();
+  // ✅ Use the calendarDate state for rendering the calendar grid
+  const currentYear = calendarDate.getFullYear();
+  const currentMonth = calendarDate.getMonth();
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
 
@@ -258,17 +213,9 @@ function AppointmentPage() {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Appointments</h1>
+            {/* ✅ Removed the sub-text/description here */}
           </div>
           <div className="flex items-center gap-3">
-            <select 
-              value={timeFilter}
-              onChange={(e) => setTimeFilter(e.target.value)}
-              className="border border-gray-300 rounded-lg px-4 py-2 text-base bg-white font-medium text-gray-700 outline-none shadow-sm cursor-pointer"
-            >
-              <option value="Today">Today</option>
-              <option value="This Week">This Week</option>
-              <option value="This Month">This Month</option>
-            </select>
             <button
               onClick={() => setIsWizardOpen(true)}
               className="bg-[#4A90E2] text-white px-5 py-2 rounded-lg text-base font-medium hover:bg-[#4A90E2]/90 transition-colors shadow-sm"
@@ -372,8 +319,12 @@ function AppointmentPage() {
               </Link>
             </div>
 
-            {/* ✅ SCROLLABLE TABLE CONTAINER */}
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex-1 flex flex-col">
+              <div className="bg-gray-50 px-5 py-3 border-b border-gray-200">
+                <h3 className="font-bold text-gray-800">
+                  Schedule for {new Date(selectedDate).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                </h3>
+              </div>
               <div className="overflow-y-auto max-h-[500px]">
                 <table className="w-full text-base relative">
                   <thead className="sticky top-0 z-10">
@@ -386,9 +337,8 @@ function AppointmentPage() {
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {filteredAppointments.length === 0 ? (
-                      <tr><td colSpan="4" className="text-center py-8 text-gray-500 text-base">No appointments found.</td></tr>
+                      <tr><td colSpan="4" className="text-center py-8 text-gray-500 text-base">No appointments found for this date.</td></tr>
                     ) : (
-                      // ✅ Removed .slice(0, 5) so it shows ALL filtered appointments
                       filteredAppointments.map((apt) => (
                         <tr 
                           key={apt.id} 
@@ -443,23 +393,21 @@ function AppointmentPage() {
               </div>
               
               <div className="flex justify-between items-center mb-4">
-                <button className="text-gray-400 hover:text-gray-600 px-2 text-lg">&lt;</button>
+                {/* ✅ Navigation Buttons now call handlePrevMonth/handleNextMonth */}
+                <button onClick={handlePrevMonth} className="text-gray-400 hover:text-gray-800 px-2 py-1 bg-gray-50 hover:bg-gray-200 rounded-md transition-colors font-bold">&lt;</button>
                 <div className="flex gap-2">
-                  <select className="border border-gray-200 rounded-md px-2 py-1 text-sm font-medium outline-none">
-                    <option>{new Date().toLocaleString('default', { month: 'long' })}</option>
-                  </select>
-                  <select className="border border-gray-200 rounded-md px-2 py-1 text-sm font-medium outline-none">
-                    <option>{new Date().getFullYear()}</option>
-                  </select>
+                  <span className="text-sm font-bold text-gray-800 bg-gray-50 px-3 py-1 rounded-md">
+                    {calendarDate.toLocaleString('default', { month: 'long' })} {calendarDate.getFullYear()}
+                  </span>
                 </div>
-                <button className="text-gray-400 hover:text-gray-600 px-2 text-lg">&gt;</button>
+                <button onClick={handleNextMonth} className="text-gray-400 hover:text-gray-800 px-2 py-1 bg-gray-50 hover:bg-gray-200 rounded-md transition-colors font-bold">&gt;</button>
               </div>
 
-              <div className="grid grid-cols-7 gap-1 text-center text-sm text-gray-400 mb-2 font-medium">
+              <div className="grid grid-cols-7 gap-1 text-center text-sm text-gray-500 mb-2 font-semibold">
                 {['Su','Mo','Tu','We','Th','Fr','Sa'].map((d) => <span key={d}>{d}</span>)}
               </div>
               
-                            <div className="grid grid-cols-7 gap-1 text-center text-base">
+              <div className="grid grid-cols-7 gap-1 text-center text-base">
                 {[...Array(firstDayOfMonth)].map((_, i) => (
                   <div key={`empty-${i}`} className="p-1"></div>
                 ))}
@@ -472,7 +420,6 @@ function AppointmentPage() {
                   const isSelected = selectedDate === formattedDate;
                   const hasAppointments = appointments.some(a => a.date === formattedDate);
 
-                  // ✅ Check if the date is in the past (using PHT timezone)
                   const todayStr = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
                   const isPast = formattedDate < todayStr;
 
@@ -480,7 +427,6 @@ function AppointmentPage() {
                     <div key={i} className="flex flex-col items-center justify-center p-0.5 h-10">
                       <button 
                         onClick={() => setSelectedDate(formattedDate)}
-                        // ✅ Passed dates are grayed but still clickable
                         className={`w-8 h-8 flex items-center justify-center rounded-full transition-colors font-medium ${
                           isSelected ? 'bg-blue-600 text-white font-bold' : 
                           isPast ? 'text-gray-300 bg-gray-50 hover:bg-gray-200' : 
@@ -490,7 +436,7 @@ function AppointmentPage() {
                       >
                         {day}
                       </button>
-                      <div className={`w-1 h-1 rounded-full mt-1 ${
+                      <div className={`w-1 h-1 rounded-full mt-0.5 ${
                         hasAppointments 
                           ? (isSelected ? 'bg-blue-600' : isPast ? 'bg-gray-300' : 'bg-blue-500') 
                           : 'bg-transparent'
@@ -511,7 +457,7 @@ function AppointmentPage() {
               
               <div className="space-y-3 overflow-y-auto pr-1 max-h-[160px]">
                 {stats.dateAppts.length === 0 ? (
-                  <p className="text-base text-gray-500 text-center py-4">No appointments for this day.</p>
+                  <p className="text-base text-gray-500 text-center py-4">No active appointments for this day.</p>
                 ) : (
                   stats.dateAppts.map((apt, idx) => (
                     <div key={idx} className="flex gap-3 text-base">
@@ -533,7 +479,7 @@ function AppointmentPage() {
         </div>
       </div>
 
-      {/* ✅ Pending Modal */}
+      {/* Pending Modal */}
       {showPendingModal && (
         <PendingAppointmentsModal 
           pendingAppointments={pendingAppointmentsList}

@@ -18,7 +18,6 @@ import ProductPreviewModal from '../../components/ProductPreviewModal';
 
 function AdminDashboard() {
   const navigate = useNavigate();
-  // ✅ Grab userData from AuthContext to get the name
   const { userRole, userData } = useAuth(); 
   const [loading, setLoading] = useState(true);
 
@@ -48,7 +47,7 @@ function AdminDashboard() {
   const [alertConfig, setAlertConfig] = useState(null);
   const [previewProduct, setPreviewProduct] = useState(null);
 
-  // ✅ Clickable Modal States
+  // Clickable Modal States
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [selectedSale, setSelectedSale] = useState(null);
   const [selectedAppt, setSelectedAppt] = useState(null);
@@ -85,7 +84,8 @@ function AdminDashboard() {
       apptSnap.forEach((doc) => {
         const data = { id: doc.id, ...doc.data() };
         allAppts.push(data);
-        if (data.date === todayStr) apptsTodayCount++;
+        // Only count active appointments for today's stat
+        if (data.date === todayStr && data.status !== 'Cancelled') apptsTodayCount++;
       });
 
       // 3. ORDERS / SALES
@@ -126,7 +126,9 @@ function AdminDashboard() {
       // 6. MOST REQUESTED SERVICE
       const serviceCount = {};
       allAppts.forEach((a) => {
-        if (a.date === todayStr && a.reason) serviceCount[a.reason] = (serviceCount[a.reason] || 0) + 1;
+        if (a.date === todayStr && a.reason && a.status !== 'Cancelled') {
+          serviceCount[a.reason] = (serviceCount[a.reason] || 0) + 1;
+        }
       });
       const mostRequested = Object.entries(serviceCount).sort((a, b) => b[1] - a[1])[0];
 
@@ -170,10 +172,12 @@ function AdminDashboard() {
     }, 0);
   }, [allOrders, chartRange]);
 
-  // Calendar Appointments
+  // ✅ CALENDAR APPOINTMENTS LIST (FIXED)
+  // Filters appointments to show only those matching the specific date clicked on the mini calendar.
+  // We now filter out 'Cancelled' so they don't clutter the schedule.
   const selectedDateAppts = useMemo(() => {
     return appointments
-      .filter(a => a.date === selectedDate)
+      .filter(a => a.date === selectedDate && a.status !== 'Cancelled')
       .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
       .map(a => ({
         ...a,
@@ -184,14 +188,13 @@ function AdminDashboard() {
   // Today's Appointments List
   const todaysAppts = useMemo(() => {
     const today = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
-    const filtered = appointments.filter(a => a.date === today);
+    const filtered = appointments.filter(a => a.date === today && a.status !== 'Cancelled');
     return filtered.sort((a, b) => {
       const getStatusWeight = (status) => {
         const s = (status || '').toLowerCase();
         if (s === 'pending' || s === 'scheduled') return 1;
         if (s === 'completed') return 2;
-        if (s === 'cancelled') return 3;
-        return 4;
+        return 3;
       };
       const weightA = getStatusWeight(a.status); const weightB = getStatusWeight(b.status);
       if (weightA !== weightB) return weightA - weightB;
@@ -212,7 +215,6 @@ function AdminDashboard() {
   const daysInMonth = new Date(currentYear, currentMonth + 1, 0).getDate();
   const firstDayOfMonth = new Date(currentYear, currentMonth, 1).getDay();
 
-  // ✅ Determine the display name for the greeting
   const displayName = userData?.name || userData?.firstName || (userRole === 'admin' ? 'Admin' : 'Staff');
 
   return (
@@ -222,7 +224,6 @@ function AdminDashboard() {
         {/* HEADER */}
         <div className="flex justify-between items-start">
           <div>
-            {/* ✅ Dynamic Greeting */}
             <h1 className="text-3xl font-bold text-gray-900">
               Welcome back, {displayName}!
             </h1>
@@ -408,8 +409,8 @@ function AdminDashboard() {
                       <div className="w-1/3 min-w-0 pr-3"><span className="text-base font-medium text-gray-700 truncate block">{apt.customerName || 'Walk-in'}</span></div>
                       <div className="flex-1 min-w-0 pr-3"><span className="text-base text-gray-500 truncate block">{apt.reason || 'Eye Examination'}</span></div>
                       <div className="w-[15%] flex-shrink-0 text-right flex items-center justify-end gap-2">
-                        <span className={`w-2 h-2 rounded-full ${apt.status === 'Completed' ? 'bg-green-500' : apt.status === 'Cancelled' ? 'bg-red-500' : 'bg-yellow-500'}`}></span>
-                        <span className={`text-sm font-bold ${apt.status === 'Completed' ? 'text-green-600' : apt.status === 'Cancelled' ? 'text-red-500' : 'text-yellow-600'}`}>{apt.status || 'Pending'}</span>
+                        <span className={`w-2 h-2 rounded-full ${apt.status === 'Completed' ? 'bg-green-500' : 'bg-yellow-500'}`}></span>
+                        <span className={`text-sm font-bold ${apt.status === 'Completed' ? 'text-green-600' : 'text-yellow-600'}`}>{apt.status || 'Pending'}</span>
                       </div>
                     </div>
                   ))
@@ -451,34 +452,25 @@ function AdminDashboard() {
                 </div>
                 
                 <div className="flex items-center gap-6 flex-1">
-                  
-                  {/* ✅ Small Donut Chart for New vs Returning */}
                   <div className="relative w-28 h-28 flex-shrink-0">
                     <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                      {/* Background circle (Total) */}
                       <circle cx="50" cy="50" r="40" fill="none" stroke="#f3f4f6" strokeWidth="15" />
-                      
-                      {/* New Customers Ring (Purple) */}
                       <circle 
                         cx="50" cy="50" r="40" fill="none" stroke="#a855f7" strokeWidth="15"
                         strokeDasharray={`${(stats.newCustomersWeek / (stats.totalCustomers || 1)) * 251.2} 251.2`} 
                       />
-                      
-                      {/* Returning Customers Ring (Green) - Offset to start where the purple ends */}
                       <circle 
                         cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="15"
                         strokeDasharray={`${(stats.returningCustomers / (stats.totalCustomers || 1)) * 251.2} 251.2`} 
                         strokeDashoffset={`-${(stats.newCustomersWeek / (stats.totalCustomers || 1)) * 251.2}`}
                       />
                     </svg>
-                    {/* Center Text */}
                     <div className="absolute inset-0 flex flex-col items-center justify-center">
                       <span className="text-2xl font-bold text-gray-900">{stats.totalCustomers}</span>
                       <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Total</span>
                     </div>
                   </div>
 
-                  {/* ✅ Legend & Stats */}
                   <div className="flex-1 space-y-3">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
@@ -536,7 +528,8 @@ function AdminDashboard() {
                   
                   const isToday = day === new Date().getDate() && currentMonth === new Date().getMonth() && currentYear === new Date().getFullYear();
                   const isSelected = selectedDate === formattedDate;
-                  const hasAppointments = appointments.some(a => a.date === formattedDate);
+                  // ✅ Check for active appointments only for the blue dot
+                  const hasAppointments = appointments.some(a => a.date === formattedDate && a.status !== 'Cancelled');
                   
                   const todayStr = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
                   const isPast = formattedDate < todayStr;
@@ -600,7 +593,7 @@ function AdminDashboard() {
 
       </div>
 
-      {/* ✅ Modals */}
+      {/* Modals */}
       {showAddCustomerModal && (
         <AddCustomerModal
           onClose={(startVisitWithId) => {
@@ -645,7 +638,6 @@ function AdminDashboard() {
         />
       )}
 
-      {/* ✅ Product Preview Modal */}
       {previewProduct && (
         <ProductPreviewModal 
           product={previewProduct}
@@ -658,7 +650,6 @@ function AdminDashboard() {
         />
       )}
 
-      {/* ✅ Product Detail Modal (From Search Catalog) */}
       {selectedProduct && (
         <ProductModal 
           product={selectedProduct} 
@@ -670,7 +661,6 @@ function AdminDashboard() {
         />
       )}
 
-      {/* ✅ Transaction Details Modal (From Recent Sales) */}
       {selectedSale && (
         <TransactionDetailsModal 
           sale={selectedSale} 
@@ -678,7 +668,6 @@ function AdminDashboard() {
         />
       )}
 
-      {/* ✅ Appointment Details Modal (From Today's Appointments) */}
       {selectedAppt && (
         <AppointmentDetailsModal 
           appointment={selectedAppt} 

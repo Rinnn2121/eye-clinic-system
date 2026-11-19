@@ -13,8 +13,11 @@ function AppointmentDetailsModal({ appointment, onClose, onConfirm, onCancel, is
     : 'N/A';
 
   const isPending = (appointment.status || '').toLowerCase() === 'pending';
+  const cartItems = appointment.interestedItems || [];
 
-  // ✅ Helper to format the audit date
+  // Calculate total from cart items
+  const cartTotal = cartItems.reduce((sum, item) => sum + (Number(item.price) * (item.qty || 1)), 0);
+
   const formatAuditDate = (isoString) => {
     if (!isoString) return '';
     return new Date(isoString).toLocaleString('en-US', { 
@@ -88,7 +91,38 @@ function AppointmentDetailsModal({ appointment, onClose, onConfirm, onCancel, is
             </div>
           </div>
 
-          {/* ✅ Audit Trail (Shows if confirmed or cancelled) */}
+          {/* ✅ CART ITEMS */}
+          {cartItems.length > 0 && (
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-sm font-bold text-gray-800 mb-3">Requested Frames / Items</p>
+              <div className="space-y-2">
+                {cartItems.map((item, idx) => (
+                  <div key={idx} className="flex items-center justify-between bg-gray-50 p-2 rounded border border-gray-100">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-white rounded flex items-center justify-center border border-gray-200 overflow-hidden">
+                        {item.imageUrl ? (
+                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-gray-300 text-xs">🖼️</span>
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium text-gray-800">{item.name}</p>
+                        <p className="text-xs text-gray-500">{item.color || 'Standard'} • Qty: {item.qty || 1}</p>
+                      </div>
+                    </div>
+                    <p className="text-sm font-bold text-gray-800">₱{Number(item.price).toLocaleString()}</p>
+                  </div>
+                ))}
+              </div>
+              <div className="flex justify-between items-center mt-3 pt-2 border-t border-gray-200">
+                <span className="text-sm font-bold text-gray-700">Total</span>
+                <span className="text-lg font-bold text-[#4A90E2]">₱{cartTotal.toLocaleString()}</span>
+              </div>
+            </div>
+          )}
+
+          {/* Audit Trail */}
           {(appointment.confirmedBy || appointment.cancelledBy) && (
             <div className="bg-gray-50 rounded-lg p-3 border border-gray-100 text-xs">
               {appointment.confirmedBy && (
@@ -108,39 +142,27 @@ function AppointmentDetailsModal({ appointment, onClose, onConfirm, onCancel, is
 
         </div>
 
-        {/* Action Buttons (Unchanged) */}
+        {/* Action Buttons */}
         <div className="px-6 py-4 bg-gray-50 border-t border-gray-200 flex-shrink-0">
           {isAdmin && isPending && (
             <div className="flex gap-3">
-              <button
-                onClick={() => onCancel(appointment)}
-                className="flex-1 bg-white border border-red-200 text-red-600 py-2.5 rounded-lg text-sm font-bold hover:bg-red-50 transition-colors"
-              >
+              <button onClick={() => onCancel(appointment)} className="flex-1 bg-white border border-red-200 text-red-600 py-2.5 rounded-lg text-sm font-bold hover:bg-red-50 transition-colors">
                 Cancel
               </button>
-              <button
-                onClick={() => onConfirm(appointment)}
-                className="flex-1 bg-[#4A90E2] text-white py-2.5 rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 transition-colors shadow-sm"
-              >
+              <button onClick={() => onConfirm(appointment)} className="flex-1 bg-[#4A90E2] text-white py-2.5 rounded-lg text-sm font-bold hover:bg-[#4A90E2]/90 transition-colors shadow-sm">
                 Confirm Booking
               </button>
             </div>
           )}
 
           {isAdmin && !isPending && appointment.status === 'Scheduled' && (
-            <button
-              onClick={() => onCancel(appointment)}
-              className="w-full bg-white border border-red-200 text-red-600 py-2.5 rounded-lg text-sm font-bold hover:bg-red-50 transition-colors"
-            >
+            <button onClick={() => onCancel(appointment)} className="w-full bg-white border border-red-200 text-red-600 py-2.5 rounded-lg text-sm font-bold hover:bg-red-50 transition-colors">
               Cancel Appointment
             </button>
           )}
 
           {(appointment.status === 'Completed' || appointment.status === 'Cancelled' || !isAdmin) && (
-            <button
-              onClick={onClose}
-              className="w-full bg-white border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-100 transition-colors"
-            >
+            <button onClick={onClose} className="w-full bg-white border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-bold hover:bg-gray-100 transition-colors">
               Close
             </button>
           )}

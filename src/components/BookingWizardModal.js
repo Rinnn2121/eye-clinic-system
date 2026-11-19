@@ -16,20 +16,18 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
-  // Store existing appointments for overlap check
   const [existingAppts, setExistingAppts] = useState([]);
 
-  // Step 1 State
+  // ✅ NEW STATE for same-day duplicate check
+  const [dateAlreadyBooked, setDateAlreadyBooked] = useState(false);
+
   const [visitTypes, setVisitTypes] = useState(
     initialService ? [initialService] : ['Eye Examination']
   );
   const [selectedDate, setSelectedDate] = useState(null);
   const [selectedTime, setSelectedTime] = useState('09:00'); 
 
-  // Step 2 State
   const [includedItems, setIncludedItems] = useState([]);
-
-  // Calendar Helper
   const [currentMonth, setCurrentMonth] = useState(new Date());
 
   const getTodayStr = () => {
@@ -40,7 +38,6 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     return `${y}-${m}-${d}`;
   };
 
-  // Fetch the user's cart on load
   useEffect(() => {
     const fetchCart = async () => {
       if (!currentUser?.email) return;
@@ -55,7 +52,32 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     fetchCart();
   }, [currentUser]);
 
-  // Fetch existing appointments for the selected date
+  // ✅ Check for SAME-DAY duplicate whenever date changes
+  useEffect(() => {
+    const checkSameDay = async () => {
+      if (!currentUser?.email || !selectedDate) {
+        setDateAlreadyBooked(false);
+        return;
+      }
+
+      const q = query(
+        collection(db, 'appointments'),
+        where('customerId', '==', currentUser.email),
+        where('date', '==', selectedDate)
+      );
+      
+      const snap = await getDocs(q);
+      const activeDuplicates = snap.docs.filter(doc => {
+        const s = doc.data().status;
+        return s !== 'Cancelled' && s !== 'Completed';
+      });
+
+      setDateAlreadyBooked(activeDuplicates.length > 0);
+    };
+
+    checkSameDay();
+  }, [currentUser, selectedDate]);
+
   useEffect(() => {
     const fetchExistingAppts = async () => {
       if (!selectedDate) return;
@@ -74,15 +96,13 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     fetchExistingAppts();
   }, [selectedDate]);
 
-  // Handle Quantity Change
   const handleUpdateQty = (id, newQty) => {
-    if (newQty < 1 || newQty > 5) return; // Enforce max 5
+    if (newQty < 1 || newQty > 5) return;
     setCartItems(cartItems.map(item => 
       item.id === id ? { ...item, quantity: newQty } : item
     ));
   };
 
-  // Toggle Service Selection
   const toggleService = (serviceId) => {
     if (visitTypes.includes(serviceId)) {
       setVisitTypes(visitTypes.filter(id => id !== serviceId));
@@ -91,7 +111,6 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     }
   };
 
-  // Helper: Check if time is in the past today
   const isTimePast = () => {
     if (selectedDate !== getTodayStr()) return false;
     const now = new Date();
@@ -99,7 +118,6 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     return selectedTime < currentTimeStr;
   };
 
-  // Helper: Check for 30-min overlap
   const isTimeSlotTaken = () => {
     if (!selectedTime || existingAppts.length === 0) return false;
     const [selHours, selMins] = selectedTime.split(':').map(Number);
@@ -116,7 +134,6 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     return false;
   };
 
-  // ✅ Helper: Check if time is outside clinic hours
   const isOutsideClinicHours = () => {
     if (!selectedTime) return false;
     return selectedTime < '09:00' || selectedTime > '17:30';
@@ -124,6 +141,11 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
 
   const handleConfirm = async () => {
     setErrorMsg('');
+
+    if (dateAlreadyBooked) {
+      setErrorMsg("You already have an appointment scheduled on this date.");
+      return;
+    }
 
     if (visitTypes.length === 0) {
       setErrorMsg("Please select at least one service.");
@@ -160,11 +182,13 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
         status: 'Pending',
         createdAt: new Date().toISOString(),
         interestedItems: selectedCartItems.map(item => ({
-          name: item.name,
-          price: item.price,
-          color: item.color,
-          qty: item.quantity
-        }))
+  id: item.id,           // ✅ Save ID for patient record reference
+  name: item.name,
+  price: item.price,
+  color: item.color,
+  qty: item.quantity,
+  imageUrl: item.imageUrl || ''  // ✅ Save image for modal display
+}))
       });
 
       // 2. Notify Admin
@@ -202,7 +226,6 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     setLoading(false);
   };
 
-  // --- CALENDAR LOGIC ---
   const getDaysInMonth = (date) => new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   const getFirstDayOfMonth = (date) => new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   const handlePrevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
@@ -221,7 +244,9 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
     { id: 'Eye Examination', desc: 'Check your eye vision and health.' },
     { id: 'Fitting of Contact Lenses', desc: 'Ensure proper fit and comfort.' },
     { id: 'Dry Eye Test', desc: 'Evaluate dry eye symptoms.' },
-    { id: 'Color Vision Test', desc: 'Check color perception.' }
+    { id: 'Color Vision Test', desc: 'Check color perception.' },
+    { id: 'Prescribing/Dispensing of Corrective Lenses and Eyeglasses', desc: 'Get your new prescription or glasses.' },
+    { id: 'Computerized Eye Examination', desc: 'Fast and accurate digital eye check.' }
   ];
 
   return (
@@ -339,6 +364,13 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                   })}
                 </div>
 
+                {/* ✅ Warning for same-day booking */}
+                {dateAlreadyBooked && selectedDate && (
+                  <div className="bg-red-50 border-l-4 border-red-500 text-red-700 p-3 rounded mb-4 text-xs">
+                    You already have an appointment booked on this date.
+                  </div>
+                )}
+
                 <h3 className="font-bold text-gray-800 mb-3">Select Time</h3>
                 <div>
                   <input 
@@ -351,7 +383,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                         : 'border-gray-300'
                     }`}
                   />
-                  {/* ✅ Inline Warnings */}
+                  {/* Inline Warnings */}
                   {isOutsideClinicHours() && selectedDate && (
                     <p className="text-xs text-red-500 mt-2 font-medium">
                       The clinic only accepts appointments between 9:00 AM and 5:30 PM.
@@ -372,7 +404,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
           {step === 2 && (
             <div className="bg-white p-6 rounded-xl border border-gray-200">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-900">Items in your Cart (Optional)</h3>
+                <h3 className="text-xl font-bold text-gray-900">Your Cart</h3>
               </div>
               
               {cartItems.length === 0 ? (
@@ -383,15 +415,8 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                 <div className="space-y-4">
                   {cartItems.map(item => (
                     <div key={item.id} className="flex items-center gap-4 p-4 border border-gray-200 rounded-lg">
-                      <div className="w-20 h-20 bg-gray-100 flex-shrink-0 flex items-center justify-center overflow-hidden rounded">
-                        {item.imageUrl ? (
-                          <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                        ) : (
-                          /* ✅ SVG Image Placeholder */
-                          <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                          </svg>
-                        )}
+                      <div className="w-20 h-20 bg-gray-100 flex-shrink-0">
+                        {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300">🖼️</div>}
                       </div>
                       <div className="flex-1">
                         <h4 className="font-bold text-gray-900 text-sm">{item.name}</h4>
@@ -422,13 +447,11 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                 </div>
               )}
 
-              {/* ✅ SVG Info Banner */}
-              <div className="mt-6 bg-[#d0e2fd] text-blue-900 p-4 rounded-md flex items-start gap-3">
-                <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <p className="text-xs leading-relaxed font-medium">
-                  Selecting frames is OPTIONAL. Your appointment can be booked for a clinic service-only.
+              <div className="mt-6 bg-[#d0e2fd] text-blue-900 p-4 rounded-md flex gap-3">
+                <span className="text-xl">ℹ️</span>
+                <p className="text-xs leading-relaxed">
+                  Items in your cart will be shared with the clinic to help prepare for your visit. 
+                  This does NOT represent an online purchase.
                 </p>
               </div>
             </div>
@@ -470,15 +493,8 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                     <div className="space-y-3">
                       {cartItems.filter(item => includedItems.includes(item.id)).map(item => (
                          <div key={item.id} className="flex items-center gap-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
-                            <div className="w-16 h-16 bg-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden rounded">
-                              {item.imageUrl ? (
-                                <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
-                              ) : (
-                                /* ✅ SVG Image Placeholder */
-                                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                </svg>
-                              )}
+                            <div className="w-16 h-16 bg-gray-200 flex-shrink-0">
+                              {item.imageUrl ? <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-gray-300">🖼️</div>}
                             </div>
                             <div className="flex-1">
                               <h4 className="font-bold text-gray-900 text-sm">{item.name}</h4>
@@ -506,17 +522,15 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                   {includedItems.length > 0 ? `${includedItems.length} items selected` : 'None'}
                 </p>
 
-                {/* ✅ SVG Info Banner */}
-                <div className="bg-[#d0e2fd] text-blue-900 p-3 rounded-lg mb-6 text-xs flex items-start gap-2">
-                  <svg className="w-4 h-4 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <p className="font-medium">No payment or order delivery is placed online. Payment process is handled at the clinic.</p>
+                <div className="bg-[#d0e2fd] text-blue-900 p-3 rounded-lg mb-6 text-xs flex gap-2">
+                  <span>ℹ️</span>
+                  <p>No payment or order delivery is placed online. Payment process is handled at the clinic.</p>
                 </div>
 
                 <button 
                   onClick={handleConfirm}
-                  disabled={loading || isTimePast() || isTimeSlotTaken() || !selectedDate || isOutsideClinicHours()}
+                  // ✅ Disable if already booked
+                  disabled={loading || dateAlreadyBooked || isTimePast() || isTimeSlotTaken() || !selectedDate || isOutsideClinicHours()}
                   className="w-full bg-blue-600 text-white py-3 rounded-lg font-bold text-sm hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Confirming...' : 'Confirm Appointment'}
@@ -539,7 +553,8 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
           {step < 3 && (
             <button 
               onClick={() => setStep(step + 1)}
-              disabled={step === 1 && (visitTypes.length === 0 || !selectedDate || isTimePast() || isTimeSlotTaken() || !selectedTime || isOutsideClinicHours())}
+              // ✅ Disable Continue if already booked
+              disabled={step === 1 && (dateAlreadyBooked || visitTypes.length === 0 || !selectedDate || isTimePast() || isTimeSlotTaken() || !selectedTime || isOutsideClinicHours())}
               className="bg-blue-600 text-white px-6 py-2 rounded-lg font-bold text-sm hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               Continue
@@ -549,7 +564,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
 
       </div>
 
-      {/* ✅ SUCCESS MODAL */}
+      {/* SUCCESS MODAL */}
       {showSuccessModal && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
           <div className="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl text-center">
@@ -584,7 +599,7 @@ export default function BookingWizardModal({ onClose, onSuccess, initialService 
                 }}
                 className="w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-xl font-bold text-sm hover:bg-gray-50 transition-colors"
               >
-                Close
+                Continue Browsing
               </button>
             </div>
             
