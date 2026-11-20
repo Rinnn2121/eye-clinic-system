@@ -167,6 +167,11 @@ function PatientRecordPage() {
     setAdditionalCharges(additionalCharges.filter((_, i) => i !== index));
   };
 
+  // ✅ NEW: Function to remove an item from the cart
+  const handleRemoveCartItem = (indexToRemove) => {
+    setCartItems(cartItems.filter((_, index) => index !== indexToRemove));
+  };
+
   const handleSave = async () => {
     if (!record.newODsph && !record.newOSsph) { setShowPrescriptionError(true); return; }
     if (!record.lensText || !record.coatingText) { setShowSelectionError(true); return; }
@@ -421,7 +426,18 @@ function PatientRecordPage() {
                       <p className="text-xs text-gray-500">Color: {item.color || 'Standard'} • Qty: {item.qty || 1}</p>
                     </div>
                   </div>
-                  <div className="font-bold text-gray-900">₱ {Number(item.price).toLocaleString()}</div>
+                  <div className="flex items-center gap-4">
+                    <div className="font-bold text-gray-900">₱ {Number(item.price).toLocaleString()}</div>
+                    {/* ✅ NEW: Remove Button */}
+                    <button 
+                      type="button" 
+                      onClick={() => handleRemoveCartItem(idx)} 
+                      className="text-red-400 hover:text-red-600 font-bold text-xl leading-none px-1"
+                      title="Remove Item"
+                    >
+                      &times;
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>

@@ -172,16 +172,28 @@ function AdminDashboard() {
     }, 0);
   }, [allOrders, chartRange]);
 
-  // ✅ CALENDAR APPOINTMENTS LIST
-  // Excludes Cancelled AND Completed so the schedule only shows active upcoming ones
+  // ✅ CALENDAR APPOINTMENTS LIST (Fixed to show formatted name)
   const selectedDateAppts = useMemo(() => {
     return appointments
       .filter(a => a.date === selectedDate && a.status !== 'Cancelled' && a.status !== 'Completed')
       .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
-      .map(a => ({
-        ...a,
-        displayTime: a.time ? new Date(`2000-01-01T${a.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''
-      }));
+      .map(a => {
+        let displayName = a.customerName || 'Walk-in';
+        
+        // If the name is an email, format it nicely
+        if (displayName.includes('@')) {
+          const prefix = displayName.split('@')[0];
+          displayName = prefix
+            .replace(/[._]/g, ' ')
+            .replace(/\b\w/g, char => char.toUpperCase());
+        }
+
+        return {
+          ...a,
+          displayName, 
+          displayTime: a.time ? new Date(`2000-01-01T${a.time}`).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : ''
+        };
+      });
   }, [appointments, selectedDate]);
 
   // Today's Appointments List
@@ -444,58 +456,85 @@ function AdminDashboard() {
                 </div>
               </div>
 
-                            <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col">
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-xl text-[#15803d]">Customers</h3>
-                  <Link to="/admin/customers" className="text-sm text-[#4A90E2] hover:underline font-bold">View All →</Link>
-                </div>
-                
-                <div className="flex items-center gap-6 flex-1">
-                  <div className="relative w-28 h-28 flex-shrink-0">
-                    <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
-                      <circle cx="50" cy="50" r="40" fill="none" stroke="#f3f4f6" strokeWidth="15" />
-                      <circle 
-                        cx="50" cy="50" r="40" fill="none" stroke="#a855f7" strokeWidth="15"
-                        strokeDasharray={`${(stats.newCustomersWeek / (stats.totalCustomers || 1)) * 251.2} 251.2`} 
-                      />
-                      <circle 
-                        cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="15"
-                        strokeDasharray={`${(stats.returningCustomers / (stats.totalCustomers || 1)) * 251.2} 251.2`} 
-                        strokeDashoffset={`-${(stats.newCustomersWeek / (stats.totalCustomers || 1)) * 251.2}`}
-                      />
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-bold text-gray-900">{stats.totalCustomers}</span>
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Total</span>
-                    </div>
-                  </div>
+                <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-200 flex flex-col">
+  <div className="flex justify-between items-center mb-4">
+    <h3 className="font-bold text-xl text-[#15803d]">Customers</h3>
+    <Link to="/admin/customers" className="text-sm text-[#4A90E2] hover:underline font-bold">View All →</Link>
+  </div>
+  
+  <div className="flex items-center gap-6 flex-1">
+    
+    {/* ✅ FIXED DONUT CHART */}
+    <div className="relative w-28 h-28 flex-shrink-0">
+      <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+        {/* Background Circle */}
+        <circle cx="50" cy="50" r="40" fill="none" stroke="#f3f4f6" strokeWidth="15" />
+        
+        {/* Calculate Active Total for the donut */}
+        {(() => {
+          const activeTotal = stats.newCustomersWeek + stats.returningCustomers;
+          
+          if (activeTotal === 0) return null; // Don't draw if no active customers
 
-                  <div className="flex-1 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-purple-500"></span>
-                        <span className="text-sm font-medium text-gray-600">New (Week)</span>
-                      </div>
-                      <span className="font-bold text-gray-900">{stats.newCustomersWeek}</span>
-                    </div>
+          const newPct = stats.newCustomersWeek / activeTotal;
+          const returnPct = stats.returningCustomers / activeTotal;
+          const circumference = 251.2; // 2 * pi * 40
 
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                        <span className="text-sm font-medium text-gray-600">Returning</span>
-                      </div>
-                      <span className="font-bold text-gray-900">{stats.returningCustomers}</span>
-                    </div>
+          return (
+            <>
+              {/* New Customers Circle (Purple) */}
+              <circle 
+                cx="50" cy="50" r="40" fill="none" stroke="#a855f7" strokeWidth="15"
+                strokeDasharray={`${newPct * circumference} ${circumference}`} 
+              />
 
-                    <div className="pt-2 border-t border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-gray-500 uppercase">Top Service</span>
-                      </div>
-                      <p className="text-sm font-bold text-gray-900 truncate mt-0.5">{stats.mostRequestedService}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              {/* Returning Customers Circle (Green) */}
+              <circle 
+                cx="50" cy="50" r="40" fill="none" stroke="#22c55e" strokeWidth="15"
+                strokeDasharray={`${returnPct * circumference} ${circumference}`} 
+                strokeDashoffset={`-${newPct * circumference}`}
+              />
+            </>
+          );
+        })()}
+      </svg>
+      
+      {/* Center Text */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center">
+        {/* Show Active Total instead of all-time total */}
+        <span className="text-2xl font-bold text-gray-900">
+          {stats.newCustomersWeek + stats.returningCustomers}
+        </span>
+        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wide">Active</span>
+      </div>
+    </div>
+
+    <div className="flex-1 space-y-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+          <span className="text-sm font-medium text-gray-600">New (Week)</span>
+        </div>
+        <span className="font-bold text-gray-900">{stats.newCustomersWeek}</span>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="w-3 h-3 rounded-full bg-green-500"></span>
+          <span className="text-sm font-medium text-gray-600">Returning</span>
+        </div>
+        <span className="font-bold text-gray-900">{stats.returningCustomers}</span>
+      </div>
+
+      <div className="pt-2 border-t border-gray-100">
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-bold text-gray-500 uppercase">Top Service</span>
+        </div>
+        <p className="text-sm font-bold text-gray-900 truncate mt-0.5">{stats.mostRequestedService}</p>
+      </div>
+    </div>
+  </div>
+</div>
             </div>
           </div>
 
@@ -569,7 +608,8 @@ function AdminDashboard() {
                     {selectedDateAppts.map((apt, idx) => (
                       <div key={idx} className="flex gap-2 items-center">
                         <span className="font-semibold whitespace-nowrap">{apt.displayTime}</span>
-                        <span className="truncate">{apt.customerName}</span>
+                        {/* ✅ Changed from apt.customerName to apt.displayName */}
+                        <span className="truncate">{apt.displayName}</span>
                       </div>
                     ))}
                   </div>
@@ -633,7 +673,7 @@ function AdminDashboard() {
           inventoryList={inventoryList} 
           onItemClick={(item) => {
             setShowInventoryModal(false);
-            setSelectedProduct(item);
+            setPreviewProduct(item); // ✅ This opens the ProductPreviewModal
           }}
         />
       )}

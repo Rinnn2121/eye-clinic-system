@@ -71,16 +71,13 @@ function CustomerTransactions() {
                 
                 {/* Left: Image & Info */}
                 <div className="flex items-center gap-4 flex-1">
-                  <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden">
-                    {order.items?.[0]?.imageUrl ? (
-                      <img src={order.items[0].imageUrl} alt={order.items[0].name} className="w-full h-full object-cover" />
-                    ) : (
-                      /* ✅ SVG Image Placeholder */
-                      <svg className="w-8 h-8 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                    )}
-                  </div>
+                  <div className="w-16 h-16 bg-gray-100 rounded-lg border border-gray-200 flex-shrink-0 flex items-center justify-center overflow-hidden p-1">
+  <img 
+    src={order.items?.[0]?.imageUrl || '/images/product.png'} 
+    alt={order.items?.[0]?.name || 'Service Item'} 
+    className={`w-full h-full ${order.items?.[0]?.imageUrl ? 'object-cover' : 'object-contain opacity-60'}`} 
+  />
+</div>
                   <div>
                     <p className="font-bold text-gray-900 text-lg">
                       {order.items?.[0]?.name || 'Product Name'}

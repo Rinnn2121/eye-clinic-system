@@ -11093,3 +11093,26 @@ E1106 19:50:18.839306    5648 watch.go:40] Failed to load config from "c:\\Users
  {"metadata":{"emulator":{"name":"dataconnect"},"message":"E1106 19:52:58.839466    5648 watch.go:40] Failed to load config from \"c:\\\\Users\\\\sarmi\\\\eye-clinic-system\\\\dataconnect\": could not find dataconnect.yaml in `c:\\Users\\sarmi\\eye-clinic-system\\dataconnect`\n"}}
 [debug] [2026-11-06T11:53:08.841Z] E1106 19:53:08.843037    5648 watch.go:40] Failed to load config from "c:\\Users\\sarmi\\eye-clinic-system\\dataconnect": could not find dataconnect.yaml in `c:\Users\sarmi\eye-clinic-system\dataconnect`
  {"metadata":{"emulator":{"name":"dataconnect"},"message":"E1106 19:53:08.843037    5648 watch.go:40] Failed to load config from \"c:\\\\Users\\\\sarmi\\\\eye-clinic-system\\\\dataconnect\": could not find dataconnect.yaml in `c:\\Users\\sarmi\\eye-clinic-system\\dataconnect`\n"}}
+[debug] [2026-11-20T06:07:20.776Z] [Firebase Plugin] Activating Firebase extension.
+[info] [Firebase Plugin] Checked firebase-tools, is up to date!
+[debug] [2026-11-20T06:07:27.033Z] [Firebase Plugin] requireAuthWrapper
+[debug] [2026-11-20T06:07:27.036Z] > command requires scopes: ["email","openid","https://www.googleapis.com/auth/cloudplatformprojects.readonly","https://www.googleapis.com/auth/firebase","https://www.googleapis.com/auth/cloud-platform"]
+[debug] [2026-11-20T06:07:27.038Z] > authorizing via signed-in user (saavedrarudolfangelo@gmail.com)
+[debug] [2026-11-20T06:07:27.046Z] Checked if tokens are valid: true, expires at: 1795156625132
+[debug] [2026-11-20T06:07:27.047Z] Checked if tokens are valid: true, expires at: 1795156625132
+[debug] [2026-11-20T06:07:27.047Z] [Firebase Plugin] User found:  saavedrarudolfangelo@gmail.com
+[info] [Firebase Plugin] (Core:Project) New user detected, fetching projects
+[debug] [2026-11-20T06:07:27.050Z] Checked if tokens are valid: true, expires at: 1795156625132
+[debug] [2026-11-20T06:07:27.053Z] >>> [apiv2][query] GET https://firebase.googleapis.com/v1beta1/projects pageSize=1000
+[debug] [2026-11-20T06:07:27.084Z] [Firebase Plugin] VSCode notification server listening on port 40001
+[info] [Firebase Plugin] Starting SQL Connect toolkit (version 3.4.28) on port 50001
+[debug] [2026-11-20T06:07:30.640Z] 'fdc build' failed with error: Error starting up SQL Connect build: spawnSync C:\Users\sarmi\.cache\firebase\emulators\dataconnect-emulator-3.4.28.exe UNKNOWN {"metadata":{"emulator":{"name":"dataconnect"},"message":"'fdc build' failed with error: Error starting up SQL Connect build: spawnSync C:\\Users\\sarmi\\.cache\\firebase\\emulators\\dataconnect-emulator-3.4.28.exe UNKNOWN"}}
+[debug] [2026-11-20T06:07:30.642Z] Ignoring unsupported arg: auto_download {"metadata":{"emulator":{"name":"dataconnect"},"message":"Ignoring unsupported arg: auto_download"}}
+[debug] [2026-11-20T06:07:30.643Z] Ignoring unsupported arg: port {"metadata":{"emulator":{"name":"dataconnect"},"message":"Ignoring unsupported arg: port"}}
+[debug] [2026-11-20T06:07:30.643Z] Starting SQL Connect Emulator with command {"binary":"C:\\Users\\sarmi\\.cache\\firebase\\emulators\\dataconnect-emulator-3.4.28.exe","args":["--logtostderr","-v=2","dev","--listen=localhost:50001","--config_dir=c:\\Users\\sarmi\\OneDrive\\Documents\\VS code\\eye-clinic-system\\dataconnect","--enable_output_schema_extensions=true","--enable_output_generated_sdk=true"],"optionalArgs":["listen","config_dir","enable_output_schema_extensions","enable_output_generated_sdk"],"joinArgs":true,"shell":false,"port":9399} {"metadata":{"emulator":{"name":"dataconnect"},"message":"Starting SQL Connect Emulator with command {\"binary\":\"C:\\\\Users\\\\sarmi\\\\.cache\\\\firebase\\\\emulators\\\\dataconnect-emulator-3.4.28.exe\",\"args\":[\"--logtostderr\",\"-v=2\",\"dev\",\"--listen=localhost:50001\",\"--config_dir=c:\\\\Users\\\\sarmi\\\\OneDrive\\\\Documents\\\\VS code\\\\eye-clinic-system\\\\dataconnect\",\"--enable_output_schema_extensions=true\",\"--enable_output_generated_sdk=true\"],\"optionalArgs\":[\"listen\",\"config_dir\",\"enable_output_schema_extensions\",\"enable_output_generated_sdk\"],\"joinArgs\":true,\"shell\":false,\"port\":9399}"}}
+[warn] !  dataconnect: Fatal error occurred: 
+   Error: spawn UNKNOWN, 
+   stopping all running emulators {"metadata":{"emulator":{"name":"dataconnect"},"message":"Fatal error occurred: \n   Error: spawn UNKNOWN, \n   stopping all running emulators"}}
+[warn] !  dataconnect: Could not spawn child process for SQL Connect Emulator. {"metadata":{"emulator":{"name":"dataconnect"},"message":"Could not spawn child process for SQL Connect Emulator."}}
+[debug] [2026-11-20T06:07:33.007Z] <<< [apiv2][status] GET https://firebase.googleapis.com/v1beta1/projects 200
+[debug] [2026-11-20T06:07:33.008Z] <<< [apiv2][body] GET https://firebase.googleapis.com/v1beta1/projects [omitted]

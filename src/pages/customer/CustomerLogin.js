@@ -35,7 +35,7 @@ function CustomerLogin() {
         role = userDoc.data().role || 'customer';
       }
 
-      // ✅ Bug 3 Fix: ONLY block unverified CUSTOMERS
+      // ✅ ONLY block unverified CUSTOMERS
       if (role === 'customer' && !user.emailVerified) {
         await signOut(auth);
         setError('Your email is not verified. Please check your inbox (and spam folder) for the verification link before logging in.');
@@ -43,7 +43,7 @@ function CustomerLogin() {
         return; 
       }
 
-      // 3. Send Login Notification Email (EmailJS)
+      // 3. Send Login Notification Email (EmailJS) - Optional, wrapped in try/catch so it doesn't block login
       try {
         await emailjs.send(
           'service_qd6q6ox',
@@ -75,9 +75,10 @@ function CustomerLogin() {
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-[#4A90E2]">VITUG-SUMAYA</h1>
-          <p className="text-sm text-gray-500 tracking-wider">OPTICAL CLINIC</p>
+        
+        {/* ✅ Updated Logo Section */}
+        <div className="flex flex-col items-center justify-center mb-8">
+          <img src="/images/vslogo.png" alt="Vitug-Sumaya Optical Clinic" className="h-20 w-auto object-contain mb-2" />
         </div>
 
         <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
