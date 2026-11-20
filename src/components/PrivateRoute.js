@@ -1,20 +1,28 @@
+// src/components/PrivateRoute.js
+
 import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-// ✅ MODULE-LEVEL VARIABLE - Survives across all re-renders
-let globalKnownRole = localStorage.getItem('userRoleCache');
+// ✅ Bug 5 Fix: Use sessionStorage so it clears on logout and browser close
+let globalKnownRole = sessionStorage.getItem('activeRole');
 
 function PrivateRoute({ children, allowedRoles }) {
   const { currentUser, userRole, loading } = useAuth();
   const location = useLocation();
 
-  // ✅ Update global role whenever we see it
+  // Save role when seen
   if (userRole) {
     globalKnownRole = userRole;
+    sessionStorage.setItem('activeRole', userRole);
   }
 
-  // ✅ If loading but we have a known role, DO NOT show spinner (avoids flash)
+  // ✅ Bug 5 Fix: Clear immediately when user logs out
+  if (!currentUser && !loading) {
+    globalKnownRole = null;
+    sessionStorage.removeItem('activeRole');
+  }
+
   if (loading && !globalKnownRole) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -23,15 +31,17 @@ function PrivateRoute({ children, allowedRoles }) {
     );
   }
 
-  // ✅ Use global role as the source of truth
   const effectiveRole = userRole || globalKnownRole;
 
-  // Not logged in
   if (!currentUser && !effectiveRole) {
     return <Navigate to="/login" replace state={{ from: location }} />;
   }
 
-  // Role check
+  // ✅ Bug 2 Fix: ONLY enforce verification for customers
+  if (currentUser && !currentUser.emailVerified && effectiveRole === 'customer') {
+    return <Navigate to="/login" replace />;
+  }
+
   if (allowedRoles && effectiveRole && !allowedRoles.includes(effectiveRole)) {
     if (effectiveRole === 'admin' || effectiveRole === 'staff') {
       return <Navigate to="/admin/dashboard" replace />;

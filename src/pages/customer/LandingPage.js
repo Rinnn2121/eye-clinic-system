@@ -270,7 +270,7 @@ function LandingPage() {
       <div className="bg-gray-100 w-full pb-12 pt-6">
         
         <div className="max-w-4xl mx-auto px-4 mb-8 relative" ref={dropdownRef}>
-          <form onSubmit={handleSearch} className="relative flex items-center bg-white border border-gray-300 shadow-sm rounded-full overflow-hidden z-20 relative">
+          <form onSubmit={handleSearch} className=" flex items-center bg-white border border-gray-300 shadow-sm rounded-full overflow-hidden z-20 relative">
             <input 
               type="text" 
               placeholder="Search for frames..." 
@@ -371,7 +371,7 @@ function LandingPage() {
               </div>
             </div>
             <div className="w-full md:w-1/2 relative bg-white">
-              <img src="/images/aoc.jpg" alt="Eyewear Collection" className="w-full h-full object-contain" />
+              <img src="/images/vslogo.png" alt="Eyewear Collection" className="w-full h-full object-contain" />
               <div className="absolute inset-0 bg-gradient-to-r from-white via-white/40 to-transparent pointer-events-none"></div>
             </div>
           </section>

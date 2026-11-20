@@ -3,20 +3,17 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import ConfirmModal from '../../components/ConfirmModal';
 
 function CustomerRegister() {
   const [formData, setFormData] = useState({
-    firstName: '',
-    lastName: '',
-    nickname: '',
-    phone: '',
-    email: '',
-    password: '',
-    confirmPassword: ''
+    firstName: '', lastName: '', nickname: '', phone: '', email: '', password: '', confirmPassword: ''
   });
   
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  
   const { signup } = useAuth(); 
   const navigate = useNavigate();
 
@@ -46,7 +43,9 @@ function CustomerRegister() {
         phone: formData.phone.trim(),
       });
       
-      navigate('/customer/dashboard');
+      // Show success modal
+      setShowSuccessModal(true);
+
     } catch (err) {
       console.error(err);
       setError('Failed to create account: ' + err.message);
@@ -54,17 +53,20 @@ function CustomerRegister() {
     setLoading(false);
   };
 
+  const handleCloseSuccess = () => {
+    setShowSuccessModal(false);
+    navigate('/login'); // ✅ Redirect here
+  };
+
   return (
     <div className="min-h-screen bg-white flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-md">
         
-        {/* Logo Section */}
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-[#4A90E2]">VITUG-SUMAYA</h1>
           <p className="text-sm text-gray-500 tracking-wider">OPTICAL CLINIC</p>
         </div>
 
-        {/* Register Form */}
         <div className="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
           <h2 className="text-2xl font-semibold text-gray-800 text-center mb-6">Create Account</h2>
           
@@ -75,98 +77,64 @@ function CustomerRegister() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            
-            {/* Name Row */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-gray-700 font-medium mb-1 text-sm">First Name *</label>
-                <input
-                  type="text" name="firstName" required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-                  value={formData.firstName} onChange={handleChange}
-                />
+                <input type="text" name="firstName" required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none" value={formData.firstName} onChange={handleChange} />
               </div>
               <div>
                 <label className="block text-gray-700 font-medium mb-1 text-sm">Last Name *</label>
-                <input
-                  type="text" name="lastName" required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-                  value={formData.lastName} onChange={handleChange}
-                />
+                <input type="text" name="lastName" required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none" value={formData.lastName} onChange={handleChange} />
               </div>
             </div>
 
-            {/* Nickname & Phone */}
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-gray-700 font-medium mb-1 text-sm">Nickname</label>
-                <input
-                  type="text" name="nickname"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-                  value={formData.nickname} onChange={handleChange}
-                />
+                <input type="text" name="nickname" className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none" value={formData.nickname} onChange={handleChange} />
               </div>
               <div>
                 <label className="block text-gray-700 font-medium mb-1 text-sm">Phone Number *</label>
-                <input
-                  type="tel" 
-                  name="phone" 
-                  required 
-                  maxLength={11} // ✅ Enforces 11 digits maximum
-                  value={formData.phone} 
-                  // ✅ Strips out any non-number characters (letters, dashes, etc)
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-                  placeholder="09XXXXXXXXX"
-                />
+                <input type="tel" name="phone" required maxLength={11} value={formData.phone} onChange={(e) => setFormData({ ...formData, phone: e.target.value.replace(/\D/g, '') })} className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none" placeholder="09XXXXXXXXX" />
               </div>
             </div>
 
-            {/* Email */}
             <div>
               <label className="block text-gray-700 font-medium mb-1 text-sm">Email *</label>
-              <input
-                type="email" name="email" required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-                value={formData.email} onChange={handleChange}
-              />
+              <input type="email" name="email" required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none" value={formData.email} onChange={handleChange} />
             </div>
 
-            {/* Password */}
             <div>
               <label className="block text-gray-700 font-medium mb-1 text-sm">Password *</label>
-              <input
-                type="password" name="password" required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-                value={formData.password} onChange={handleChange}
-              />
+              <input type="password" name="password" required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none" value={formData.password} onChange={handleChange} />
             </div>
 
             <div>
               <label className="block text-gray-700 font-medium mb-1 text-sm">Confirm Password *</label>
-              <input
-                type="password" name="confirmPassword" required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none"
-                value={formData.confirmPassword} onChange={handleChange}
-              />
+              <input type="password" name="confirmPassword" required className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#4A90E2] focus:border-transparent outline-none" value={formData.confirmPassword} onChange={handleChange} />
             </div>
 
-            <button
-              type="submit" disabled={loading}
-              className="w-full bg-[#4A90E2] text-white py-2.5 rounded-lg hover:bg-[#4A90E2]/80 transition-colors font-medium disabled:opacity-50 mt-2"
-            >
+            <button type="submit" disabled={loading} className="w-full bg-[#4A90E2] text-white py-2.5 rounded-lg hover:bg-[#4A90E2]/80 transition-colors font-medium disabled:opacity-50 mt-2">
               {loading ? 'Creating Account...' : 'Create Account'}
             </button>
           </form>
 
           <div className="text-center mt-6 border-t border-gray-100 pt-4">
-            <Link to="/login" className="text-[#4A90E2] hover:underline text-sm font-medium">
-              Already have an account? Login
-            </Link>
+            <Link to="/login" className="text-[#4A90E2] hover:underline text-sm font-medium">Already have an account? Login</Link>
           </div>
         </div>
-
       </div>
+
+      <ConfirmModal
+        isOpen={showSuccessModal}
+        title="Account Created!"
+        message="Your account has been successfully created. Please check your email inbox (and spam folder) to verify your email before logging in."
+        iconType="success"
+        confirmText="Go to Login"
+        confirmColor="green"
+        isAlert
+        onConfirm={handleCloseSuccess}
+      />
     </div>
   );
 }
