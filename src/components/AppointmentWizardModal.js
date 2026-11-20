@@ -15,8 +15,9 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
   const [saving, setSaving] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   
-  // ✅ NEW STATE for same-day duplicate check
+  // State for same-day duplicate check
   const [dateAlreadyBooked, setDateAlreadyBooked] = useState(false);
+  const [checkingDate, setCheckingDate] = useState(false);
 
   const todayStr = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
 
@@ -52,30 +53,48 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
     }
   }, [modalStep]);
 
-  // ✅ Check for SAME-DAY duplicate whenever customer or date changes
+  // Check for SAME-DAY duplicate whenever customer or date changes
   useEffect(() => {
+    let ignore = false;
+
     const checkSameDay = async () => {
       if (!selectedCustomer || !formData.date) {
-        setDateAlreadyBooked(false);
+        if (!ignore) {
+          setDateAlreadyBooked(false);
+          setCheckingDate(false);
+        }
         return;
       }
 
-      const q = query(
-        collection(db, 'appointments'),
-        where('customerId', '==', selectedCustomer.id),
-        where('date', '==', formData.date)
-      );
-      
-      const snap = await getDocs(q);
-      const activeDuplicates = snap.docs.filter(doc => {
-        const s = doc.data().status;
-        return s !== 'Cancelled' && s !== 'Completed';
-      });
+      if (!ignore) setCheckingDate(true);
 
-      setDateAlreadyBooked(activeDuplicates.length > 0);
+      try {
+        const q = query(
+          collection(db, 'appointments'),
+          where('customerId', '==', selectedCustomer.id),
+          where('date', '==', formData.date)
+        );
+        
+        const snap = await getDocs(q);
+        
+        if (ignore) return;
+
+        const activeDuplicates = snap.docs.filter(doc => {
+          const s = doc.data().status;
+          return s !== 'Cancelled' && s !== 'Completed';
+        });
+
+        setDateAlreadyBooked(activeDuplicates.length > 0);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        if (!ignore) setCheckingDate(false);
+      }
     };
 
     checkSameDay();
+
+    return () => { ignore = true; };
   }, [selectedCustomer, formData.date]);
 
   // Fetch existing appointments for the selected date to check overlap
@@ -162,6 +181,24 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
 
     setSaving(true);
     try {
+      // Final safety check right before saving
+      const verifyQuery = query(
+        collection(db, 'appointments'),
+        where('customerId', '==', selectedCustomer.id),
+        where('date', '==', formData.date)
+      );
+      const verifySnap = await getDocs(verifyQuery);
+      const stillDuplicates = verifySnap.docs.filter(doc => {
+        const s = doc.data().status;
+        return s !== 'Cancelled' && s !== 'Completed';
+      });
+
+      if (stillDuplicates.length > 0) {
+        setErrorMsg("This customer already has an appointment scheduled on this date.");
+        setSaving(false);
+        return;
+      }
+
       await addDoc(collection(db, 'appointments'), {
         ...formData,
         customerId: selectedCustomer.id,
@@ -241,7 +278,8 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
                   </div>
                   <h3 className="font-bold text-gray-900 text-lg mb-2">New Customer</h3>
                   <p className="text-sm text-gray-500 mb-6">Register a new customer and create an appointment.</p>
-                  <div className="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium group-hover:bg-blue-700">Continue</div>
+                  {/* ✅ Changed to match Returning Customer button style */}
+                  <div className="w-full bg-white border border-blue-600 text-blue-600 py-2.5 rounded-lg font-medium group-hover:bg-blue-50">Continue</div>
                 </div>
                 <div onClick={() => setModalStep(2)} className="group border-2 border-gray-200 hover:border-blue-500 hover:bg-blue-50 rounded-xl p-6 flex flex-col items-center text-center cursor-pointer transition-all">
                   <div className="text-gray-700 group-hover:text-blue-600 mb-4 transition-colors">
@@ -260,7 +298,12 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
             <div>
               <h3 className="font-bold text-lg text-gray-900 mb-4">Select customer</h3>
               <div className="relative mb-4">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                {/* ✅ Replaced emoji with SVG Search icon */}
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </span>
                 <input type="text" placeholder="Search by customer name, phone no..." value={customerSearch} onChange={(e) => setCustomerSearch(e.target.value)} className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-[#4A90E2] outline-none" />
               </div>
               <div className="border border-gray-200 rounded-xl overflow-hidden mb-6">
@@ -317,10 +360,11 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
                       dateAlreadyBooked ? 'border-red-500 bg-red-50 text-red-700' : 'border-gray-300'
                     }`}
                   />
-                  {/* ✅ Same Day Warning */}
-                  {dateAlreadyBooked && (
+                  {checkingDate ? (
+                    <p className="text-xs text-gray-400 mt-1 font-medium">Checking availability...</p>
+                  ) : dateAlreadyBooked ? (
                     <p className="text-xs text-red-500 mt-1 font-medium">This customer already has an appointment on this date.</p>
-                  )}
+                  ) : null}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Time *</label>
@@ -397,8 +441,7 @@ export default function AppointmentWizardModal({ onClose, onSuccess, initialServ
                     }
                     setModalStep(4);
                   }} 
-                  // ✅ Disable next button if duplicate
-                  disabled={dateAlreadyBooked}
+                  disabled={dateAlreadyBooked || checkingDate}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Next

@@ -36,6 +36,17 @@ function ViewRecordModal({ record, customer, onClose, onUpdatePayment }) {
     return `${sign}${diff.toFixed(2)}`;
   };
 
+  // ✅ Payment History Logic
+  const payments = record.payments || [];
+  // Include the initial payment if it exists
+  const initialPayment = record.amountPaid && !payments.length ? [{
+    date: record.createdAt,
+    amount: record.amountPaid,
+    method: record.paymentMethod || 'Cash',
+    isInitial: true
+  }] : [];
+  const allPayments = [...initialPayment, ...payments];
+
   return (
     <div className="fixed inset-0 bg-black/60 flex items-start justify-center p-4 pt-10 pb-10 z-50 overflow-y-auto">
       <div className="bg-white rounded-xl w-full max-w-2xl shadow-2xl border border-gray-200 relative">
@@ -262,7 +273,7 @@ function ViewRecordModal({ record, customer, onClose, onUpdatePayment }) {
             </div>
           </div>
 
-          {/* ✅ UPDATED NOTES SECTION */}
+          {/* NOTES SECTION */}
           <div className="space-y-4">
             <div>
               <label className="block text-[11px] text-gray-700 font-bold mb-1">Prescription Notes / Remarks</label>
@@ -299,6 +310,28 @@ function ViewRecordModal({ record, customer, onClose, onUpdatePayment }) {
               </div>
             </div>
           </div>
+
+          {/* ✅ PAYMENT LEDGER (NEW) */}
+          {allPayments.length > 0 && (
+            <div className="bg-gray-50 rounded-xl p-4 border border-gray-200">
+              <h3 className="text-sm font-bold text-gray-800 mb-3 border-b border-gray-200 pb-2">Payment Ledger</h3>
+              <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                {allPayments.map((p, idx) => (
+                  <div key={idx} className="flex justify-between items-center text-sm bg-white p-2 rounded border border-gray-100 shadow-sm">
+                    <div>
+                      <p className="font-bold text-gray-800">₱ {Number(p.amount).toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">
+                        {p.date ? new Date(p.date).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—'}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                      {p.method}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Totals */}
           <div className="bg-gray-50 rounded-xl p-4 border border-gray-200 space-y-4">

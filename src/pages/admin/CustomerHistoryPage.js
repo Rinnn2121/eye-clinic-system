@@ -23,6 +23,7 @@ function CustomerHistoryPage() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [alertConfig, setAlertConfig] = useState(null);
+  const [paymentMethod, setPaymentMethod] = useState('Cash');
 
   // ✅ Search & Filter States
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,7 +61,7 @@ function CustomerHistoryPage() {
     loadData();
   }, [loadData]);
 
-  const handleUpdatePayment = async (e) => {
+    const handleUpdatePayment = async (e) => {
     e.preventDefault();
     if (!paymentRecord) return;
     setUpdating(true);
@@ -71,10 +72,20 @@ function CustomerHistoryPage() {
       const updatedBalance = paymentRecord.total - updatedAmountPaid;
       const newStatus = updatedBalance <= 0 ? 'paid' : 'pending';
 
+      // ✅ Save the payment to the ledger array
+      const newPaymentEntry = {
+        date: new Date().toISOString(),
+        amount: paymentAmount,
+        method: paymentMethod
+      };
+      
+      const currentPayments = paymentRecord.payments || [];
+
       await updateDoc(doc(db, 'records', paymentRecord.id), {
         amountPaid: updatedAmountPaid,
         balance: updatedBalance > 0 ? updatedBalance : 0,
-        paymentStatus: newStatus
+        paymentStatus: newStatus,
+        payments: [...currentPayments, newPaymentEntry] // ✅ Append to ledger
       });
 
       if (paymentRecord.receiptNo) {
@@ -96,6 +107,7 @@ function CustomerHistoryPage() {
 
       setPaymentRecord(null);
       setNewPayment('');
+      setPaymentMethod('Cash'); // Reset
       setViewRecord(null); 
       loadData(); 
 
@@ -364,7 +376,7 @@ function CustomerHistoryPage() {
         }}
       />
 
-      {/* Update Payment Modal */}
+             {/* Update Payment Modal */}
       {paymentRecord && (
         <div className="fixed inset-0 bg-black/60 flex items-center justify-center p-4 z-[60]">
           <div className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
@@ -373,6 +385,19 @@ function CustomerHistoryPage() {
             <form onSubmit={handleUpdatePayment}>
               <label className="block text-sm font-medium mb-2">Amount Paid Now (₱)</label>
               <input type="number" required value={newPayment} onChange={(e) => setNewPayment(e.target.value)} className="w-full px-4 py-2 border border-gray-300 rounded-xl mb-4 outline-none focus:ring-2 focus:ring-[#4A90E2]" placeholder="0" max={paymentRecord.balance} />
+              
+              {/* ✅ NEW: Payment Method Selector */}
+              <label className="block text-sm font-medium mb-2">Payment Method</label>
+              <select 
+                value={paymentMethod} 
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-xl mb-4 outline-none focus:ring-2 focus:ring-[#4A90E2] bg-white"
+              >
+                <option value="Cash">Cash</option>
+                <option value="GCash">GCash</option>
+                <option value="Card">Card</option>
+              </select>
+
               <div className="flex gap-2">
                 <button type="button" onClick={() => setPaymentRecord(null)} className="flex-1 border border-gray-300 py-2 rounded-lg text-sm font-medium hover:bg-gray-50">Cancel</button>
                 <button type="submit" disabled={updating} className="flex-1 bg-[#4A90E2] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#4A90E2]/90 disabled:opacity-50">{updating ? 'Saving...' : 'Save Payment'}</button>

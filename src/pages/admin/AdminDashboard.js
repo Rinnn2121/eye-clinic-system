@@ -172,12 +172,11 @@ function AdminDashboard() {
     }, 0);
   }, [allOrders, chartRange]);
 
-  // ✅ CALENDAR APPOINTMENTS LIST (FIXED)
-  // Filters appointments to show only those matching the specific date clicked on the mini calendar.
-  // We now filter out 'Cancelled' so they don't clutter the schedule.
+  // ✅ CALENDAR APPOINTMENTS LIST
+  // Excludes Cancelled AND Completed so the schedule only shows active upcoming ones
   const selectedDateAppts = useMemo(() => {
     return appointments
-      .filter(a => a.date === selectedDate && a.status !== 'Cancelled')
+      .filter(a => a.date === selectedDate && a.status !== 'Cancelled' && a.status !== 'Completed')
       .sort((a, b) => (a.time || '').localeCompare(b.time || ''))
       .map(a => ({
         ...a,
@@ -528,8 +527,8 @@ function AdminDashboard() {
                   
                   const isToday = day === new Date().getDate() && currentMonth === new Date().getMonth() && currentYear === new Date().getFullYear();
                   const isSelected = selectedDate === formattedDate;
-                  // ✅ Check for active appointments only for the blue dot
-                  const hasAppointments = appointments.some(a => a.date === formattedDate && a.status !== 'Cancelled');
+                  // ✅ Check for active appointments only for the blue dot (excludes Cancelled AND Completed)
+                  const hasAppointments = appointments.some(a => a.date === formattedDate && a.status !== 'Cancelled' && a.status !== 'Completed');
                   
                   const todayStr = new Date(new Date().getTime() + (8 * 60 * 60 * 1000)).toISOString().split('T')[0];
                   const isPast = formattedDate < todayStr;
@@ -559,7 +558,8 @@ function AdminDashboard() {
 
               <div className="mt-4 bg-[#dbeafe] text-blue-900 text-sm p-3 rounded-xl">
                 <div className="flex justify-between items-center font-bold mb-2">
-                  <span>Incoming Schedule</span>
+                  {/* ✅ Changed text to "Schedule" */}
+                  <span>Schedule</span>
                   <span>{new Date(selectedDate).toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}</span>
                 </div>
                 {selectedDateAppts.length === 0 ? (
